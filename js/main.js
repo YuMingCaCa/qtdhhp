@@ -29,15 +29,13 @@ import {
 
 /**
  * Injects all necessary CSS styles into the document's head.
- * This ensures the application is styled correctly without relying on an external CSS file,
- * which was causing loading issues.
+ * This ensures the application is styled correctly without relying on an external CSS file.
  */
 function injectStyles() {
     const style = document.createElement('style');
     style.textContent = `
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #f0f4f8;
         }
         .modal {
             display: none;
@@ -175,6 +173,7 @@ const SETTINGS_DOC_ID = 'appSettings';
 
 // UI Elements
 const loginPage = document.getElementById('login-page');
+const moduleSelectionPage = document.getElementById('module-selection-page');
 const appContent = document.getElementById('app-content');
 const loginFormContainer = document.getElementById('login-form').parentElement;
 const registerFormContainer = document.getElementById('register-form-container');
@@ -1150,9 +1149,11 @@ async function initializeFirebase() {
 
                 state.currentUser = { uid: user.uid, ...userDoc.data() };
                 document.getElementById('user-email').textContent = state.currentUser.email;
+                document.getElementById('user-email-module-page').textContent = state.currentUser.email;
 
                 loginPage.classList.add('hidden');
-                appContent.classList.remove('hidden');
+                appContent.classList.add('hidden');
+                moduleSelectionPage.classList.remove('hidden');
 
                 updateUIForRole();
                 setupOnSnapshotListeners();
@@ -1162,6 +1163,7 @@ async function initializeFirebase() {
                 state.currentUser = null;
                 loginPage.classList.remove('hidden');
                 appContent.classList.add('hidden');
+                moduleSelectionPage.classList.add('hidden');
                 dataListenersAttached = false;
                 clearInactivityListeners();
             }
@@ -1217,8 +1219,17 @@ function addEventListeners() {
             setButtonLoading(btn, false);
         }
     });
-    document.getElementById('logout-btn').addEventListener('click', () => {
-        signOut(auth);
+    document.getElementById('logout-btn').addEventListener('click', () => signOut(auth));
+    document.getElementById('logout-btn-module-page').addEventListener('click', () => signOut(auth));
+    
+    // Module Navigation
+    document.getElementById('module-workload').addEventListener('click', () => {
+        moduleSelectionPage.classList.add('hidden');
+        appContent.classList.remove('hidden');
+    });
+    document.getElementById('back-to-modules-btn').addEventListener('click', () => {
+        appContent.classList.add('hidden');
+        moduleSelectionPage.classList.remove('hidden');
     });
 
     // Change Password
