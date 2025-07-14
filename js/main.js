@@ -178,6 +178,23 @@ const appContent = document.getElementById('app-content');
 const loginFormContainer = document.getElementById('login-form').parentElement;
 const registerFormContainer = document.getElementById('register-form-container');
 
+// --- Page Navigation Logic ---
+/**
+ * Reliably shows a single main page container and hides all others.
+ * This prevents race conditions where multiple pages might be visible.
+ * @param {string} pageIdToShow The ID of the page element to display ('login-page', 'module-selection-page', 'app-content').
+ */
+function showPage(pageIdToShow) {
+    const pages = [loginPage, moduleSelectionPage, appContent];
+    pages.forEach(page => {
+        if (page.id === pageIdToShow) {
+            page.classList.remove('hidden');
+        } else {
+            page.classList.add('hidden');
+        }
+    });
+}
+
 // --- Custom Alert/Confirm Modal Logic ---
 function showAlert(message, isSuccess = false) {
     const modal = document.getElementById('alert-modal');
@@ -1151,9 +1168,7 @@ async function initializeFirebase() {
                 document.getElementById('user-email').textContent = state.currentUser.email;
                 document.getElementById('user-email-module-page').textContent = state.currentUser.email;
 
-                loginPage.classList.add('hidden');
-                appContent.classList.add('hidden');
-                moduleSelectionPage.classList.remove('hidden');
+                showPage('module-selection-page');
 
                 updateUIForRole();
                 setupOnSnapshotListeners();
@@ -1161,9 +1176,7 @@ async function initializeFirebase() {
                 setupInactivityListeners();
             } else {
                 state.currentUser = null;
-                loginPage.classList.remove('hidden');
-                appContent.classList.add('hidden');
-                moduleSelectionPage.classList.add('hidden');
+                showPage('login-page');
                 dataListenersAttached = false;
                 clearInactivityListeners();
             }
@@ -1224,12 +1237,10 @@ function addEventListeners() {
     
     // Module Navigation
     document.getElementById('module-workload').addEventListener('click', () => {
-        moduleSelectionPage.classList.add('hidden');
-        appContent.classList.remove('hidden');
+        showPage('app-content');
     });
     document.getElementById('back-to-modules-btn').addEventListener('click', () => {
-        appContent.classList.add('hidden');
-        moduleSelectionPage.classList.remove('hidden');
+        showPage('module-selection-page');
     });
 
     // Change Password
