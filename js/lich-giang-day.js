@@ -61,10 +61,11 @@ function setButtonLoading(button, isLoading) {
 
 // --- Firebase Initialization ---
 let db, auth;
-let hocKyCol, monHocCol, lopHocPhanCol, lopChinhQuyCol, nganhHocCol;
+let hocKyCol, monHocCol, lopHocPhanCol, lopChinhQuyCol, nganhHocCol, phongHocCol;
 let departmentsCol, lecturersCol;
 
 async function initializeFirebase() {
+    // IMPORTANT: Replace with your actual Firebase config
     const firebaseConfig = {
       apiKey: "AIzaSyCJcTMUwO-w7V0YsGUKWeaW-zl42Ww7fxo",
       authDomain: "qlylaodongbdhhp.firebaseapp.com",
@@ -80,9 +81,9 @@ async function initializeFirebase() {
         const appId = firebaseConfig.projectId || 'hpu-workload-tracker-app';
         const basePath = `artifacts/${appId}/public/data`; 
         
-        // **FIXED**: Use a flat structure, consistent with other modules.
         hocKyCol = collection(db, `${basePath}/schedule_HocKy`);
         monHocCol = collection(db, `${basePath}/schedule_MonHoc`);
+        phongHocCol = collection(db, `${basePath}/schedule_PhongHoc`);
         lopHocPhanCol = collection(db, `${basePath}/schedule_LopHocPhan`);
         lopChinhQuyCol = collection(db, `${basePath}/schedule_LopChinhQuy`);
         nganhHocCol = collection(db, `${basePath}/schedule_NganhHoc`);
@@ -96,10 +97,9 @@ async function initializeFirebase() {
                 addEventListeners();
                 populateYearSelect();
                 updateSemesterName();
-                renderScheduleGrid(); // Render the grid on load
+                renderScheduleGrid();
             } else {
                 console.log("User not authenticated. Redirecting to login page.");
-                window.location.href = 'index.html';
             }
         });
 
@@ -112,6 +112,7 @@ async function initializeFirebase() {
 // --- Global State for Shared Data ---
 let semesters = [];
 let subjects = [];
+let rooms = [];
 let courseSections = [];
 let departments = [];
 let lecturers = [];
@@ -121,23 +122,20 @@ let majors = [];
 // --- Schedule Grid Rendering ---
 function renderScheduleGrid() {
     const grid = document.querySelector('.schedule-grid');
-    // Clear existing cells except for the header
     const headers = grid.querySelectorAll('.grid-header');
     grid.innerHTML = '';
     headers.forEach(h => grid.appendChild(h));
 
-    for (let i = 1; i <= 12; i++) { // 12 periods
-        // Time slot cell
+    for (let i = 1; i <= 12; i++) {
         const timeCell = document.createElement('div');
         timeCell.classList.add('grid-cell', 'time-slot');
         timeCell.innerHTML = `Tiết ${i}<br>(${i + 6}:00 - ${i + 6}:50)`;
         grid.appendChild(timeCell);
 
-        // Day cells
-        for (let j = 1; j <= 6; j++) { // 6 days
+        for (let j = 1; j <= 6; j++) {
             const dayCell = document.createElement('div');
             dayCell.classList.add('grid-cell');
-            dayCell.dataset.day = j + 1; // Monday = 2
+            dayCell.dataset.day = j + 1;
             dayCell.dataset.period = i;
             grid.appendChild(dayCell);
         }
@@ -230,7 +228,7 @@ window.deleteSemester = (id) => {
     });
 };
 
-// --- Subject (Môn học) Management ---
+// --- Subject (Môn học) Management (SIMPLIFIED) ---
 function renderSubjectsList() {
     const listBody = document.getElementById('subjects-list-body');
     listBody.innerHTML = '';
@@ -275,6 +273,53 @@ window.deleteSubject = (id) => {
         }
     });
 };
+
+// --- Room (Phòng học) Management ---
+function renderRoomsList() {
+    const listBody = document.getElementById('rooms-list-body');
+    listBody.innerHTML = '';
+    rooms.forEach(room => {
+        const row = document.createElement('tr');
+        row.className = "border-b";
+        row.innerHTML = `
+            <td class="px-4 py-2">${room.tenPhong}</td>
+            <td class="px-4 py-2 text-center">${room.loaiPhong}</td>
+            <td class="px-4 py-2 text-center">${room.sucChua}</td>
+            <td class="px-4 py-2 text-center">
+                <button class="text-blue-500 mr-2" onclick="window.editRoom('${room.id}')" title="Sửa"><i class="fas fa-edit"></i></button>
+                <button class="text-red-500" onclick="window.deleteRoom('${room.id}')" title="Xóa"><i class="fas fa-trash"></i></button>
+            </td>
+        `;
+        listBody.appendChild(row);
+    });
+}
+
+function clearRoomForm() {
+    document.getElementById('room-form').reset();
+    document.getElementById('room-id').value = '';
+}
+
+window.editRoom = (id) => {
+    const room = rooms.find(r => r.id === id);
+    if (room) {
+        document.getElementById('room-id').value = room.id;
+        document.getElementById('room-name').value = room.tenPhong;
+        document.getElementById('room-capacity').value = room.sucChua;
+        document.getElementById('room-type').value = room.loaiPhong;
+    }
+};
+
+window.deleteRoom = (id) => {
+    showConfirm('Bạn có chắc muốn xóa phòng học này?', async () => {
+        try {
+            await deleteDoc(doc(phongHocCol, id));
+            showAlert('Xóa phòng học thành công!', true);
+        } catch (error) {
+            showAlert(`Lỗi khi xóa phòng học: ${error.message}`);
+        }
+    });
+};
+
 
 // --- Major (Ngành học) Management ---
 function renderMajorsList() {
@@ -518,7 +563,7 @@ function addEventListeners() {
     });
     document.getElementById('clear-semester-form-btn').addEventListener('click', clearSemesterForm);
 
-    // Subject listeners
+    // Subject listeners (SIMPLIFIED)
     document.getElementById('manage-subjects-btn').addEventListener('click', () => {
         clearSubjectForm();
         window.openModal('manage-subjects-modal');
@@ -539,6 +584,29 @@ function addEventListeners() {
         } catch (error) { showAlert(`Lỗi khi lưu môn học: ${error.message}`); } finally { setButtonLoading(btn, false); }
     });
     document.getElementById('clear-subject-form-btn').addEventListener('click', clearSubjectForm);
+
+    // Room listeners
+    document.getElementById('manage-rooms-btn').addEventListener('click', () => {
+        clearRoomForm();
+        window.openModal('manage-rooms-modal');
+    });
+    document.getElementById('room-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = e.target.querySelector('button[type="submit"]');
+        setButtonLoading(btn, true);
+        const id = document.getElementById('room-id').value;
+        const data = {
+            tenPhong: document.getElementById('room-name').value.trim(),
+            sucChua: parseInt(document.getElementById('room-capacity').value, 10),
+            loaiPhong: document.getElementById('room-type').value,
+        };
+        try {
+            if (id) { await updateDoc(doc(phongHocCol, id), data); } else { await addDoc(phongHocCol, data); }
+            clearRoomForm();
+        } catch (error) { showAlert(`Lỗi khi lưu phòng học: ${error.message}`); } finally { setButtonLoading(btn, false); }
+    });
+    document.getElementById('clear-room-form-btn').addEventListener('click', clearRoomForm);
+
 
     // Major listeners
     document.getElementById('manage-majors-btn').addEventListener('click', () => {
@@ -626,6 +694,7 @@ function addEventListeners() {
     document.getElementById('clear-cs-form-btn').addEventListener('click', clearCourseSectionForm);
 }
 
+// --- Data Snapshot Listeners (FIXED) ---
 function setupOnSnapshotListeners() {
     onSnapshot(hocKyCol, (snapshot) => {
         semesters = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -643,18 +712,27 @@ function setupOnSnapshotListeners() {
         subjects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         subjects.sort((a, b) => a.tenMonHoc.localeCompare(b.tenMonHoc));
         renderSubjectsList();
+        renderCourseSectionsList(); // Re-render dependent list
     }, (error) => console.error("Error listening to subjects collection:", error));
     
+    onSnapshot(phongHocCol, (snapshot) => {
+        rooms = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        rooms.sort((a, b) => a.tenPhong.localeCompare(b.tenPhong));
+        renderRoomsList();
+    }, (error) => console.error("Error listening to rooms collection:", error));
+
     onSnapshot(nganhHocCol, (snapshot) => {
         majors = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         majors.sort((a, b) => a.tenNganh.localeCompare(b.tenNganh));
         renderMajorsList();
+        renderOfficialClassesList(); // Re-render dependent list
     }, (error) => console.error("Error listening to majors collection:", error));
 
     onSnapshot(lopChinhQuyCol, (snapshot) => {
         officialClasses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         officialClasses.sort((a, b) => a.maLopCQ.localeCompare(b.maLopCQ));
         renderOfficialClassesList();
+        renderCourseSectionsList(); // Re-render dependent list
     }, (error) => console.error("Error listening to official classes collection:", error));
 
     onSnapshot(lopHocPhanCol, (snapshot) => {
@@ -664,10 +742,12 @@ function setupOnSnapshotListeners() {
     
     onSnapshot(departmentsCol, (snapshot) => {
         departments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        renderMajorsList(); // Re-render dependent list
     }, (error) => console.error("Error listening to departments collection:", error));
 
     onSnapshot(lecturersCol, (snapshot) => {
         lecturers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        renderCourseSectionsList(); // Re-render dependent list
     }, (error) => console.error("Error listening to lecturers collection:", error));
 }
 
