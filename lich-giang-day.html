@@ -75,34 +75,44 @@
             </div>
 
             <!-- Bảng điều khiển quản lý dữ liệu -->
-            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
-                <button id="manage-semesters-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center transition-all">
+            <div class="flex flex-wrap gap-4 mb-8">
+                 <button id="manage-semesters-btn" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center transition-all min-w-[160px]">
                     <i class="fas fa-calendar-check mr-2"></i> Quản lý Học kỳ
                 </button>
-                 <button id="manage-majors-btn" class="bg-teal-500 hover:bg-teal-600 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center transition-all">
+                 <button id="manage-majors-btn" class="flex-1 bg-teal-500 hover:bg-teal-600 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center transition-all min-w-[160px]">
                     <i class="fas fa-sitemap mr-2"></i> Quản lý Ngành
                 </button>
-                <button id="manage-subjects-btn" class="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center transition-all">
+                <button id="manage-subjects-btn" class="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center transition-all min-w-[160px]">
                     <i class="fas fa-book mr-2"></i> Quản lý Môn học
                 </button>
-                <button id="manage-rooms-btn" class="bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center transition-all">
+                <button id="manage-rooms-btn" class="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center transition-all min-w-[160px]">
                     <i class="fas fa-school mr-2"></i> Quản lý Phòng học
                 </button>
-                 <button id="manage-official-classes-btn" class="bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center transition-all">
+                 <button id="manage-official-classes-btn" class="flex-1 bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center transition-all min-w-[160px]">
                     <i class="fas fa-users-class mr-2"></i> Quản lý Lớp (CQ)
                 </button>
-                <button id="manage-course-sections-btn" class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center transition-all">
+                <button id="manage-course-sections-btn" class="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center transition-all min-w-[160px]">
                     <i class="fas fa-chalkboard-teacher mr-2"></i> Phân công Giảng dạy
                 </button>
             </div>
 
             <!-- Giao diện xếp lịch -->
             <div class="border-t pt-8">
-                <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
                     <h2 id="schedule-title" class="text-2xl font-semibold text-gray-700 mb-2 md:mb-0">Thời khóa biểu</h2>
-                    <div class="w-full md:w-auto">
-                        <label for="class-schedule-select" class="block text-sm font-medium text-gray-700">Xem thời khóa biểu cho lớp:</label>
-                        <select id="class-schedule-select" class="mt-1 block w-full md:w-72 p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"></select>
+                    <div class="flex flex-col md:flex-row items-start md:items-center gap-4 w-full md:w-auto">
+                        <div class="w-full md:w-auto">
+                            <label for="class-schedule-select" class="block text-sm font-medium text-gray-700">Xem TKB cho lớp:</label>
+                            <select id="class-schedule-select" class="mt-1 block w-full md:w-60 p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"></select>
+                        </div>
+                        <div class="flex gap-2 w-full md:w-auto self-end">
+                             <button id="manual-schedule-btn" class="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg">
+                                <i class="fas fa-plus-circle mr-2"></i>Thủ công
+                            </button>
+                            <button id="auto-schedule-btn" class="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg">
+                                <i class="fas fa-magic mr-2"></i>Tự động
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -113,8 +123,75 @@
         </div>
     </div>
 
-    <!-- MODALS (No changes here, only in JS logic) -->
-    <!-- Manage Semesters Modal -->
+    <!-- MODALS -->
+    <!-- Auto Schedule Results Modal (NEW) -->
+    <div id="auto-schedule-results-modal" class="modal">
+        <div class="modal-content max-w-3xl">
+            <span class="close-button no-print" onclick="closeModal('auto-schedule-results-modal')">&times;</span>
+            <h3 class="text-xl font-bold mb-4">Kết quả Xếp lịch Tự động</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <h4 class="font-semibold text-green-600 mb-2">Thành công</h4>
+                    <div id="auto-schedule-success" class="max-h-60 overflow-y-auto border p-2 rounded-md bg-green-50">
+                        <!-- Success items will be populated here -->
+                    </div>
+                </div>
+                 <div>
+                    <h4 class="font-semibold text-red-600 mb-2">Thất bại</h4>
+                    <div id="auto-schedule-failed" class="max-h-60 overflow-y-auto border p-2 rounded-md bg-red-50">
+                        <!-- Failed items will be populated here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Manual Schedule Modal -->
+    <div id="manual-schedule-modal" class="modal">
+        <div class="modal-content max-w-xl">
+            <span class="close-button no-print" onclick="closeModal('manual-schedule-modal')">&times;</span>
+            <h3 class="text-xl font-bold mb-4">Xếp lịch Thủ công</h3>
+            <form id="manual-schedule-form" class="p-4 border rounded-lg bg-gray-50 space-y-4">
+                <div>
+                    <label for="ms-section-select" class="block text-sm font-medium text-gray-700">Chọn lớp học phần cần xếp</label>
+                    <select id="ms-section-select" required class="mt-1 p-2 border rounded-md w-full"></select>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label for="ms-day-select" class="block text-sm font-medium text-gray-700">Thứ</label>
+                        <select id="ms-day-select" required class="mt-1 p-2 border rounded-md w-full">
+                            <option value="2">Thứ 2</option>
+                            <option value="3">Thứ 3</option>
+                            <option value="4">Thứ 4</option>
+                            <option value="5">Thứ 5</option>
+                            <option value="6">Thứ 6</option>
+                            <option value="7">Thứ 7</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="ms-start-period" class="block text-sm font-medium text-gray-700">Tiết bắt đầu</label>
+                        <input type="number" id="ms-start-period" min="1" max="15" required class="mt-1 p-2 border rounded-md w-full">
+                    </div>
+                    <div>
+                        <label for="ms-num-periods" class="block text-sm font-medium text-gray-700">Số tiết</label>
+                        <input type="number" id="ms-num-periods" min="1" max="5" required class="mt-1 p-2 border rounded-md w-full">
+                    </div>
+                </div>
+                 <div>
+                    <label for="ms-room-select" class="block text-sm font-medium text-gray-700">Phòng học</label>
+                    <select id="ms-room-select" required class="mt-1 p-2 border rounded-md w-full"></select>
+                </div>
+                <div class="flex justify-end pt-4">
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">
+                        <i class="fas fa-save mr-2"></i>Lưu Lịch học
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
+    <!-- Other Modals (No changes) -->
     <div id="manage-semesters-modal" class="modal">
         <div class="modal-content">
             <span class="close-button no-print" onclick="closeModal('manage-semesters-modal')">&times;</span>
@@ -169,7 +246,6 @@
         </div>
     </div>
     
-    <!-- Manage Subjects Modal -->
     <div id="manage-subjects-modal" class="modal">
         <div class="modal-content max-w-2xl">
             <span class="close-button no-print" onclick="closeModal('manage-subjects-modal')">&times;</span>
@@ -211,7 +287,6 @@
         </div>
     </div>
 
-    <!-- Manage Majors Modal -->
     <div id="manage-majors-modal" class="modal">
         <div class="modal-content max-w-2xl">
             <span class="close-button no-print" onclick="closeModal('manage-majors-modal')">&times;</span>
@@ -248,7 +323,6 @@
         </div>
     </div>
 
-    <!-- Manage Rooms Modal -->
     <div id="manage-rooms-modal" class="modal">
         <div class="modal-content max-w-2xl">
             <span class="close-button no-print" onclick="closeModal('manage-rooms-modal')">&times;</span>
@@ -294,8 +368,6 @@
         </div>
     </div>
 
-
-    <!-- Manage Official Classes Modal -->
     <div id="manage-official-classes-modal" class="modal">
         <div class="modal-content max-w-2xl">
             <span class="close-button no-print" onclick="closeModal('manage-official-classes-modal')">&times;</span>
@@ -337,7 +409,6 @@
         </div>
     </div>
 
-    <!-- Manage Course Sections Modal -->
     <div id="manage-course-sections-modal" class="modal">
         <div class="modal-content max-w-3xl">
             <span class="close-button no-print" onclick="closeModal('manage-course-sections-modal')">&times;</span>
