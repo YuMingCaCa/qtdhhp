@@ -61,7 +61,7 @@ function setButtonLoading(button, isLoading) {
 
 // --- Firebase Initialization ---
 let db, auth;
-let hocKyCol, monHocCol, lopHocPhanCol, lopChinhQuyCol, nganhHocCol, phongHocCol;
+let hocKyCol, monHocCol, lopHocPhanCol, lopChinhQuyCol, nganhHocCol, phongHocCol, thoiKhoaBieuCol;
 let departmentsCol, lecturersCol;
 
 async function initializeFirebase() {
@@ -87,6 +87,7 @@ async function initializeFirebase() {
         lopHocPhanCol = collection(db, `${basePath}/schedule_LopHocPhan`);
         lopChinhQuyCol = collection(db, `${basePath}/schedule_LopChinhQuy`);
         nganhHocCol = collection(db, `${basePath}/schedule_NganhHoc`);
+        thoiKhoaBieuCol = collection(db, `${basePath}/schedule_ThoiKhoaBieu`); // New
         departmentsCol = collection(db, `${basePath}/departments`);
         lecturersCol = collection(db, `${basePath}/lecturers`);
         
@@ -97,7 +98,6 @@ async function initializeFirebase() {
                 addEventListeners();
                 populateYearSelect();
                 updateSemesterName();
-                renderScheduleGrid();
             } else {
                 console.log("User not authenticated. Redirecting to login page.");
             }
@@ -118,28 +118,123 @@ let departments = [];
 let lecturers = [];
 let officialClasses = [];
 let majors = [];
+let schedules = []; // New state for schedules
 
 // --- Schedule Grid Rendering ---
-function renderScheduleGrid() {
-    const grid = document.querySelector('.schedule-grid');
-    const headers = grid.querySelectorAll('.grid-header');
-    grid.innerHTML = '';
-    headers.forEach(h => grid.appendChild(h));
 
-    for (let i = 1; i <= 12; i++) {
-        const timeCell = document.createElement('div');
-        timeCell.classList.add('grid-cell', 'time-slot');
-        timeCell.innerHTML = `Tiết ${i}<br>(${i + 6}:00 - ${i + 6}:50)`;
-        grid.appendChild(timeCell);
+function renderScheduleTable() {
+    const container = document.getElementById('schedule-container');
+    container.innerHTML = ''; // Clear previous content
 
-        for (let j = 1; j <= 6; j++) {
-            const dayCell = document.createElement('div');
-            dayCell.classList.add('grid-cell');
-            dayCell.dataset.day = j + 1;
-            dayCell.dataset.period = i;
-            grid.appendChild(dayCell);
+    const table = document.createElement('table');
+    table.className = 'schedule-table';
+
+    // Header Row
+    const thead = document.createElement('thead');
+    const headerRow = document.createElement('tr');
+    const headers = ['Ca', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
+    headers.forEach(text => {
+        const th = document.createElement('th');
+        th.textContent = text;
+        headerRow.appendChild(th);
+    });
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+
+    // Body Rows (Shifts)
+    const tbody = document.createElement('tbody');
+    const shifts = ['Sáng', 'Chiều', 'Tối'];
+    shifts.forEach((shiftName, index) => {
+        const row = document.createElement('tr');
+        
+        // Shift Label Cell
+        const shiftCell = document.createElement('td');
+        shiftCell.className = 'shift-label';
+        shiftCell.textContent = shiftName;
+        row.appendChild(shiftCell);
+
+        // Day Cells
+        for (let day = 2; day <= 7; day++) {
+            const dayCell = document.createElement('td');
+            dayCell.dataset.day = day;
+            dayCell.dataset.shift = index + 1; // 1: Sáng, 2: Chiều, 3: Tối
+            row.appendChild(dayCell);
         }
+        tbody.appendChild(row);
+    });
+    table.appendChild(tbody);
+    container.appendChild(table);
+}
+
+function displayScheduleForClass(classId) {
+    const table = document.querySelector('.schedule-table');
+    if (!table) {
+        renderScheduleTable();
     }
+    
+    const scheduleTitle = document.getElementById('schedule-title');
+    
+    // Clear only old schedule blocks
+    document.querySelectorAll('.schedule-block').forEach(block => block.remove());
+
+    const selectedClass = officialClasses.find(oc => oc.id === classId);
+    if (!selectedClass) {
+        scheduleTitle.textContent = 'Vui lòng chọn một lớp';
+        return;
+    }
+    scheduleTitle.textContent = `Thời khóa biểu lớp: ${selectedClass.maLopCQ}`;
+
+    const sectionsForClass = courseSections.filter(cs => cs.lopChinhQuyId === classId);
+    if (sectionsForClass.length === 0) return;
+
+    sectionsForClass.forEach(section => {
+        const schedulesForSection = schedules.filter(s => s.lopHocPhanId === section.id);
+
+        schedulesForSection.forEach(scheduleInfo => {
+            const subject = subjects.find(s => s.id === section.monHocId);
+            const lecturer = lecturers.find(l => l.id === section.giangVienId);
+
+            if (!subject || !lecturer || !scheduleInfo) return;
+
+            const startPeriod = scheduleInfo.tietBatDau;
+            const endPeriod = startPeriod + scheduleInfo.soTiet - 1;
+
+            let shiftIndex;
+            if (startPeriod >= 1 && startPeriod <= 5) shiftIndex = 1;      // Sáng
+            else if (startPeriod >= 6 && startPeriod <= 10) shiftIndex = 2; // Chiều
+            else if (startPeriod >= 11 && startPeriod <= 15) shiftIndex = 3;// Tối
+            else return;
+
+            const targetCell = document.querySelector(`td[data-day='${scheduleInfo.thu}'][data-shift='${shiftIndex}']`);
+            if (!targetCell) return;
+
+            const block = document.createElement('div');
+            block.className = 'schedule-block';
+            
+            block.innerHTML = `
+                <p class="font-bold">${subject.tenMonHoc}</p>
+                <p><strong>Số TC:</strong> ${subject.soTinChi}</p>
+                <p><strong>Tiết:</strong> ${startPeriod} - ${endPeriod}</p>
+                <p><strong>GV:</strong> ${lecturer.name}</p>
+                <p><strong>SĐT:</strong> ${lecturer.soDienThoai || 'N/A'}</p>
+            `;
+            
+            targetCell.appendChild(block);
+        });
+    });
+}
+
+function populateClassSelect() {
+    const select = document.getElementById('class-schedule-select');
+    const currentValue = select.value;
+    select.innerHTML = '<option value="">-- Chọn lớp để xem TKB --</option>';
+    officialClasses.forEach(oc => {
+        const option = document.createElement('option');
+        option.value = oc.id;
+        option.textContent = oc.maLopCQ;
+        select.appendChild(option);
+    });
+    select.value = currentValue;
 }
 
 
@@ -228,7 +323,7 @@ window.deleteSemester = (id) => {
     });
 };
 
-// --- Subject (Môn học) Management (SIMPLIFIED) ---
+// --- Subject (Môn học) Management ---
 function renderSubjectsList() {
     const listBody = document.getElementById('subjects-list-body');
     listBody.innerHTML = '';
@@ -537,6 +632,11 @@ window.deleteCourseSection = (id) => {
 
 // --- Event Listeners and Initial Setup ---
 function addEventListeners() {
+    // Schedule view listener
+    document.getElementById('class-schedule-select').addEventListener('change', (e) => {
+        displayScheduleForClass(e.target.value);
+    });
+
     // Semester listeners
     document.getElementById('manage-semesters-btn').addEventListener('click', () => {
         clearSemesterForm();
@@ -563,7 +663,7 @@ function addEventListeners() {
     });
     document.getElementById('clear-semester-form-btn').addEventListener('click', clearSemesterForm);
 
-    // Subject listeners (SIMPLIFIED)
+    // Subject listeners
     document.getElementById('manage-subjects-btn').addEventListener('click', () => {
         clearSubjectForm();
         window.openModal('manage-subjects-modal');
@@ -694,61 +794,68 @@ function addEventListeners() {
     document.getElementById('clear-cs-form-btn').addEventListener('click', clearCourseSectionForm);
 }
 
-// --- Data Snapshot Listeners (FIXED) ---
+// --- Data Snapshot Listeners ---
+let isDataReady = {
+    semesters: false, subjects: false, rooms: false, courseSections: false,
+    departments: false, lecturers: false, officialClasses: false, schedules: false,
+};
+let initialLoadDone = false;
+
+function checkAllDataReady() {
+    if (initialLoadDone) return;
+    if (Object.values(isDataReady).every(status => status === true)) {
+        initialLoadDone = true;
+        console.log("All initial data loaded.");
+        renderScheduleTable();
+        populateClassSelect();
+        
+        const classSelect = document.getElementById('class-schedule-select');
+        if (officialClasses.length > 0) {
+            classSelect.value = officialClasses[0].id;
+            displayScheduleForClass(officialClasses[0].id);
+        }
+    }
+}
+
 function setupOnSnapshotListeners() {
-    onSnapshot(hocKyCol, (snapshot) => {
-        semesters = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        semesters.sort((a, b) => {
-            if (a.namHoc > b.namHoc) return -1;
-            if (a.namHoc < b.namHoc) return 1;
-            if (a.hocKy > b.hocKy) return -1;
-            if (a.hocKy < b.hocKy) return 1;
-            return 0;
-        });
-        renderSemestersList();
-    }, (error) => console.error("Error listening to semesters collection:", error));
+    const collections = [
+        { name: 'semesters', col: hocKyCol, state: semesters, render: renderSemestersList, sort: (a, b) => b.namHoc.localeCompare(a.namHoc) || b.hocKy - a.hocKy },
+        { name: 'subjects', col: monHocCol, state: subjects, render: renderSubjectsList, sort: (a, b) => a.tenMonHoc.localeCompare(b.tenMonHoc) },
+        { name: 'rooms', col: phongHocCol, state: rooms, render: renderRoomsList, sort: (a, b) => a.tenPhong.localeCompare(b.tenPhong) },
+        { name: 'courseSections', col: lopHocPhanCol, state: courseSections, render: renderCourseSectionsList, sort: (a, b) => a.maLopHP.localeCompare(b.maLopHP) },
+        { name: 'departments', col: departmentsCol, state: departments, render: renderMajorsList, sort: (a, b) => a.name.localeCompare(b.name) },
+        { name: 'lecturers', col: lecturersCol, state: lecturers, render: null, sort: (a, b) => a.name.localeCompare(b.name) },
+        { name: 'officialClasses', col: lopChinhQuyCol, state: officialClasses, render: renderOfficialClassesList, sort: (a, b) => a.maLopCQ.localeCompare(b.maLopCQ) },
+        { name: 'schedules', col: thoiKhoaBieuCol, state: schedules, render: null, sort: null }
+    ];
 
-    onSnapshot(monHocCol, (snapshot) => {
-        subjects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        subjects.sort((a, b) => a.tenMonHoc.localeCompare(b.tenMonHoc));
-        renderSubjectsList();
-        renderCourseSectionsList(); // Re-render dependent list
-    }, (error) => console.error("Error listening to subjects collection:", error));
-    
-    onSnapshot(phongHocCol, (snapshot) => {
-        rooms = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        rooms.sort((a, b) => a.tenPhong.localeCompare(b.tenPhong));
-        renderRoomsList();
-    }, (error) => console.error("Error listening to rooms collection:", error));
+    collections.forEach(c => {
+        onSnapshot(c.col, (snapshot) => {
+            c.state.length = 0; // Clear the array
+            snapshot.docs.forEach(doc => c.state.push({ id: doc.id, ...doc.data() }));
+            if (c.sort) c.state.sort(c.sort);
+            if (c.render) c.render();
 
-    onSnapshot(nganhHocCol, (snapshot) => {
-        majors = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        majors.sort((a, b) => a.tenNganh.localeCompare(b.tenNganh));
-        renderMajorsList();
-        renderOfficialClassesList(); // Re-render dependent list
-    }, (error) => console.error("Error listening to majors collection:", error));
+            // Re-render dependent views
+            if (['subjects', 'lecturers', 'officialClasses'].includes(c.name)) {
+                renderCourseSectionsList();
+            }
+            if (c.name === 'majors') renderOfficialClassesList();
+            if (c.name === 'departments') renderMajorsList();
+            if (c.name === 'officialClasses') populateClassSelect();
 
-    onSnapshot(lopChinhQuyCol, (snapshot) => {
-        officialClasses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        officialClasses.sort((a, b) => a.maLopCQ.localeCompare(b.maLopCQ));
-        renderOfficialClassesList();
-        renderCourseSectionsList(); // Re-render dependent list
-    }, (error) => console.error("Error listening to official classes collection:", error));
+            // Always re-render the main schedule view on any data change
+            const selectedClassId = document.getElementById('class-schedule-select').value;
+            if (selectedClassId) {
+                displayScheduleForClass(selectedClassId);
+            }
 
-    onSnapshot(lopHocPhanCol, (snapshot) => {
-        courseSections = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        renderCourseSectionsList();
-    }, (error) => console.error("Error listening to course sections collection:", error));
-    
-    onSnapshot(departmentsCol, (snapshot) => {
-        departments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        renderMajorsList(); // Re-render dependent list
-    }, (error) => console.error("Error listening to departments collection:", error));
-
-    onSnapshot(lecturersCol, (snapshot) => {
-        lecturers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        renderCourseSectionsList(); // Re-render dependent list
-    }, (error) => console.error("Error listening to lecturers collection:", error));
+            if (!isDataReady[c.name]) {
+                isDataReady[c.name] = true;
+                checkAllDataReady();
+            }
+        }, (error) => console.error(`Error listening to ${c.name}:`, error));
+    });
 }
 
 // --- Global Functions for Modals ---
