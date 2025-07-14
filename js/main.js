@@ -436,6 +436,7 @@ function renderLecturersList() {
         row.innerHTML = `
             <td class="px-4 py-2">${lecturer.name}</td>
             <td class="px-4 py-2">${lecturer.code}</td>
+            <td class="px-4 py-2">${lecturer.soDienThoai || 'N/A'}</td>
             <td class="px-4 py-2">${department?.name || 'Chưa phân khoa'}</td>
             <td class="px-4 py-2 text-center">
                 <button class="text-blue-500 mr-2" onclick="editLecturer('${lecturer.id}')"><i class="fas fa-edit"></i></button>
@@ -1011,6 +1012,7 @@ window.editLecturer = (id) => {
     document.getElementById('lecturer-name').value = lecturer.name;
     document.getElementById('lecturer-code').value = lecturer.code;
     document.getElementById('lecturer-department').value = lecturer.departmentId;
+    document.getElementById('lecturer-phone').value = lecturer.soDienThoai || '';
 };
 
 window.deleteLecturer = (id) => {
@@ -1912,8 +1914,9 @@ function addEventListeners() {
         const name = document.getElementById('lecturer-name').value.trim();
         const code = document.getElementById('lecturer-code').value.trim();
         const departmentId = document.getElementById('lecturer-department').value;
-        if (!name || !code || !departmentId) { showAlert("Vui lòng điền đầy đủ thông tin."); setButtonLoading(btn, false); return; }
-        const data = { name, code, departmentId };
+        const soDienThoai = document.getElementById('lecturer-phone').value.trim();
+        if (!name || !code || !departmentId) { showAlert("Vui lòng điền đầy đủ thông tin bắt buộc."); setButtonLoading(btn, false); return; }
+        const data = { name, code, departmentId, soDienThoai };
         try {
             if (id) {
                 await updateDoc(doc(lecturersCol, id), data);

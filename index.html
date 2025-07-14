@@ -443,7 +443,7 @@
         </div>
     </div>
 
-    <!-- Manage Lecturers Modal -->
+    <!-- Manage Lecturers Modal (UPDATED) -->
     <div id="manage-lecturers-modal" class="modal">
         <div class="modal-content">
             <span class="close-button no-print" onclick="closeModal('manage-lecturers-modal')">&times;</span>
@@ -460,12 +460,18 @@
                         <input type="text" id="lecturer-code" placeholder="VD: GV001" required class="mt-1 p-2 border rounded-md w-full">
                     </div>
                     <div>
+                        <label for="lecturer-phone" class="block text-sm font-medium text-gray-700">Số điện thoại</label>
+                        <input type="tel" id="lecturer-phone" placeholder="VD: 0912345678" class="mt-1 p-2 border rounded-md w-full">
+                    </div>
+                    <div>
                         <label for="lecturer-department" class="block text-sm font-medium text-gray-700">Khoa</label>
                         <select id="lecturer-department" required class="mt-1 p-2 border rounded-md w-full">
                             <option value="">-- Chọn Khoa --</option>
                         </select>
                     </div>
-                    <button type="submit" class="bg-green-600 hover:bg-green-700 text-white p-2 rounded-md">Lưu Giảng viên</button>
+                    <div class="md:col-span-2">
+                        <button type="submit" class="bg-green-600 hover:bg-green-700 text-white p-2 rounded-md w-full">Lưu Giảng viên</button>
+                    </div>
                 </div>
             </form>
             <div class="overflow-x-auto max-h-80">
@@ -474,6 +480,7 @@
                         <tr>
                             <th class="px-4 py-2 text-left">Họ và Tên</th>
                             <th class="px-4 py-2 text-left">Mã GV</th>
+                            <th class="px-4 py-2 text-left">Số điện thoại</th>
                             <th class="px-4 py-2 text-left">Khoa</th>
                             <th class="px-4 py-2 text-center">Hành động</th>
                         </tr>
