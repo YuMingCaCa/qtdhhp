@@ -61,7 +61,7 @@ function setButtonLoading(button, isLoading) {
 
 // --- Firebase Initialization ---
 let db, auth;
-let hocKyCol, monHocCol, lopHocPhanCol;
+let hocKyCol, monHocCol, lopHocPhanCol, lopChinhQuyCol, nganhHocCol;
 let departmentsCol, lecturersCol;
 
 async function initializeFirebase() {
@@ -80,9 +80,12 @@ async function initializeFirebase() {
         const appId = firebaseConfig.projectId || 'hpu-workload-tracker-app';
         const basePath = `artifacts/${appId}/public/data`; 
         
+        // **FIXED**: Use a flat structure, consistent with other modules.
         hocKyCol = collection(db, `${basePath}/schedule_HocKy`);
         monHocCol = collection(db, `${basePath}/schedule_MonHoc`);
         lopHocPhanCol = collection(db, `${basePath}/schedule_LopHocPhan`);
+        lopChinhQuyCol = collection(db, `${basePath}/schedule_LopChinhQuy`);
+        nganhHocCol = collection(db, `${basePath}/schedule_NganhHoc`);
         departmentsCol = collection(db, `${basePath}/departments`);
         lecturersCol = collection(db, `${basePath}/lecturers`);
         
@@ -93,6 +96,7 @@ async function initializeFirebase() {
                 addEventListeners();
                 populateYearSelect();
                 updateSemesterName();
+                renderScheduleGrid(); // Render the grid on load
             } else {
                 console.log("User not authenticated. Redirecting to login page.");
                 window.location.href = 'index.html';
@@ -111,6 +115,35 @@ let subjects = [];
 let courseSections = [];
 let departments = [];
 let lecturers = [];
+let officialClasses = [];
+let majors = [];
+
+// --- Schedule Grid Rendering ---
+function renderScheduleGrid() {
+    const grid = document.querySelector('.schedule-grid');
+    // Clear existing cells except for the header
+    const headers = grid.querySelectorAll('.grid-header');
+    grid.innerHTML = '';
+    headers.forEach(h => grid.appendChild(h));
+
+    for (let i = 1; i <= 12; i++) { // 12 periods
+        // Time slot cell
+        const timeCell = document.createElement('div');
+        timeCell.classList.add('grid-cell', 'time-slot');
+        timeCell.innerHTML = `Tiết ${i}<br>(${i + 6}:00 - ${i + 6}:50)`;
+        grid.appendChild(timeCell);
+
+        // Day cells
+        for (let j = 1; j <= 6; j++) { // 6 days
+            const dayCell = document.createElement('div');
+            dayCell.classList.add('grid-cell');
+            dayCell.dataset.day = j + 1; // Monday = 2
+            dayCell.dataset.period = i;
+            grid.appendChild(dayCell);
+        }
+    }
+}
+
 
 // --- Semester (Học kỳ) Management ---
 function populateYearSelect() {
@@ -243,11 +276,106 @@ window.deleteSubject = (id) => {
     });
 };
 
+// --- Major (Ngành học) Management ---
+function renderMajorsList() {
+    const listBody = document.getElementById('majors-list-body');
+    listBody.innerHTML = '';
+    majors.forEach(major => {
+        const department = departments.find(d => d.id === major.departmentId);
+        const row = document.createElement('tr');
+        row.className = "border-b";
+        row.innerHTML = `
+            <td class="px-4 py-2">${major.tenNganh}</td>
+            <td class="px-4 py-2">${department ? department.name : 'N/A'}</td>
+            <td class="px-4 py-2 text-center">
+                <button class="text-blue-500 mr-2" onclick="window.editMajor('${major.id}')" title="Sửa"><i class="fas fa-edit"></i></button>
+                <button class="text-red-500" onclick="window.deleteMajor('${major.id}')" title="Xóa"><i class="fas fa-trash"></i></button>
+            </td>
+        `;
+        listBody.appendChild(row);
+    });
+}
+
+function clearMajorForm() {
+    document.getElementById('major-form').reset();
+    document.getElementById('major-id').value = '';
+}
+
+window.editMajor = (id) => {
+    const major = majors.find(m => m.id === id);
+    if (major) {
+        document.getElementById('major-id').value = major.id;
+        document.getElementById('major-name').value = major.tenNganh;
+        document.getElementById('major-department-select').value = major.departmentId;
+    }
+};
+
+window.deleteMajor = (id) => {
+    showConfirm('Bạn có chắc muốn xóa ngành học này?', async () => {
+        try {
+            await deleteDoc(doc(nganhHocCol, id));
+            showAlert('Xóa ngành học thành công!', true);
+        } catch (error) {
+            showAlert(`Lỗi khi xóa ngành học: ${error.message}`);
+        }
+    });
+};
+
+
+// --- Official Class (Lớp Chính Quy) Management ---
+function renderOfficialClassesList() {
+    const listBody = document.getElementById('official-classes-list-body');
+    listBody.innerHTML = '';
+    officialClasses.forEach(oc => {
+        const major = majors.find(m => m.id === oc.majorId);
+        const row = document.createElement('tr');
+        row.className = "border-b";
+        row.innerHTML = `
+            <td class="px-4 py-2">${oc.maLopCQ}</td>
+            <td class="px-4 py-2">${major ? major.tenNganh : 'N/A'}</td>
+            <td class="px-4 py-2 text-center">${oc.siSo}</td>
+            <td class="px-4 py-2 text-center">
+                <button class="text-blue-500 mr-2" onclick="window.editOfficialClass('${oc.id}')" title="Sửa"><i class="fas fa-edit"></i></button>
+                <button class="text-red-500" onclick="window.deleteOfficialClass('${oc.id}')" title="Xóa"><i class="fas fa-trash"></i></button>
+            </td>
+        `;
+        listBody.appendChild(row);
+    });
+}
+
+function clearOfficialClassForm() {
+    document.getElementById('official-class-form').reset();
+    document.getElementById('official-class-id').value = '';
+}
+
+window.editOfficialClass = (id) => {
+    const oc = officialClasses.find(c => c.id === id);
+    if (oc) {
+        document.getElementById('official-class-id').value = oc.id;
+        document.getElementById('oc-major-select').value = oc.majorId;
+        document.getElementById('oc-code').value = oc.maLopCQ;
+        document.getElementById('oc-size').value = oc.siSo;
+    }
+};
+
+window.deleteOfficialClass = (id) => {
+    showConfirm('Bạn có chắc muốn xóa lớp chính quy này?', async () => {
+        try {
+            await deleteDoc(doc(lopChinhQuyCol, id));
+            showAlert('Xóa lớp thành công!', true);
+        } catch (error) {
+            showAlert(`Lỗi khi xóa lớp: ${error.message}`);
+        }
+    });
+};
+
+
 // --- Course Section (Lớp học phần) Management ---
 function populateDropdownsForCSModal() {
     const semesterSelect = document.getElementById('cs-semester-select');
     const subjectSelect = document.getElementById('cs-subject-select');
     const departmentSelect = document.getElementById('cs-department-select');
+    const officialClassSelect = document.getElementById('cs-official-class-select');
     
     semesterSelect.innerHTML = '<option value="">-- Chọn học kỳ --</option>';
     semesters.forEach(s => {
@@ -262,6 +390,11 @@ function populateDropdownsForCSModal() {
     departmentSelect.innerHTML = '<option value="">-- Chọn khoa --</option>';
     departments.forEach(d => {
         departmentSelect.innerHTML += `<option value="${d.id}">${d.name}</option>`;
+    });
+    
+    officialClassSelect.innerHTML = '<option value="">-- Chọn lớp --</option>';
+    officialClasses.forEach(oc => {
+        officialClassSelect.innerHTML += `<option value="${oc.id}" data-size="${oc.siSo}">${oc.maLopCQ}</option>`;
     });
 }
 
@@ -281,6 +414,21 @@ function populateLecturersByDepartment(departmentId) {
     lecturerSelect.disabled = false;
 }
 
+function updateCourseSectionCode() {
+    const subjectSelect = document.getElementById('cs-subject-select');
+    const officialClassSelect = document.getElementById('cs-official-class-select');
+    const codeInput = document.getElementById('cs-code');
+
+    const selectedSubject = subjects.find(s => s.id === subjectSelect.value);
+    const selectedOC = officialClasses.find(oc => oc.id === officialClassSelect.value);
+
+    if (selectedSubject && selectedOC) {
+        codeInput.value = `${selectedSubject.maHocPhan}-${selectedOC.maLopCQ}`;
+    } else {
+        codeInput.value = '';
+    }
+}
+
 function renderCourseSectionsList() {
     const listBody = document.getElementById('course-sections-list-body');
     listBody.innerHTML = '';
@@ -290,7 +438,7 @@ function renderCourseSectionsList() {
         const row = document.createElement('tr');
         row.className = "border-b";
         row.innerHTML = `
-            <td class="px-4 py-2 font-semibold">${cs.maLop}</td>
+            <td class="px-4 py-2 font-semibold">${cs.maLopHP}</td>
             <td class="px-4 py-2">${subject ? subject.tenMonHoc : 'N/A'}</td>
             <td class="px-4 py-2">${lecturer ? lecturer.name : 'N/A'}</td>
             <td class="px-4 py-2 text-center">
@@ -317,24 +465,24 @@ window.editCourseSection = (id) => {
         document.getElementById('course-section-id').value = cs.id;
         document.getElementById('cs-semester-select').value = cs.hocKyId;
         document.getElementById('cs-subject-select').value = cs.monHocId;
-        document.getElementById('cs-code').value = cs.maLop;
-        document.getElementById('cs-size').value = cs.siSo;
+        document.getElementById('cs-official-class-select').value = cs.lopChinhQuyId;
+        document.getElementById('cs-code').value = cs.maLopHP;
         
-        // Set department and trigger change to populate lecturers
         const departmentSelect = document.getElementById('cs-department-select');
         departmentSelect.value = departmentId;
         departmentSelect.dispatchEvent(new Event('change'));
 
-        // Set lecturer after the list is populated
-        document.getElementById('cs-lecturer-select').value = cs.giangVienId; 
+        setTimeout(() => {
+            document.getElementById('cs-lecturer-select').value = cs.giangVienId; 
+        }, 100);
     }
 };
 
 window.deleteCourseSection = (id) => {
-    showConfirm('Bạn có chắc muốn xóa lớp học phần này?', async () => {
+    showConfirm('Bạn có chắc muốn xóa phân công này?', async () => {
         try {
             await deleteDoc(doc(lopHocPhanCol, id));
-            showAlert('Xóa lớp học phần thành công!', true);
+            showAlert('Xóa phân công thành công!', true);
         } catch (error) {
             showAlert(`Lỗi khi xóa: ${error.message}`);
         }
@@ -392,6 +540,61 @@ function addEventListeners() {
     });
     document.getElementById('clear-subject-form-btn').addEventListener('click', clearSubjectForm);
 
+    // Major listeners
+    document.getElementById('manage-majors-btn').addEventListener('click', () => {
+        const departmentSelect = document.getElementById('major-department-select');
+        departmentSelect.innerHTML = '<option value="">-- Chọn Khoa --</option>';
+        departments.forEach(d => {
+            departmentSelect.innerHTML += `<option value="${d.id}">${d.name}</option>`;
+        });
+        clearMajorForm();
+        window.openModal('manage-majors-modal');
+    });
+    document.getElementById('major-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = e.target.querySelector('button[type="submit"]');
+        setButtonLoading(btn, true);
+        const id = document.getElementById('major-id').value;
+        const data = {
+            tenNganh: document.getElementById('major-name').value.trim(),
+            departmentId: document.getElementById('major-department-select').value,
+        };
+        try {
+            if (id) { await updateDoc(doc(nganhHocCol, id), data); } else { await addDoc(nganhHocCol, data); }
+            clearMajorForm();
+        } catch (error) { showAlert(`Lỗi khi lưu ngành: ${error.message}`); } finally { setButtonLoading(btn, false); }
+    });
+    document.getElementById('clear-major-form-btn').addEventListener('click', clearMajorForm);
+
+
+    // Official Class listeners
+    document.getElementById('manage-official-classes-btn').addEventListener('click', () => {
+        const majorSelect = document.getElementById('oc-major-select');
+        majorSelect.innerHTML = '<option value="">-- Chọn Ngành --</option>';
+        majors.forEach(m => {
+            majorSelect.innerHTML += `<option value="${m.id}">${m.tenNganh}</option>`;
+        });
+        clearOfficialClassForm();
+        window.openModal('manage-official-classes-modal');
+    });
+    document.getElementById('official-class-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = e.target.querySelector('button[type="submit"]');
+        setButtonLoading(btn, true);
+        const id = document.getElementById('official-class-id').value;
+        const data = {
+            maLopCQ: document.getElementById('oc-code').value.trim(),
+            siSo: parseInt(document.getElementById('oc-size').value, 10),
+            majorId: document.getElementById('oc-major-select').value,
+        };
+        try {
+            if (id) { await updateDoc(doc(lopChinhQuyCol, id), data); } else { await addDoc(lopChinhQuyCol, data); }
+            clearOfficialClassForm();
+        } catch (error) { showAlert(`Lỗi khi lưu lớp: ${error.message}`); } finally { setButtonLoading(btn, false); }
+    });
+    document.getElementById('clear-oc-form-btn').addEventListener('click', clearOfficialClassForm);
+
+
     // Course Section listeners
     document.getElementById('manage-course-sections-btn').addEventListener('click', () => {
         clearCourseSectionForm();
@@ -401,6 +604,8 @@ function addEventListeners() {
     document.getElementById('cs-department-select').addEventListener('change', (e) => {
         populateLecturersByDepartment(e.target.value);
     });
+    document.getElementById('cs-subject-select').addEventListener('change', updateCourseSectionCode);
+    document.getElementById('cs-official-class-select').addEventListener('change', updateCourseSectionCode);
     document.getElementById('course-section-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const btn = e.target.querySelector('button[type="submit"]');
@@ -409,14 +614,14 @@ function addEventListeners() {
         const data = {
             hocKyId: document.getElementById('cs-semester-select').value,
             monHocId: document.getElementById('cs-subject-select').value,
-            maLop: document.getElementById('cs-code').value.trim(),
-            siSo: parseInt(document.getElementById('cs-size').value, 10),
+            lopChinhQuyId: document.getElementById('cs-official-class-select').value,
+            maLopHP: document.getElementById('cs-code').value.trim(),
             giangVienId: document.getElementById('cs-lecturer-select').value,
         };
         try {
             if (id) { await updateDoc(doc(lopHocPhanCol, id), data); } else { await addDoc(lopHocPhanCol, data); }
             clearCourseSectionForm();
-        } catch (error) { showAlert(`Lỗi khi lưu lớp học phần: ${error.message}`); } finally { setButtonLoading(btn, false); }
+        } catch (error) { showAlert(`Lỗi khi lưu phân công: ${error.message}`); } finally { setButtonLoading(btn, false); }
     });
     document.getElementById('clear-cs-form-btn').addEventListener('click', clearCourseSectionForm);
 }
@@ -439,6 +644,18 @@ function setupOnSnapshotListeners() {
         subjects.sort((a, b) => a.tenMonHoc.localeCompare(b.tenMonHoc));
         renderSubjectsList();
     }, (error) => console.error("Error listening to subjects collection:", error));
+    
+    onSnapshot(nganhHocCol, (snapshot) => {
+        majors = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        majors.sort((a, b) => a.tenNganh.localeCompare(b.tenNganh));
+        renderMajorsList();
+    }, (error) => console.error("Error listening to majors collection:", error));
+
+    onSnapshot(lopChinhQuyCol, (snapshot) => {
+        officialClasses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        officialClasses.sort((a, b) => a.maLopCQ.localeCompare(b.maLopCQ));
+        renderOfficialClassesList();
+    }, (error) => console.error("Error listening to official classes collection:", error));
 
     onSnapshot(lopHocPhanCol, (snapshot) => {
         courseSections = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
