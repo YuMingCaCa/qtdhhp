@@ -121,6 +121,9 @@
                             <button id="auto-schedule-btn" class="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg">
                                 <i class="fas fa-magic mr-2"></i>Tự động
                             </button>
+                             <button id="conflict-check-btn" class="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg">
+                                <i class="fas fa-exclamation-triangle mr-2"></i>Kiểm tra
+                            </button>
                             <button id="print-schedule-btn" class="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg">
                                 <i class="fas fa-print mr-2"></i>In Lịch
                             </button>
@@ -137,6 +140,17 @@
 
     <!-- MODALS -->
 
+    <!-- Conflict Check Modal -->
+    <div id="conflict-check-modal" class="modal">
+        <div class="modal-content max-w-4xl">
+            <span class="close-button no-print" onclick="closeModal('conflict-check-modal')">&times;</span>
+            <h3 class="text-xl font-bold mb-4">Kết quả Kiểm tra Xung đột Toàn bộ Thời khóa biểu</h3>
+            <div id="conflict-results-container" class="space-y-4 max-h-[70vh] overflow-y-auto p-2">
+                <!-- Results will be populated by JS -->
+            </div>
+        </div>
+    </div>
+
     <!-- Print Options Modal -->
     <div id="print-options-modal" class="modal">
         <div class="modal-content max-w-2xl">
@@ -148,32 +162,46 @@
                     <select id="print-semester-select" required class="mt-1 p-2 border rounded-md w-full"></select>
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700">2. Chọn Phạm vi xem</label>
+                    <label class="block text-sm font-medium text-gray-700">2. Chọn Kiểu xem</label>
                     <div class="mt-2 flex gap-4">
                         <label class="flex items-center">
                             <input type="radio" name="print-view-type" value="department" checked class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500">
-                            <span class="ml-2 text-sm text-gray-700">Theo Khoa / Toàn trường</span>
+                            <span class="ml-2 text-sm text-gray-700">Lịch toàn Khoa / Trường</span>
                         </label>
                         <label class="flex items-center">
                             <input type="radio" name="print-view-type" value="lecturer" class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500">
-                            <span class="ml-2 text-sm text-gray-700">Theo Giảng viên</span>
+                            <span class="ml-2 text-sm text-gray-700">Lịch theo Giảng viên</span>
                         </label>
                     </div>
                 </div>
-                <div id="print-filter-details-container">
-                    <!-- Department Filter -->
-                    <div id="print-department-filter">
+
+                <!-- Department/School View Options -->
+                <div id="department-view-options">
+                    <div id="print-department-filter" class="mb-4">
                         <label for="print-department-select" class="block text-sm font-medium text-gray-700">3. Chọn Khoa</label>
                         <select id="print-department-select" class="mt-1 p-2 border rounded-md w-full">
                             <option value="all">-- Toàn trường --</option>
                         </select>
                     </div>
-                    <!-- Lecturer Filter (hidden by default) -->
-                    <div id="print-lecturer-filter" class="hidden">
-                        <label for="print-lecturer-select" class="block text-sm font-medium text-gray-700">3. Chọn Giảng viên</label>
-                        <!-- **** FIX: Removed 'required' attribute **** -->
-                        <select id="print-lecturer-select" class="mt-1 p-2 border rounded-md w-full"></select>
+                     <div class="pl-6 border-l-2 border-gray-300">
+                        <label class="block text-sm font-medium text-gray-700">4. Sắp xếp lịch theo</label>
+                        <div class="mt-2 flex gap-4">
+                            <label class="flex items-center">
+                                <input type="radio" name="department-group-by" value="room" checked class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500">
+                                <span class="ml-2 text-sm text-gray-700">Phòng học</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="radio" name="department-group-by" value="class" class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500">
+                                <span class="ml-2 text-sm text-gray-700">Lớp học</span>
+                            </label>
+                        </div>
                     </div>
+                </div>
+                
+                <!-- Lecturer View Options -->
+                <div id="lecturer-view-options" class="hidden">
+                    <label for="print-lecturer-select" class="block text-sm font-medium text-gray-700">3. Chọn Giảng viên</label>
+                    <select id="print-lecturer-select" class="mt-1 p-2 border rounded-md w-full"></select>
                 </div>
 
                 <div class="flex justify-end pt-4">

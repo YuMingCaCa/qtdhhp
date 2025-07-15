@@ -777,6 +777,124 @@ async function runAutoScheduler(btn) {
     }
 }
 
+// --- Conflict Check Tool ---
+function runConflictCheck() {
+    const conflicts = {
+        lecturer: [],
+        room: [],
+        class: []
+    };
+
+    const checkedPairs = new Set();
+
+    for (let i = 0; i < schedules.length; i++) {
+        for (let j = i + 1; j < schedules.length; j++) {
+            const s1 = schedules[i];
+            const s2 = schedules[j];
+
+            // Only check schedules on the same day
+            if (s1.thu !== s2.thu) continue;
+            
+            // Check for time overlap
+            const s1_start = s1.tietBatDau;
+            const s1_end = s1.tietBatDau + s1.soTiet - 1;
+            const s2_start = s2.tietBatDau;
+            const s2_end = s2.tietBatDau + s2.soTiet - 1;
+
+            if (!isOverlapping(s1_start, s1_end, s2_start, s2_end)) continue;
+
+            // If overlapping, check for resource conflicts
+            const section1 = courseSections.find(cs => cs.id === s1.lopHocPhanId);
+            const section2 = courseSections.find(cs => cs.id === s2.lopHocPhanId);
+
+            if (!section1 || !section2) continue;
+
+            // 1. Lecturer conflict
+            if (section1.giangVienId === section2.giangVienId) {
+                conflicts.lecturer.push({ s1, s2, section1, section2 });
+            }
+            // 2. Room conflict
+            if (s1.phongHocId === s2.phongHocId) {
+                conflicts.room.push({ s1, s2, section1, section2 });
+            }
+            // 3. Class conflict
+            if (section1.lopChinhQuyId === section2.lopChinhQuyId) {
+                conflicts.class.push({ s1, s2, section1, section2 });
+            }
+        }
+    }
+    
+    displayConflictResults(conflicts);
+}
+
+function displayConflictResults(conflicts) {
+    const container = document.getElementById('conflict-results-container');
+    container.innerHTML = '';
+    let hasConflicts = false;
+
+    const createConflictEntry = (title, conflictList, type) => {
+        if (conflictList.length === 0) return;
+        hasConflicts = true;
+
+        const details = document.createElement('details');
+        details.className = 'bg-white p-4 rounded-lg shadow';
+        details.open = true;
+        
+        const summary = document.createElement('summary');
+        summary.className = 'font-bold text-lg cursor-pointer text-red-700';
+        summary.innerHTML = `<i class="fas fa-exclamation-triangle mr-2"></i>${title} (${conflictList.length} cặp xung đột)`;
+        details.appendChild(summary);
+
+        const list = document.createElement('div');
+        list.className = 'mt-4 space-y-3 pl-5';
+        
+        conflictList.forEach(({ s1, s2, section1, section2 }) => {
+            const item = document.createElement('div');
+            item.className = 'p-3 border-l-4 border-red-500 bg-red-50 rounded';
+            
+            const subject1 = subjects.find(s => s.id === section1.monHocId)?.tenMonHoc || 'N/A';
+            const class1 = officialClasses.find(oc => oc.id === section1.lopChinhQuyId)?.maLopCQ || 'N/A';
+            const subject2 = subjects.find(s => s.id === section2.monHocId)?.tenMonHoc || 'N/A';
+            const class2 = officialClasses.find(oc => oc.id === section2.lopChinhQuyId)?.maLopCQ || 'N/A';
+            const lecturer = lecturers.find(l => l.id === section1.giangVienId)?.name || 'N/A';
+            const room = rooms.find(r => r.id === s1.phongHocId)?.tenPhong || 'N/A';
+
+            let conflictSourceInfo = '';
+            if (type === 'lecturer') conflictSourceInfo = `<strong>Giảng viên:</strong> ${lecturer}`;
+            if (type === 'room') conflictSourceInfo = `<strong>Phòng:</strong> ${room}`;
+            if (type === 'class') conflictSourceInfo = `<strong>Lớp:</strong> ${class1}`;
+
+            item.innerHTML = `
+                <p class="font-semibold">${conflictSourceInfo} - Trùng lịch vào Thứ ${s1.thu}, Tiết ${Math.max(s1.tietBatDau, s2.tietBatDau)}-${Math.min(s1.tietBatDau + s1.soTiet - 1, s2.tietBatDau + s2.soTiet - 1)}</p>
+                <ul class="list-disc list-inside text-sm mt-2 space-y-1">
+                    <li><strong>${subject1}</strong> (Lớp ${class1})</li>
+                    <li><strong>${subject2}</strong> (Lớp ${class2})</li>
+                </ul>
+            `;
+            list.appendChild(item);
+        });
+        
+        details.appendChild(list);
+        container.appendChild(details);
+    };
+
+    createConflictEntry('Xung đột Giảng viên', conflicts.lecturer, 'lecturer');
+    createConflictEntry('Xung đột Phòng học', conflicts.room, 'room');
+    createConflictEntry('Xung đột Lớp học', conflicts.class, 'class');
+
+    if (!hasConflicts) {
+        container.innerHTML = `
+            <div class="p-4 rounded-lg bg-green-100 text-green-800 text-center">
+                <i class="fas fa-check-circle fa-2x mb-2"></i>
+                <p class="font-bold text-lg">Hệ thống không tìm thấy xung đột nào trong thời khóa biểu hiện tại.</p>
+            </div>
+        `;
+    }
+
+    openModal('conflict-check-modal');
+}
+
+
 // --- Direct schedule actions ---
 window.openScheduleActionModal = (scheduleId) => {
     const schedule = schedules.find(s => s.id === scheduleId);
@@ -862,21 +980,15 @@ function populatePrintModalDropdowns() {
 }
 
 function generatePrintableSchedule(options) {
-    const { semesterId, viewType, filterId } = options;
-    console.clear(); // Clear console for fresh logs
-    console.log("--- BẮT ĐẦU IN LỊCH ---");
-    console.log("Tùy chọn:", { semesterId, viewType, filterId });
+    const { semesterId, viewType, filterId, groupBy } = options;
 
     const selectedSemester = semesters.find(s => s.id === semesterId);
     if (!selectedSemester) {
         showAlert("Vui lòng chọn một học kỳ hợp lệ.");
         return;
     }
-    console.log("Học kỳ đã chọn:", selectedSemester.tenHocKy);
 
-    // 1. Lọc các lớp học phần trong học kỳ
     const sectionsInSemester = courseSections.filter(cs => cs.hocKyId === semesterId);
-    console.log(`Bước 1: Tìm thấy ${sectionsInSemester.length} lớp học phần trong học kỳ này.`);
     if (sectionsInSemester.length === 0) {
         showAlert("Không có lớp học phần nào được phân công trong học kỳ đã chọn.");
         return;
@@ -885,47 +997,30 @@ function generatePrintableSchedule(options) {
     let finalSections = [];
     let title = `Thời khóa biểu ${selectedSemester.tenHocKy}`;
 
-    // 2. Lọc các lớp học phần theo phạm vi (Giảng viên, Khoa, Toàn trường)
     if (viewType === 'lecturer') {
         title += ` - Giảng viên: ${lecturers.find(l => l.id === filterId)?.name || 'N/A'}`;
         finalSections = sectionsInSemester.filter(cs => cs.giangVienId === filterId);
-        console.log(`Bước 2 (GV): Lọc theo giảng viên ID: ${filterId}. Tìm thấy ${finalSections.length} lớp học phần.`);
     } else { // viewType is 'department'
         if (filterId === 'all') {
             title += ` - Toàn trường`;
             finalSections = sectionsInSemester;
-            console.log(`Bước 2 (Toàn trường): Lấy tất cả ${finalSections.length} lớp học phần.`);
         } else {
             const department = departments.find(d => d.id === filterId);
             title += ` - Khoa: ${department?.name || 'N/A'}`;
-            console.log(`Bước 2 (Khoa): Lọc theo Khoa ID: ${filterId} (${department?.name})`);
-
             const lecturersInDept = lecturers.filter(l => l.departmentId === filterId);
-            if (lecturersInDept.length === 0) {
-                showAlert(`Không có giảng viên nào thuộc khoa "${department?.name}".`);
-                console.warn(`Không tìm thấy giảng viên nào cho Khoa ID: ${filterId}`);
-                return;
-            }
             const lecturerIdsInDept = lecturersInDept.map(l => l.id);
-            console.log(` -> Tìm thấy ${lecturerIdsInDept.length} giảng viên trong khoa này. IDs:`, lecturerIdsInDept);
-            
             finalSections = sectionsInSemester.filter(cs => lecturerIdsInDept.includes(cs.giangVienId));
-            console.log(` -> Lọc các lớp học phần của các giảng viên này. Tìm thấy ${finalSections.length} lớp.`);
         }
     }
     
-    // 3. Từ các lớp học phần đã lọc, tìm các lịch học tương ứng
     const sectionIds = finalSections.map(cs => cs.id);
     const relevantSchedules = schedules.filter(s => sectionIds.includes(s.lopHocPhanId));
-    console.log(`Bước 3: Từ ${sectionIds.length} lớp học phần, tìm thấy ${relevantSchedules.length} lịch học cụ thể.`);
 
     if (relevantSchedules.length === 0) {
         showAlert("Không có dữ liệu lịch học nào cho lựa chọn của bạn.");
-        console.warn("Không tìm thấy lịch học cụ thể nào. Quá trình in dừng lại.");
         return;
     }
 
-    // 4. Generate the HTML for the new tab
     let tableBodyHtml = '';
     const days = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
     let tableHeaderHtml = '';
@@ -963,36 +1058,72 @@ function generatePrintableSchedule(options) {
             tableBodyHtml += '</tr>';
         });
     } else { // 'department' or 'all'
-        tableHeaderHtml = `<th>Phòng</th>${days.map(d => `<th>${d}</th>`).join('')}`;
-        const roomsWithSchedules = rooms
-            .filter(r => relevantSchedules.some(s => s.phongHocId === r.id))
-            .sort((a, b) => a.tenPhong.localeCompare(b.tenPhong));
+        if (groupBy === 'class') {
+            tableHeaderHtml = `<th>Lớp</th>${days.map(d => `<th>${d}</th>`).join('')}`;
+            const relevantOfficialClassIds = new Set(finalSections.map(fs => fs.lopChinhQuyId));
+            const classesWithSchedules = officialClasses
+                .filter(oc => relevantOfficialClassIds.has(oc.id))
+                .sort((a, b) => a.maLopCQ.localeCompare(b.maLopCQ));
 
-        roomsWithSchedules.forEach(room => {
-            tableBodyHtml += `<tr><td class="row-header">${room.tenPhong}</td>`;
-            for (let day = 2; day <= 7; day++) {
-                let cellHtml = '';
-                const schedulesInCell = relevantSchedules.filter(s => s.phongHocId === room.id && s.thu === day);
-                schedulesInCell.sort((a, b) => a.tietBatDau - b.tietBatDau);
+            classesWithSchedules.forEach(oClass => {
+                tableBodyHtml += `<tr><td class="row-header">${oClass.maLopCQ}</td>`;
+                for (let day = 2; day <= 7; day++) {
+                    let cellHtml = '';
+                    const sectionsForThisClass = finalSections.filter(fs => fs.lopChinhQuyId === oClass.id);
+                    const sectionIdsForThisClass = sectionsForThisClass.map(s => s.id);
+                    const schedulesInCell = relevantSchedules.filter(s => sectionIdsForThisClass.includes(s.lopHocPhanId) && s.thu === day);
+                    schedulesInCell.sort((a, b) => a.tietBatDau - b.tietBatDau);
 
-                schedulesInCell.forEach(s => {
-                    const section = finalSections.find(cs => cs.id === s.lopHocPhanId);
-                    const subject = subjects.find(sub => sub.id === section?.monHocId);
-                    const lecturer = lecturers.find(l => l.id === section?.giangVienId);
-                    const oClass = officialClasses.find(oc => oc.id === section?.lopChinhQuyId);
-                    cellHtml += `
-                        <div class="print-schedule-item">
-                            <p><strong>${subject?.tenMonHoc || 'N/A'}</strong></p>
-                            <p>Lớp: ${oClass?.maLopCQ || 'N/A'}</p>
-                            <p>GV: ${lecturer?.name || 'N/A'}</p>
-                            <p>Tiết: ${s.tietBatDau}-${s.tietBatDau + s.soTiet - 1}</p>
-                        </div>
-                    `;
-                });
-                tableBodyHtml += `<td>${cellHtml}</td>`;
-            }
-            tableBodyHtml += '</tr>';
-        });
+                    schedulesInCell.forEach(s => {
+                        const section = finalSections.find(cs => cs.id === s.lopHocPhanId);
+                        const subject = subjects.find(sub => sub.id === section?.monHocId);
+                        const lecturer = lecturers.find(l => l.id === section?.giangVienId);
+                        const room = rooms.find(r => r.id === s.phongHocId);
+                        cellHtml += `
+                            <div class="print-schedule-item">
+                                <p><strong>${subject?.tenMonHoc || 'N/A'}</strong></p>
+                                <p>GV: ${lecturer?.name || 'N/A'}</p>
+                                <p>Phòng: ${room?.tenPhong || 'N/A'}</p>
+                                <p>Tiết: ${s.tietBatDau}-${s.tietBatDau + s.soTiet - 1}</p>
+                            </div>
+                        `;
+                    });
+                    tableBodyHtml += `<td>${cellHtml}</td>`;
+                }
+                tableBodyHtml += '</tr>';
+            });
+        } else { // Default to groupBy === 'room'
+            tableHeaderHtml = `<th>Phòng</th>${days.map(d => `<th>${d}</th>`).join('')}`;
+            const roomsWithSchedules = rooms
+                .filter(r => relevantSchedules.some(s => s.phongHocId === r.id))
+                .sort((a, b) => a.tenPhong.localeCompare(b.tenPhong));
+
+            roomsWithSchedules.forEach(room => {
+                tableBodyHtml += `<tr><td class="row-header">${room.tenPhong}</td>`;
+                for (let day = 2; day <= 7; day++) {
+                    let cellHtml = '';
+                    const schedulesInCell = relevantSchedules.filter(s => s.phongHocId === room.id && s.thu === day);
+                    schedulesInCell.sort((a, b) => a.tietBatDau - b.tietBatDau);
+
+                    schedulesInCell.forEach(s => {
+                        const section = finalSections.find(cs => cs.id === s.lopHocPhanId);
+                        const subject = subjects.find(sub => sub.id === section?.monHocId);
+                        const lecturer = lecturers.find(l => l.id === section?.giangVienId);
+                        const oClass = officialClasses.find(oc => oc.id === section?.lopChinhQuyId);
+                        cellHtml += `
+                            <div class="print-schedule-item">
+                                <p><strong>${subject?.tenMonHoc || 'N/A'}</strong></p>
+                                <p>Lớp: ${oClass?.maLopCQ || 'N/A'}</p>
+                                <p>GV: ${lecturer?.name || 'N/A'}</p>
+                                <p>Tiết: ${s.tietBatDau}-${s.tietBatDau + s.soTiet - 1}</p>
+                            </div>
+                        `;
+                    });
+                    tableBodyHtml += `<td>${cellHtml}</td>`;
+                }
+                tableBodyHtml += '</tr>';
+            });
+        }
     }
 
     const printWindow = window.open('', '_blank');
@@ -1055,6 +1186,11 @@ function addEventListeners() {
         showConfirm("Bạn có chắc muốn chạy xếp lịch tự động cho tất cả các lớp chưa có lịch?", () => {
              runAutoScheduler(e.currentTarget);
         });
+    });
+    
+    // Conflict Check Button Listener
+    document.getElementById('conflict-check-btn').addEventListener('click', () => {
+        runConflictCheck();
     });
 
     // Manual Schedule Form Submission
@@ -1139,14 +1275,16 @@ function addEventListeners() {
     // Print Modal Listeners
     document.getElementById('print-schedule-btn').addEventListener('click', () => {
         populatePrintModalDropdowns();
+        // Trigger change event to set initial visibility
+        document.querySelector('input[name="print-view-type"]:checked').dispatchEvent(new Event('change'));
         openModal('print-options-modal');
     });
 
     document.querySelectorAll('input[name="print-view-type"]').forEach(radio => {
         radio.addEventListener('change', (e) => {
             const isDepartmentView = e.target.value === 'department';
-            document.getElementById('print-department-filter').style.display = isDepartmentView ? 'block' : 'none';
-            document.getElementById('print-lecturer-filter').style.display = !isDepartmentView ? 'block' : 'none';
+            document.getElementById('department-view-options').style.display = isDepartmentView ? 'block' : 'none';
+            document.getElementById('lecturer-view-options').style.display = !isDepartmentView ? 'block' : 'none';
         });
     });
 
@@ -1155,14 +1293,15 @@ function addEventListeners() {
         const semesterId = document.getElementById('print-semester-select').value;
         const viewType = document.querySelector('input[name="print-view-type"]:checked').value;
         let filterId;
+        let groupBy = 'room'; // Default value
 
         if (viewType === 'department') {
             filterId = document.getElementById('print-department-select').value;
+            groupBy = document.querySelector('input[name="department-group-by"]:checked').value;
         } else {
             filterId = document.getElementById('print-lecturer-select').value;
         }
 
-        // **** FIX: Javascript-based validation ****
         if (!semesterId) {
             showAlert("Vui lòng chọn học kỳ.");
             return;
@@ -1172,7 +1311,7 @@ function addEventListeners() {
             return;
         }
 
-        generatePrintableSchedule({ semesterId, viewType, filterId });
+        generatePrintableSchedule({ semesterId, viewType, filterId, groupBy });
         closeModal('print-options-modal');
     });
 
