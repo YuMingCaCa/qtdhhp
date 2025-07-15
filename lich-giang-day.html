@@ -56,6 +56,15 @@
             transform: translateY(-2px);
             box-shadow: 0 4px 10px rgba(0,0,0,0.1);
         }
+        /* Basic modal styles */
+        .modal { display: none; position: fixed; z-index: 50; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5); -webkit-animation-name: fadeIn; -webkit-animation-duration: 0.4s; animation-name: fadeIn; animation-duration: 0.4s; }
+        .modal-content { background-color: #fefefe; margin: 5% auto; padding: 24px; border: 1px solid #888; width: 90%; max-width: 800px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1); -webkit-animation-name: slideIn; -webkit-animation-duration: 0.4s; animation-name: slideIn; animation-duration: 0.4s; }
+        @-webkit-keyframes slideIn { from {top: -300px; opacity: 0} to {top: 0; opacity: 1} }
+        @keyframes slideIn { from {margin-top: -5%; opacity: 0} to {margin-top: 5%; opacity: 1} }
+        @-webkit-keyframes fadeIn { from {opacity: 0} to {opacity: 1} }
+        @keyframes fadeIn { from {opacity: 0} to {opacity: 1} }
+        .close-button { color: #aaa; float: right; font-size: 28px; font-weight: bold; }
+        .close-button:hover, .close-button:focus { color: black; text-decoration: none; cursor: pointer; }
     </style>
 </head>
 <body class="p-4 md:p-8">
@@ -89,7 +98,7 @@
                     <i class="fas fa-school mr-2"></i> Quản lý Phòng học
                 </button>
                  <button id="manage-official-classes-btn" class="flex-1 bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center transition-all min-w-[160px]">
-                    <i class="fas fa-users-class mr-2"></i> Quản lý Lớp (CQ)
+                    <i class="fas fa-users mr-2"></i> Quản lý Lớp (CQ)
                 </button>
                 <button id="manage-course-sections-btn" class="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center transition-all min-w-[160px]">
                     <i class="fas fa-chalkboard-teacher mr-2"></i> Phân công Giảng dạy
@@ -112,7 +121,6 @@
                             <button id="auto-schedule-btn" class="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg">
                                 <i class="fas fa-magic mr-2"></i>Tự động
                             </button>
-                            <!-- NEW: Print Button -->
                             <button id="print-schedule-btn" class="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg">
                                 <i class="fas fa-print mr-2"></i>In Lịch
                             </button>
@@ -129,7 +137,7 @@
 
     <!-- MODALS -->
 
-    <!-- NEW: Print Options Modal -->
+    <!-- Print Options Modal -->
     <div id="print-options-modal" class="modal">
         <div class="modal-content max-w-2xl">
             <span class="close-button no-print" onclick="closeModal('print-options-modal')">&times;</span>
@@ -163,7 +171,8 @@
                     <!-- Lecturer Filter (hidden by default) -->
                     <div id="print-lecturer-filter" class="hidden">
                         <label for="print-lecturer-select" class="block text-sm font-medium text-gray-700">3. Chọn Giảng viên</label>
-                        <select id="print-lecturer-select" required class="mt-1 p-2 border rounded-md w-full"></select>
+                        <!-- **** FIX: Removed 'required' attribute **** -->
+                        <select id="print-lecturer-select" class="mt-1 p-2 border rounded-md w-full"></select>
                     </div>
                 </div>
 
@@ -326,7 +335,7 @@
             <form id="subject-form" class="mb-4 p-4 border rounded-lg bg-gray-50">
                 <input type="hidden" id="subject-id">
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-                    <div class="md:col-span-3">
+                    <div class="md:col-span-2">
                         <label for="subject-name" class="block text-sm font-medium text-gray-700">Tên môn học</label>
                         <input type="text" id="subject-name" placeholder="VD: Lập trình Web" required class="mt-1 p-2 border rounded-md w-full">
                     </div>
@@ -338,7 +347,7 @@
                         <label for="subject-credits" class="block text-sm font-medium text-gray-700">Số tín chỉ</label>
                         <input type="number" id="subject-credits" value="3" min="0" step="0.5" required class="mt-1 p-2 border rounded-md w-full">
                     </div>
-                    <div class="flex items-end gap-2">
+                    <div class="md:col-span-3 flex gap-2">
                         <button type="submit" class="bg-green-600 hover:bg-green-700 text-white p-2 rounded-md w-full">Lưu</button>
                         <button type="button" id="clear-subject-form-btn" class="bg-gray-200 hover:bg-gray-300 text-black p-2 rounded-md w-full">Mới</button>
                     </div>
@@ -560,4 +569,4 @@
     <!-- Liên kết tới tệp JS riêng của module này -->
     <script type="module" src="js/lich-giang-day.js"></script>
 </body>
-</ht
+</html>
