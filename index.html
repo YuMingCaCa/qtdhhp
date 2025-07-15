@@ -185,6 +185,7 @@
                                 <button id="manage-tasks-btn"><i class="fas fa-tasks fa-fw text-purple-600"></i>Nhiệm vụ</button>
                                 <button id="manage-departments-btn"><i class="fas fa-building fa-fw text-blue-600"></i>Khoa</button>
                                 <button id="manage-lecturers-btn"><i class="fas fa-users fa-fw text-green-600"></i>Giảng viên</button>
+                                <button id="transfer-priority-btn"><i class="fas fa-crown fa-fw text-yellow-500"></i>Chuyển giao Quyền</button>
                             </div>
                         </div>
                     </div>
@@ -213,6 +214,27 @@
     </div>
 
     <!-- Modals -->
+    <!-- Transfer Priority Modal -->
+    <div id="transfer-priority-modal" class="modal">
+        <div class="modal-content max-w-lg">
+            <span class="close-button no-print" onclick="closeModal('transfer-priority-modal')">&times;</span>
+            <h3 class="text-xl font-bold mb-4">Chuyển giao Quyền Ưu tiên</h3>
+            <p class="text-sm text-yellow-700 bg-yellow-100 p-3 rounded-md mb-4">
+                <i class="fas fa-exclamation-triangle mr-2"></i>
+                <strong>Cảnh báo:</strong> Hành động này sẽ chuyển toàn bộ quyền ưu tiên xếp lịch và bảo vệ tài khoản cho một Admin khác. Bạn sẽ mất các quyền này sau khi chuyển.
+            </p>
+            <form id="transfer-priority-form">
+                <div>
+                    <label for="admin-select" class="block text-sm font-medium text-gray-700">Chọn Admin để chuyển giao:</label>
+                    <select id="admin-select" required class="mt-1 block w-full p-2 border border-gray-300 rounded-md"></select>
+                </div>
+                <div class="mt-6 flex justify-end">
+                    <button type="submit" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg">Xác nhận Chuyển giao</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
     <!-- Statistics Modal -->
     <div id="statistics-modal" class="modal">
         <div class="modal-content">
@@ -444,7 +466,7 @@
         </div>
     </div>
 
-    <!-- Manage Lecturers Modal (UPDATED with filter) -->
+    <!-- Manage Lecturers Modal (UPDATED with filter and link button) -->
     <div id="manage-lecturers-modal" class="modal">
         <div class="modal-content">
             <span class="close-button no-print" onclick="closeModal('manage-lecturers-modal')">&times;</span>
@@ -488,9 +510,9 @@
                         <tr>
                             <th class="px-4 py-2 text-left">Họ và Tên</th>
                             <th class="px-4 py-2 text-left">Mã GV</th>
-                            <th class="px-4 py-2 text-left">Số điện thoại</th>
                             <th class="px-4 py-2 text-left">Khoa</th>
                             <th class="px-4 py-2 text-center">Hành động</th>
+                            <th class="px-4 py-2 text-center">Liên kết</th>
                         </tr>
                     </thead>
                     <tbody id="lecturers-list-body"></tbody>

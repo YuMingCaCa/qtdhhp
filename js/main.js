@@ -24,7 +24,8 @@ import {
     deleteDoc,
     writeBatch,
     query,
-    where
+    where,
+    deleteField 
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 /**
@@ -156,6 +157,7 @@ let state = {
     entries: [],
     tasks: [],
     customYears: [],
+    prioritySchedulerUID: null, // UID of the priority user
     selectedDepartmentId: null,
     selectedYear: null,
     currentLecturerIdForDetails: null, // To keep track of whose details are open
@@ -311,12 +313,22 @@ function updateUIForRole() {
     if (!state.currentUser) return;
     const isAdmin = state.currentUser.role === 'admin';
     document.querySelectorAll('.admin-only').forEach(el => {
-        el.style.display = isAdmin ? 'inline-block' : 'none';
+        el.style.display = isAdmin ? 'block' : 'none';
     });
+
+    // Hide/show priority-only buttons
+    const isPriorityUser = state.currentUser.uid === state.prioritySchedulerUID;
+    document.querySelectorAll('.priority-only').forEach(el => {
+        el.style.display = isPriorityUser ? 'block' : 'none';
+    });
+
 
     const roleBadge = document.getElementById('user-role-badge');
     if (isAdmin) {
         roleBadge.textContent = 'Admin';
+        if (isPriorityUser) {
+            roleBadge.textContent += ' (Ưu tiên)';
+        }
         roleBadge.className = 'ml-2 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-green-100 text-green-800';
     } else {
         roleBadge.textContent = 'Viewer';
@@ -449,14 +461,29 @@ function renderLecturersList() {
         const department = state.departments.find(d => d.id === lecturer.departmentId);
         const row = document.createElement('tr');
         row.className = "border-b";
+        
+        const isLinkedToCurrentUser = lecturer.linkedUid === state.currentUser.uid;
+        const isLinkedToAnotherUser = lecturer.linkedUid && lecturer.linkedUid !== state.currentUser.uid;
+        
+        let linkButtonHtml = '';
+        if (isLinkedToCurrentUser) {
+            linkButtonHtml = `<button class="text-red-500 hover:text-red-700" title="Hủy liên kết tài khoản này" onclick="window.unlinkLecturer('${lecturer.id}')"><i class="fas fa-unlink fa-lg"></i></button>`;
+        } else if (isLinkedToAnotherUser) {
+            linkButtonHtml = `<span class="text-gray-400" title="Đã liên kết với tài khoản khác"><i class="fas fa-lock fa-lg"></i></span>`;
+        } else {
+            linkButtonHtml = `<button class="text-blue-500 hover:text-blue-700" title="Gắn giảng viên này vào tài khoản của bạn" onclick="window.linkLecturerToCurrentUser('${lecturer.id}')"><i class="fas fa-link fa-lg"></i></button>`;
+        }
+
         row.innerHTML = `
             <td class="px-4 py-2">${lecturer.name}</td>
             <td class="px-4 py-2">${lecturer.code}</td>
-            <td class="px-4 py-2">${lecturer.soDienThoai || 'N/A'}</td>
             <td class="px-4 py-2">${department?.name || 'Chưa phân khoa'}</td>
             <td class="px-4 py-2 text-center">
                 <button class="text-blue-500 mr-2" onclick="editLecturer('${lecturer.id}')"><i class="fas fa-edit"></i></button>
                 <button class="text-red-500" onclick="deleteLecturer('${lecturer.id}')"><i class="fas fa-trash"></i></button>
+            </td>
+            <td class="px-4 py-2 text-center">
+                ${linkButtonHtml}
             </td>
         `;
         listBody.appendChild(row);
@@ -582,21 +609,24 @@ async function renderUsersList() {
         usersSnapshot.forEach(userDoc => {
             const userData = userDoc.data();
             const isCurrentUser = state.currentUser.uid === userDoc.id;
+            const isPriorityUser = userDoc.id === state.prioritySchedulerUID; // Check if this is the priority user
+            const isDisabled = isCurrentUser || isPriorityUser; // Disable if it's the current user OR the priority user
+
             const row = document.createElement('tr');
             row.className = "border-b";
             row.innerHTML = `
-                <td class="px-4 py-2">${userData.email}</td>
+                <td class="px-4 py-2">${userData.email} ${isPriorityUser ? '<span class="text-xs font-bold text-teal-600 ml-2">(Ưu tiên)</span>' : ''}</td>
                 <td class="px-4 py-2">
-                    <select data-uid="${userDoc.id}" class="role-select p-1 border rounded-md w-full" ${isCurrentUser ? 'disabled' : ''}>
+                    <select data-uid="${userDoc.id}" class="role-select p-1 border rounded-md w-full" ${isDisabled ? 'disabled' : ''}>
                         <option value="viewer" ${userData.role === 'viewer' ? 'selected' : ''}>Viewer</option>
                         <option value="admin" ${userData.role === 'admin' ? 'selected' : ''}>Admin</option>
                     </select>
                 </td>
                 <td class="px-4 py-2 text-center">
                     <div class="flex justify-center items-center gap-2">
-                        <button data-uid="${userDoc.id}" class="save-role-btn bg-green-500 hover:bg-green-600 text-white text-xs py-1 px-2 rounded" ${isCurrentUser ? 'disabled' : ''}>Lưu</button>
-                        <button data-email="${userData.email}" class="reset-password-btn bg-blue-500 hover:bg-blue-600 text-white text-xs py-1 px-2 rounded" ${isCurrentUser ? 'disabled' : ''}>Reset Pass</button>
-                        <button data-uid="${userDoc.id}" class="delete-user-btn bg-red-500 hover:bg-red-600 text-white text-xs py-1 px-2 rounded" ${isCurrentUser ? 'disabled' : ''}>Xóa</button>
+                        <button data-uid="${userDoc.id}" class="save-role-btn bg-green-500 hover:bg-green-600 text-white text-xs py-1 px-2 rounded" ${isDisabled ? 'disabled' : ''}>Lưu</button>
+                        <button data-email="${userData.email}" class="reset-password-btn bg-blue-500 hover:bg-blue-600 text-white text-xs py-1 px-2 rounded" ${isDisabled ? 'disabled' : ''}>Reset Pass</button>
+                        <button data-uid="${userDoc.id}" class="delete-user-btn bg-red-500 hover:bg-red-600 text-white text-xs py-1 px-2 rounded" ${isDisabled ? 'disabled' : ''}>Xóa</button>
                     </div>
                 </td>
             `;
@@ -1057,6 +1087,54 @@ window.deleteTask = (id) => {
     });
 };
 
+// NEW: Function to link a lecturer record to the current user's account
+window.linkLecturerToCurrentUser = async (lecturerId) => {
+    const lecturerToLink = state.lecturers.find(l => l.id === lecturerId);
+    if (!lecturerToLink) {
+        showAlert("Không tìm thấy giảng viên để liên kết.");
+        return;
+    }
+
+    const currentlyLinkedLecturer = state.lecturers.find(l => l.linkedUid === state.currentUser.uid);
+    if (currentlyLinkedLecturer) {
+        showAlert(`Tài khoản của bạn đã được liên kết với giảng viên "${currentlyLinkedLecturer.name}". Vui lòng hủy liên kết trước.`);
+        return;
+    }
+
+    showConfirm(`Bạn có chắc muốn liên kết tài khoản của mình với giảng viên "${lecturerToLink.name}"?`, async () => {
+        try {
+            await updateDoc(doc(lecturersCol, lecturerId), {
+                linkedUid: state.currentUser.uid
+            });
+            showAlert("Liên kết tài khoản thành công!", true);
+        } catch (error) {
+            console.error("Error linking lecturer:", error);
+            showAlert(`Lỗi khi liên kết tài khoản: ${error.message}`);
+        }
+    });
+};
+
+// NEW: Function to unlink a lecturer
+window.unlinkLecturer = async (lecturerId) => {
+    const lecturerToUnlink = state.lecturers.find(l => l.id === lecturerId);
+    if (!lecturerToUnlink) {
+        showAlert("Không tìm thấy giảng viên.");
+        return;
+    }
+
+    showConfirm(`Bạn có chắc muốn hủy liên kết tài khoản khỏi giảng viên "${lecturerToUnlink.name}"?`, async () => {
+        try {
+            await updateDoc(doc(lecturersCol, lecturerId), {
+                linkedUid: deleteField()
+            });
+            showAlert("Hủy liên kết thành công!", true);
+        } catch (error) {
+            console.error("Error unlinking lecturer:", error);
+            showAlert(`Lỗi khi hủy liên kết: ${error.message}`);
+        }
+    });
+};
+
 // --- Inactivity Logout Logic ---
 let inactivityTimer;
 const activityEvents = ['mousemove', 'mousedown', 'keypress', 'scroll', 'touchstart'];
@@ -1201,11 +1279,14 @@ function setupOnSnapshotListeners() {
 
     onSnapshot(doc(settingsCol, SETTINGS_DOC_ID), (docSnapshot) => {
         if (docSnapshot.exists()) {
-            state.customYears = docSnapshot.data().customYears || [];
+            const settingsData = docSnapshot.data();
+            state.customYears = settingsData.customYears || [];
+            state.prioritySchedulerUID = settingsData.prioritySchedulerUID || null;
         } else if (state.currentUser.role === 'admin') {
-            setDoc(doc(settingsCol, SETTINGS_DOC_ID), { customYears: [] });
+            setDoc(doc(settingsCol, SETTINGS_DOC_ID), { customYears: [], prioritySchedulerUID: null });
         }
         renderYearSelect();
+        updateUIForRole(); // Update UI after getting priority user info
     }, snapshotErrorHandler('Cài đặt'));
 }
 
@@ -1253,6 +1334,19 @@ async function initializeFirebase() {
                 }
 
                 state.currentUser = { uid: user.uid, ...userDoc.data() };
+                
+                // Set priority user if not set
+                const settingsDocRef = doc(settingsCol, SETTINGS_DOC_ID);
+                const settingsDoc = await getDoc(settingsDocRef);
+                if (!settingsDoc.exists() || !settingsDoc.data().prioritySchedulerUID) {
+                    if (state.currentUser.role === 'admin') {
+                        await setDoc(settingsDocRef, { prioritySchedulerUID: user.uid }, { merge: true });
+                        state.prioritySchedulerUID = user.uid;
+                    }
+                } else {
+                    state.prioritySchedulerUID = settingsDoc.data().prioritySchedulerUID;
+                }
+
                 document.getElementById('user-email').textContent = state.currentUser.email;
                 document.getElementById('user-email-module-page').textContent = state.currentUser.email;
 
@@ -1396,6 +1490,12 @@ function addEventListeners() {
         const email = target.dataset.email;
 
         if (target.classList.contains('save-role-btn')) {
+            if (uid === state.prioritySchedulerUID) {
+                showAlert('Không thể thay đổi vai trò của người dùng ưu tiên.');
+                const selectEl = document.querySelector(`.role-select[data-uid="${uid}"]`);
+                selectEl.value = 'admin'; // Revert change
+                return;
+            }
             const selectEl = document.querySelector(`.role-select[data-uid="${uid}"]`);
             const newRole = selectEl.value;
             setButtonLoading(target, true);
