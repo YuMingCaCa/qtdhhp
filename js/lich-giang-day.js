@@ -1165,6 +1165,217 @@ function generatePrintableSchedule(options) {
 }
 
 
+// --- Import Logic (NEW) ---
+
+// Function to download a template Excel file
+function downloadTemplate() {
+    const type = document.getElementById('import-type-select').value;
+    let headers, filename;
+
+    switch (type) {
+        case 'subjects':
+            headers = ["tenMonHoc", "maHocPhan", "soTinChi"];
+            filename = "Mau_Import_MonHoc.xlsx";
+            break;
+        case 'rooms':
+            headers = ["tenPhong", "sucChua", "loaiPhong"];
+            filename = "Mau_Import_PhongHoc.xlsx";
+            break;
+        case 'majors':
+             headers = ["tenNganh", "tenKhoa"]; // Use department name for simplicity
+            filename = "Mau_Import_NganhHoc.xlsx";
+            break;
+        case 'lecturers':
+            headers = ["tenGiangVien", "maGiangVien", "soDienThoai", "tenKhoa"];
+            filename = "Mau_Import_GiangVien.xlsx";
+            break;
+        case 'officialClasses':
+            headers = ["maLopCQ", "siSo", "tenNganh"]; // Use major name
+            filename = "Mau_Import_LopChinhQuy.xlsx";
+            break;
+        case 'courseSections':
+            headers = ["tenHocKy", "maHocPhan", "maLopCQ", "maGiangVien"];
+            filename = "Mau_Import_PhanCong.xlsx";
+            break;
+        default:
+            showAlert("Loại dữ liệu không hợp lệ.");
+            return;
+    }
+
+    const ws = XLSX.utils.json_to_sheet([{}], { header: headers });
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Data");
+    XLSX.writeFile(wb, filename);
+}
+
+// Main function to handle file import
+async function handleFileImport() {
+    const btn = document.getElementById('start-import-btn');
+    setButtonLoading(btn, true);
+
+    const fileInput = document.getElementById('import-file-input');
+    const type = document.getElementById('import-type-select').value;
+    const logContainer = document.getElementById('import-log');
+    const resultsContainer = document.getElementById('import-results-container');
+    
+    resultsContainer.classList.remove('hidden');
+    logContainer.innerHTML = 'Bắt đầu quá trình import...<br>';
+
+    if (!fileInput.files || fileInput.files.length === 0) {
+        showAlert("Vui lòng chọn một file Excel.");
+        setButtonLoading(btn, false);
+        return;
+    }
+
+    const file = fileInput.files[0];
+    const reader = new FileReader();
+
+    reader.onload = async (e) => {
+        try {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+            const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+            if (jsonData.length === 0) {
+                logContainer.innerHTML += '<span class="text-red-500">Lỗi: File không có dữ liệu.</span><br>';
+                setButtonLoading(btn, false);
+                return;
+            }
+
+            logContainer.innerHTML += `Đã đọc ${jsonData.length} dòng từ file.<br>Đang xử lý và ghi vào cơ sở dữ liệu...<br>`;
+
+            const batch = writeBatch(db);
+            let successCount = 0;
+            let errorCount = 0;
+
+            // Process data based on type
+            for (const row of jsonData) {
+                try {
+                    let docData;
+                    let collectionRef;
+
+                    switch (type) {
+                        case 'subjects':
+                            collectionRef = monHocCol;
+                            docData = {
+                                tenMonHoc: String(row.tenMonHoc || '').trim(),
+                                maHocPhan: String(row.maHocPhan || '').trim(),
+                                soTinChi: parseFloat(row.soTinChi || 0)
+                            };
+                            if (!docData.tenMonHoc || !docData.maHocPhan) throw new Error("Thiếu tên môn học hoặc mã học phần.");
+                            break;
+                        case 'rooms':
+                             collectionRef = phongHocCol;
+                             docData = {
+                                tenPhong: String(row.tenPhong || '').trim(),
+                                sucChua: parseInt(row.sucChua || 0, 10),
+                                loaiPhong: String(row.loaiPhong || 'Lý thuyết').trim()
+                             };
+                             if (!docData.tenPhong) throw new Error("Thiếu tên phòng.");
+                             break;
+                        case 'majors':
+                            collectionRef = nganhHocCol;
+                            const departmentNameFromExcel = String(row.tenKhoa || '').trim().toLowerCase();
+                            const department = departments.find(d => {
+                                const dbName = d.name.toLowerCase();
+                                // Check for exact match OR match where DB name has "Khoa " prefix
+                                return dbName === departmentNameFromExcel || dbName === `khoa ${departmentNameFromExcel}`;
+                            });
+                            if (!department) throw new Error(`Không tìm thấy khoa "${row.tenKhoa}"`);
+                            docData = {
+                                tenNganh: String(row.tenNganh || '').trim(),
+                                departmentId: department.id
+                            };
+                            if (!docData.tenNganh) throw new Error("Thiếu tên ngành.");
+                            break;
+                        case 'lecturers':
+                            collectionRef = lecturersCol;
+                            const depName = String(row.tenKhoa || '').trim().toLowerCase();
+                            const dept = departments.find(d => {
+                                const dbName = d.name.toLowerCase();
+                                return dbName === depName || dbName === `khoa ${depName}`;
+                            });
+                            if (!dept) throw new Error(`Không tìm thấy khoa "${row.tenKhoa}"`);
+                            docData = {
+                                name: String(row.tenGiangVien || '').trim(),
+                                code: String(row.maGiangVien || '').trim(),
+                                soDienThoai: String(row.soDienThoai || '').trim(),
+                                departmentId: dept.id
+                            };
+                            if (!docData.name || !docData.code) throw new Error("Thiếu tên hoặc mã giảng viên.");
+                            break;
+                        case 'officialClasses':
+                            collectionRef = lopChinhQuyCol;
+                            const major = majors.find(m => m.tenNganh.toLowerCase() === String(row.tenNganh || '').trim().toLowerCase());
+                            if (!major) throw new Error(`Không tìm thấy ngành học "${row.tenNganh}"`);
+                            docData = {
+                                maLopCQ: String(row.maLopCQ || '').trim(),
+                                siSo: parseInt(row.siSo || 0, 10),
+                                majorId: major.id
+                            };
+                            if (!docData.maLopCQ) throw new Error("Thiếu mã lớp chính quy.");
+                            break;
+                        case 'courseSections':
+                            collectionRef = lopHocPhanCol;
+                            const semester = semesters.find(s => s.tenHocKy.toLowerCase() === String(row.tenHocKy || '').trim().toLowerCase());
+                            const subject = subjects.find(s => s.maHocPhan.toLowerCase() === String(row.maHocPhan || '').trim().toLowerCase());
+                            const officialClass = officialClasses.find(oc => oc.maLopCQ.toLowerCase() === String(row.maLopCQ || '').trim().toLowerCase());
+                            const lecturer = lecturers.find(l => l.code.toLowerCase() === String(row.maGiangVien || '').trim().toLowerCase());
+
+                            if (!semester) throw new Error(`Không tìm thấy học kỳ "${row.tenHocKy}"`);
+                            if (!subject) throw new Error(`Không tìm thấy môn học có mã "${row.maHocPhan}"`);
+                            if (!officialClass) throw new Error(`Không tìm thấy lớp chính quy có mã "${row.maLopCQ}"`);
+                            if (!lecturer) throw new Error(`Không tìm thấy giảng viên có mã "${row.maGiangVien}"`);
+
+                            docData = {
+                                hocKyId: semester.id,
+                                monHocId: subject.id,
+                                lopChinhQuyId: officialClass.id,
+                                giangVienId: lecturer.id,
+                                maLopHP: `${subject.maHocPhan}-${officialClass.maLopCQ}`
+                            };
+                            break;
+                        default:
+                            throw new Error("Loại import không hợp lệ.");
+                    }
+                    
+                    batch.set(doc(collectionRef), docData);
+                    successCount++;
+                } catch (rowError) {
+                    errorCount++;
+                    logContainer.innerHTML += `<span class="text-orange-500">- Dòng ${successCount + errorCount}: Lỗi - ${rowError.message}</span><br>`;
+                }
+            }
+
+            if (successCount > 0) {
+                await batch.commit();
+            }
+            
+            logContainer.innerHTML += `<hr class="my-2">`;
+            logContainer.innerHTML += `<strong class="text-green-600">Hoàn thành!</strong><br>`;
+            logContainer.innerHTML += `<span>- Import thành công: ${successCount} mục.</span><br>`;
+            logContainer.innerHTML += `<span>- Bị lỗi: ${errorCount} mục.</span><br>`;
+
+        } catch (error) {
+            console.error("Import error:", error);
+            logContainer.innerHTML += `<span class="text-red-500">Đã xảy ra lỗi nghiêm trọng: ${error.message}</span><br>`;
+        } finally {
+            setButtonLoading(btn, false);
+            fileInput.value = ''; // Reset file input
+        }
+    };
+
+    reader.onerror = () => {
+        logContainer.innerHTML += `<span class="text-red-500">Lỗi khi đọc file.</span><br>`;
+        setButtonLoading(btn, false);
+    };
+
+    reader.readAsArrayBuffer(file);
+}
+
+
 // --- Event Listeners and Initial Setup ---
 function addEventListeners() {
     // Schedule view listener
@@ -1314,6 +1525,16 @@ function addEventListeners() {
         generatePrintableSchedule({ semesterId, viewType, filterId, groupBy });
         closeModal('print-options-modal');
     });
+
+    // Import Modal Listeners (NEW)
+    document.getElementById('import-data-btn').addEventListener('click', () => {
+        document.getElementById('import-file-input').value = '';
+        document.getElementById('import-log').innerHTML = '';
+        document.getElementById('import-results-container').classList.add('hidden');
+        openModal('import-data-modal');
+    });
+    document.getElementById('download-template-btn').addEventListener('click', downloadTemplate);
+    document.getElementById('start-import-btn').addEventListener('click', handleFileImport);
 
 
     // Semester listeners
