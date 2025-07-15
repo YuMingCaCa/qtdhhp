@@ -305,7 +305,7 @@ window.deleteSemester = (id) => {
     });
 };
 
-// --- Subject (Môn học) Management (UPDATED) ---
+// --- Subject (Môn học) Management ---
 function populateSubjectFilters() {
     const filterDepSelect = document.getElementById('filter-subject-by-department');
     const formDepSelect = document.getElementById('subject-department-select');
@@ -472,18 +472,18 @@ window.deleteMajor = (id) => {
 };
 
 
-// --- Official Class (Lớp Chính Quy) Management ---
+// --- Official Class (Lớp Chính Quy) Management (UPDATED) ---
 function renderOfficialClassesList() {
     const listBody = document.getElementById('official-classes-list-body');
     listBody.innerHTML = '';
     officialClasses.forEach(oc => {
-        const major = majors.find(m => m.id === oc.majorId);
+        const department = departments.find(d => d.id === oc.departmentId);
         const row = document.createElement('tr');
         row.className = "border-b";
         row.innerHTML = `
             <td class="p-2 w-10 text-center"><input type="checkbox" class="official-class-checkbox" data-id="${oc.id}"></td>
             <td class="px-4 py-2">${oc.maLopCQ}</td>
-            <td class="px-4 py-2">${major ? major.tenNganh : 'N/A'}</td>
+            <td class="px-4 py-2">${department ? department.name : 'N/A'}</td>
             <td class="px-4 py-2 text-center">${oc.siSo}</td>
             <td class="px-4 py-2 text-center">
                 <button class="text-blue-500 mr-2" onclick="window.editOfficialClass('${oc.id}')" title="Sửa"><i class="fas fa-edit"></i></button>
@@ -503,7 +503,7 @@ window.editOfficialClass = (id) => {
     const oc = officialClasses.find(c => c.id === id);
     if (oc) {
         document.getElementById('official-class-id').value = oc.id;
-        document.getElementById('oc-major-select').value = oc.majorId;
+        document.getElementById('oc-department-select').value = oc.departmentId;
         document.getElementById('oc-code').value = oc.maLopCQ;
         document.getElementById('oc-size').value = oc.siSo;
     }
@@ -617,16 +617,13 @@ window.editCourseSection = (id) => {
         
         // Populate subjects based on the class's department first
         const officialClass = officialClasses.find(oc => oc.id === cs.lopChinhQuyId);
-        if (officialClass) {
-            const major = majors.find(m => m.id === officialClass.majorId);
-            if (major) {
-                const subjectSelect = document.getElementById('cs-subject-select');
-                const filteredSubjects = subjects.filter(s => s.departmentId === major.departmentId);
-                subjectSelect.innerHTML = '<option value="">-- Chọn môn học --</option>';
-                filteredSubjects.forEach(s => {
-                    subjectSelect.innerHTML += `<option value="${s.id}">${s.tenMonHoc} (${s.maHocPhan})</option>`;
-                });
-            }
+        if (officialClass && officialClass.departmentId) {
+            const subjectSelect = document.getElementById('cs-subject-select');
+            const filteredSubjects = subjects.filter(s => s.departmentId === officialClass.departmentId);
+            subjectSelect.innerHTML = '<option value="">-- Chọn môn học --</option>';
+            filteredSubjects.forEach(s => {
+                subjectSelect.innerHTML += `<option value="${s.id}">${s.tenMonHoc} (${s.maHocPhan})</option>`;
+            });
         }
         
         document.getElementById('cs-subject-select').value = cs.monHocId;
@@ -1222,7 +1219,7 @@ function downloadTemplate() {
 
     switch (type) {
         case 'subjects':
-            headers = ["tenMonHoc", "maHocPhan", "soTinChi", "tenKhoa"]; // CHANGED
+            headers = ["tenMonHoc", "maHocPhan", "soTinChi", "tenKhoa"];
             filename = "Mau_Import_MonHoc.xlsx";
             break;
         case 'rooms':
@@ -1238,7 +1235,7 @@ function downloadTemplate() {
             filename = "Mau_Import_GiangVien.xlsx";
             break;
         case 'officialClasses':
-            headers = ["maLopCQ", "siSo", "tenNganh"];
+            headers = ["maLopCQ", "siSo", "tenKhoa"]; // CHANGED
             filename = "Mau_Import_LopChinhQuy.xlsx";
             break;
         case 'courseSections':
@@ -1330,24 +1327,18 @@ async function handleFileImport() {
                         case 'majors':
                             collectionRef = nganhHocCol;
                             const departmentNameFromExcel = String(row.tenKhoa || '').trim().toLowerCase();
-                            const department = departments.find(d => {
-                                const dbName = d.name.toLowerCase();
-                                return dbName === departmentNameFromExcel || dbName === `khoa ${departmentNameFromExcel}`;
-                            });
-                            if (!department) throw new Error(`Không tìm thấy khoa "${row.tenKhoa}"`);
+                            const departmentForMajor = departments.find(d => d.name.toLowerCase() === departmentNameFromExcel);
+                            if (!departmentForMajor) throw new Error(`Không tìm thấy khoa "${row.tenKhoa}"`);
                             docData = {
                                 tenNganh: String(row.tenNganh || '').trim(),
-                                departmentId: department.id
+                                departmentId: departmentForMajor.id
                             };
                             if (!docData.tenNganh) throw new Error("Thiếu tên ngành.");
                             break;
                         case 'lecturers':
                             collectionRef = lecturersCol;
                             const depName = String(row.tenKhoa || '').trim().toLowerCase();
-                            const dept = departments.find(d => {
-                                const dbName = d.name.toLowerCase();
-                                return dbName === depName || dbName === `khoa ${depName}`;
-                            });
+                            const dept = departments.find(d => d.name.toLowerCase() === depName);
                             if (!dept) throw new Error(`Không tìm thấy khoa "${row.tenKhoa}"`);
                             docData = {
                                 name: String(row.tenGiangVien || '').trim(),
@@ -1359,12 +1350,13 @@ async function handleFileImport() {
                             break;
                         case 'officialClasses':
                             collectionRef = lopChinhQuyCol;
-                            const major = majors.find(m => m.tenNganh.toLowerCase() === String(row.tenNganh || '').trim().toLowerCase());
-                            if (!major) throw new Error(`Không tìm thấy ngành học "${row.tenNganh}"`);
+                            const departmentNameForClass = String(row.tenKhoa || '').trim().toLowerCase();
+                            const departmentForClass = departments.find(d => d.name.toLowerCase() === departmentNameForClass);
+                            if (!departmentForClass) throw new Error(`Không tìm thấy khoa "${row.tenKhoa}"`);
                             docData = {
                                 maLopCQ: String(row.maLopCQ || '').trim(),
                                 siSo: parseInt(row.siSo || 0, 10),
-                                majorId: major.id
+                                departmentId: departmentForClass.id
                             };
                             if (!docData.maLopCQ) throw new Error("Thiếu mã lớp chính quy.");
                             break;
@@ -1614,7 +1606,7 @@ function addEventListeners() {
     });
     document.getElementById('clear-semester-form-btn').addEventListener('click', clearSemesterForm);
 
-    // Subject listeners (UPDATED)
+    // Subject listeners
     document.getElementById('manage-subjects-btn').addEventListener('click', () => {
         clearSubjectForm();
         populateSubjectFilters();
@@ -1695,12 +1687,12 @@ function addEventListeners() {
     document.getElementById('clear-major-form-btn').addEventListener('click', clearMajorForm);
 
 
-    // Official Class listeners
+    // Official Class listeners (UPDATED)
     document.getElementById('manage-official-classes-btn').addEventListener('click', () => {
-        const majorSelect = document.getElementById('oc-major-select');
-        majorSelect.innerHTML = '<option value="">-- Chọn Ngành --</option>';
-        majors.forEach(m => {
-            majorSelect.innerHTML += `<option value="${m.id}">${m.tenNganh}</option>`;
+        const departmentSelect = document.getElementById('oc-department-select');
+        departmentSelect.innerHTML = '<option value="">-- Chọn Khoa --</option>';
+        departments.forEach(d => {
+            departmentSelect.innerHTML += `<option value="${d.id}">${d.name}</option>`;
         });
         clearOfficialClassForm();
         window.openModal('manage-official-classes-modal');
@@ -1713,7 +1705,7 @@ function addEventListeners() {
         const data = {
             maLopCQ: document.getElementById('oc-code').value.trim(),
             siSo: parseInt(document.getElementById('oc-size').value, 10),
-            majorId: document.getElementById('oc-major-select').value,
+            departmentId: document.getElementById('oc-department-select').value,
         };
         try {
             if (id) { await updateDoc(doc(lopChinhQuyCol, id), data); } else { await addDoc(lopChinhQuyCol, data); }
@@ -1723,7 +1715,7 @@ function addEventListeners() {
     document.getElementById('clear-oc-form-btn').addEventListener('click', clearOfficialClassForm);
 
 
-    // Course Section listeners (UPDATED)
+    // Course Section listeners
     document.getElementById('manage-course-sections-btn').addEventListener('click', () => {
         clearCourseSectionForm();
         populateDropdownsForCSModal();
@@ -1738,19 +1730,16 @@ function addEventListeners() {
         const officialClass = officialClasses.find(oc => oc.id === e.target.value);
         const subjectSelect = document.getElementById('cs-subject-select');
         
-        if (officialClass) {
-            const major = majors.find(m => m.id === officialClass.majorId);
-            if (major) {
-                // Filter subjects by the department of the class's major
-                const filteredSubjects = subjects.filter(s => s.departmentId === major.departmentId);
-                subjectSelect.innerHTML = '<option value="">-- Chọn môn học --</option>';
-                filteredSubjects.forEach(s => {
-                    subjectSelect.innerHTML += `<option value="${s.id}">${s.tenMonHoc} (${s.maHocPhan})</option>`;
-                });
-            } else {
-                 subjectSelect.innerHTML = '<option value="">-- Lớp chưa có ngành --</option>';
-            }
-        } else {
+        if (officialClass && officialClass.departmentId) {
+            const filteredSubjects = subjects.filter(s => s.departmentId === officialClass.departmentId);
+            subjectSelect.innerHTML = '<option value="">-- Chọn môn học --</option>';
+            filteredSubjects.forEach(s => {
+                subjectSelect.innerHTML += `<option value="${s.id}">${s.tenMonHoc} (${s.maHocPhan})</option>`;
+            });
+        } else if (officialClass) {
+            subjectSelect.innerHTML = '<option value="">-- Lớp chưa thuộc khoa nào --</option>';
+        }
+        else {
             subjectSelect.innerHTML = '<option value="">-- Chọn lớp trước --</option>';
         }
     });
@@ -1882,9 +1871,10 @@ function setupOnSnapshotListeners() {
                 renderMajorsList();
                 renderSubjectsList();
                 populateSubjectFilters();
+                renderOfficialClassesList(); // Re-render classes when departments change
             }
              if (c.name === 'majors') {
-                renderOfficialClassesList();
+                // No longer the primary driver for class rendering
             }
             if (c.name === 'officialClasses' || c.name === 'subjects' || c.name === 'lecturers' || c.name === 'semesters') {
                 renderCourseSectionsList();

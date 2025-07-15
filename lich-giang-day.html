@@ -402,7 +402,6 @@
         </div>
     </div>
     
-    <!-- MODAL QUẢN LÝ MÔN HỌC (ĐÃ CẬP NHẬT) -->
     <div id="manage-subjects-modal" class="modal">
         <div class="modal-content max-w-4xl">
              <span class="close-button no-print" onclick="closeModal('manage-subjects-modal')">&times;</span>
@@ -555,6 +554,7 @@
         </div>
     </div>
 
+    <!-- MODAL QUẢN LÝ LỚP CHÍNH QUY (ĐÃ CẬP NHẬT) -->
     <div id="manage-official-classes-modal" class="modal">
         <div class="modal-content max-w-2xl">
             <span class="close-button no-print" onclick="closeModal('manage-official-classes-modal')">&times;</span>
@@ -568,8 +568,8 @@
                 <input type="hidden" id="official-class-id">
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
                     <div>
-                        <label for="oc-major-select" class="block text-sm font-medium text-gray-700">Ngành</label>
-                        <select id="oc-major-select" required class="mt-1 p-2 border rounded-md w-full"></select>
+                        <label for="oc-department-select" class="block text-sm font-medium text-gray-700">Khoa</label>
+                        <select id="oc-department-select" required class="mt-1 p-2 border rounded-md w-full"></select>
                     </div>
                     <div>
                         <label for="oc-code" class="block text-sm font-medium text-gray-700">Mã lớp</label>
@@ -591,7 +591,7 @@
                         <tr>
                             <th class="p-2 w-10 text-center"><input type="checkbox" id="select-all-official-classes"></th>
                             <th class="px-4 py-2 text-left">Mã Lớp</th>
-                            <th class="px-4 py-2 text-left">Ngành</th>
+                            <th class="px-4 py-2 text-left">Khoa</th>
                             <th class="px-4 py-2 text-center">Sĩ số</th>
                             <th class="px-4 py-2 text-center">Hành động</th>
                         </tr>
