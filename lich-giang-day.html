@@ -11,6 +11,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- SheetJS for Excel file reading -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -84,24 +86,27 @@
             </div>
 
             <!-- Bảng điều khiển quản lý dữ liệu -->
-            <div class="flex flex-wrap gap-4 mb-8">
-                 <button id="manage-semesters-btn" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center transition-all min-w-[160px]">
-                    <i class="fas fa-calendar-check mr-2"></i> Quản lý Học kỳ
+            <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-8">
+                 <button id="manage-semesters-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center transition-all">
+                    <i class="fas fa-calendar-check mr-2"></i><span>Học kỳ</span>
                 </button>
-                 <button id="manage-majors-btn" class="flex-1 bg-teal-500 hover:bg-teal-600 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center transition-all min-w-[160px]">
-                    <i class="fas fa-sitemap mr-2"></i> Quản lý Ngành
+                 <button id="manage-majors-btn" class="bg-teal-500 hover:bg-teal-600 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center transition-all">
+                    <i class="fas fa-sitemap mr-2"></i><span>Ngành</span>
                 </button>
-                <button id="manage-subjects-btn" class="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center transition-all min-w-[160px]">
-                    <i class="fas fa-book mr-2"></i> Quản lý Môn học
+                <button id="manage-subjects-btn" class="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center transition-all">
+                    <i class="fas fa-book mr-2"></i><span>Môn học</span>
                 </button>
-                <button id="manage-rooms-btn" class="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center transition-all min-w-[160px]">
-                    <i class="fas fa-school mr-2"></i> Quản lý Phòng học
+                <button id="manage-rooms-btn" class="bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center transition-all">
+                    <i class="fas fa-school mr-2"></i><span>Phòng học</span>
                 </button>
-                 <button id="manage-official-classes-btn" class="flex-1 bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center transition-all min-w-[160px]">
-                    <i class="fas fa-users mr-2"></i> Quản lý Lớp (CQ)
+                 <button id="manage-official-classes-btn" class="bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center transition-all">
+                    <i class="fas fa-users mr-2"></i><span>Lớp CQ</span>
                 </button>
-                <button id="manage-course-sections-btn" class="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center transition-all min-w-[160px]">
-                    <i class="fas fa-chalkboard-teacher mr-2"></i> Phân công Giảng dạy
+                <button id="manage-course-sections-btn" class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center transition-all">
+                    <i class="fas fa-chalkboard-teacher mr-2"></i><span>Phân công</span>
+                </button>
+                <button id="import-data-btn" class="bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center transition-all">
+                    <i class="fas fa-file-import mr-2"></i><span>Import</span>
                 </button>
             </div>
 
@@ -139,6 +144,40 @@
     </div>
 
     <!-- MODALS -->
+
+    <!-- Import Data Modal -->
+    <div id="import-data-modal" class="modal">
+        <div class="modal-content max-w-2xl">
+            <span class="close-button no-print" onclick="closeModal('import-data-modal')">&times;</span>
+            <h3 class="text-xl font-bold mb-4">Import Dữ liệu hàng loạt</h3>
+            <div class="p-4 border rounded-lg bg-gray-50 space-y-4">
+                <div>
+                    <label for="import-type-select" class="block text-sm font-medium text-gray-700">1. Chọn loại dữ liệu để import</label>
+                    <select id="import-type-select" class="mt-1 p-2 border rounded-md w-full">
+                        <option value="subjects">Môn học</option>
+                        <option value="rooms">Phòng học</option>
+                        <option value="majors">Ngành học</option>
+                        <option value="officialClasses">Lớp chính quy</option>
+                        <option value="courseSections">Phân công giảng dạy</option>
+                    </select>
+                </div>
+                <div>
+                     <label for="import-file-input" class="block text-sm font-medium text-gray-700">2. Chọn file Excel (.xlsx)</label>
+                     <input type="file" id="import-file-input" accept=".xlsx" class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                </div>
+                <div class="flex justify-between items-center">
+                    <button id="download-template-btn" type="button" class="text-blue-600 hover:underline text-sm"><i class="fas fa-download mr-1"></i> Tải file mẫu</button>
+                    <button id="start-import-btn" class="bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-2 px-4 rounded-lg">
+                        <i class="fas fa-rocket mr-2"></i>Bắt đầu Import
+                    </button>
+                </div>
+            </div>
+             <div id="import-results-container" class="mt-4 hidden">
+                <h4 class="font-semibold text-gray-800 mb-2">Kết quả Import:</h4>
+                <div id="import-log" class="max-h-60 overflow-y-auto border rounded-md p-3 bg-gray-50 text-sm"></div>
+            </div>
+        </div>
+    </div>
 
     <!-- Conflict Check Modal -->
     <div id="conflict-check-modal" class="modal">
