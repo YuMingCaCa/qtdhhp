@@ -345,7 +345,12 @@
     <div id="manage-semesters-modal" class="modal">
         <div class="modal-content">
             <span class="close-button no-print" onclick="closeModal('manage-semesters-modal')">&times;</span>
-            <h3 class="text-xl font-bold mb-4">Quản lý Học kỳ</h3>
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold">Quản lý Học kỳ</h3>
+                <button id="delete-selected-semesters-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg text-sm hidden">
+                    <i class="fas fa-trash-alt mr-2"></i>Xóa mục đã chọn
+                </button>
+            </div>
             <form id="semester-form" class="mb-4 p-4 border rounded-lg bg-gray-50">
                 <input type="hidden" id="semester-id">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
@@ -384,6 +389,7 @@
                 <table class="min-w-full bg-white">
                     <thead class="bg-gray-100 sticky top-0">
                         <tr>
+                            <th class="p-2 w-10 text-center"><input type="checkbox" id="select-all-semesters"></th>
                             <th class="px-4 py-2 text-left">Tên Học kỳ</th>
                             <th class="px-4 py-2 text-left">Năm học</th>
                             <th class="px-4 py-2 text-center">Ngày bắt đầu</th>
@@ -396,14 +402,24 @@
         </div>
     </div>
     
+    <!-- MODAL QUẢN LÝ MÔN HỌC (ĐÃ CẬP NHẬT) -->
     <div id="manage-subjects-modal" class="modal">
-        <div class="modal-content max-w-2xl">
-            <span class="close-button no-print" onclick="closeModal('manage-subjects-modal')">&times;</span>
-            <h3 class="text-xl font-bold mb-4">Quản lý Môn học</h3>
+        <div class="modal-content max-w-4xl">
+             <span class="close-button no-print" onclick="closeModal('manage-subjects-modal')">&times;</span>
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold">Quản lý Môn học</h3>
+                <button id="delete-selected-subjects-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg text-sm hidden">
+                    <i class="fas fa-trash-alt mr-2"></i>Xóa mục đã chọn
+                </button>
+            </div>
             <form id="subject-form" class="mb-4 p-4 border rounded-lg bg-gray-50">
                 <input type="hidden" id="subject-id">
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-                    <div class="md:col-span-2">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
+                    <div class="lg:col-span-3">
+                        <label for="subject-department-select" class="block text-sm font-medium text-gray-700">Thuộc Khoa</label>
+                        <select id="subject-department-select" required class="mt-1 p-2 border rounded-md w-full"></select>
+                    </div>
+                    <div class="lg:col-span-2">
                         <label for="subject-name" class="block text-sm font-medium text-gray-700">Tên môn học</label>
                         <input type="text" id="subject-name" placeholder="VD: Lập trình Web" required class="mt-1 p-2 border rounded-md w-full">
                     </div>
@@ -415,18 +431,27 @@
                         <label for="subject-credits" class="block text-sm font-medium text-gray-700">Số tín chỉ</label>
                         <input type="number" id="subject-credits" value="3" min="0" step="0.5" required class="mt-1 p-2 border rounded-md w-full">
                     </div>
-                    <div class="md:col-span-3 flex gap-2">
+                    <div class="lg:col-span-2 flex gap-2">
                         <button type="submit" class="bg-green-600 hover:bg-green-700 text-white p-2 rounded-md w-full">Lưu</button>
                         <button type="button" id="clear-subject-form-btn" class="bg-gray-200 hover:bg-gray-300 text-black p-2 rounded-md w-full">Mới</button>
                     </div>
                 </div>
             </form>
+            <div class="mb-4 p-4 border rounded-lg bg-gray-50">
+                <h4 class="font-semibold mb-2">Lọc danh sách môn học</h4>
+                <div>
+                    <label for="filter-subject-by-department" class="block text-sm font-medium text-gray-700">Lọc theo Khoa</label>
+                    <select id="filter-subject-by-department" class="mt-1 p-2 border rounded-md w-full"></select>
+                </div>
+            </div>
             <div class="overflow-x-auto max-h-80">
                 <table class="min-w-full bg-white">
                     <thead class="bg-gray-100 sticky top-0">
                         <tr>
+                            <th class="p-2 w-10 text-center"><input type="checkbox" id="select-all-subjects"></th>
                             <th class="px-4 py-2 text-left">Tên Môn học</th>
                             <th class="px-4 py-2 text-left">Mã HP</th>
+                            <th class="px-4 py-2 text-left">Khoa</th>
                             <th class="px-4 py-2 text-center">Số TC</th>
                             <th class="px-4 py-2 text-center">Hành động</th>
                         </tr>
@@ -440,7 +465,12 @@
     <div id="manage-majors-modal" class="modal">
         <div class="modal-content max-w-2xl">
             <span class="close-button no-print" onclick="closeModal('manage-majors-modal')">&times;</span>
-            <h3 class="text-xl font-bold mb-4">Quản lý Ngành học</h3>
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold">Quản lý Ngành học</h3>
+                 <button id="delete-selected-majors-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg text-sm hidden">
+                    <i class="fas fa-trash-alt mr-2"></i>Xóa mục đã chọn
+                </button>
+            </div>
             <form id="major-form" class="mb-4 p-4 border rounded-lg bg-gray-50">
                 <input type="hidden" id="major-id">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
@@ -462,6 +492,7 @@
                 <table class="min-w-full bg-white">
                     <thead class="bg-gray-100 sticky top-0">
                         <tr>
+                            <th class="p-2 w-10 text-center"><input type="checkbox" id="select-all-majors"></th>
                             <th class="px-4 py-2 text-left">Tên Ngành</th>
                             <th class="px-4 py-2 text-left">Khoa</th>
                             <th class="px-4 py-2 text-center">Hành động</th>
@@ -476,7 +507,12 @@
     <div id="manage-rooms-modal" class="modal">
         <div class="modal-content max-w-2xl">
             <span class="close-button no-print" onclick="closeModal('manage-rooms-modal')">&times;</span>
-            <h3 class="text-xl font-bold mb-4">Quản lý Phòng học</h3>
+             <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold">Quản lý Phòng học</h3>
+                 <button id="delete-selected-rooms-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg text-sm hidden">
+                    <i class="fas fa-trash-alt mr-2"></i>Xóa mục đã chọn
+                </button>
+            </div>
             <form id="room-form" class="mb-4 p-4 border rounded-lg bg-gray-50">
                 <input type="hidden" id="room-id">
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
@@ -506,6 +542,7 @@
                 <table class="min-w-full bg-white">
                     <thead class="bg-gray-100 sticky top-0">
                         <tr>
+                            <th class="p-2 w-10 text-center"><input type="checkbox" id="select-all-rooms"></th>
                             <th class="px-4 py-2 text-left">Tên Phòng</th>
                             <th class="px-4 py-2 text-center">Loại phòng</th>
                             <th class="px-4 py-2 text-center">Sức chứa</th>
@@ -521,7 +558,12 @@
     <div id="manage-official-classes-modal" class="modal">
         <div class="modal-content max-w-2xl">
             <span class="close-button no-print" onclick="closeModal('manage-official-classes-modal')">&times;</span>
-            <h3 class="text-xl font-bold mb-4">Quản lý Lớp Chính Quy</h3>
+             <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold">Quản lý Lớp Chính Quy</h3>
+                 <button id="delete-selected-official-classes-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg text-sm hidden">
+                    <i class="fas fa-trash-alt mr-2"></i>Xóa mục đã chọn
+                </button>
+            </div>
             <form id="official-class-form" class="mb-4 p-4 border rounded-lg bg-gray-50">
                 <input type="hidden" id="official-class-id">
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
@@ -547,6 +589,7 @@
                 <table class="min-w-full bg-white">
                     <thead class="bg-gray-100 sticky top-0">
                         <tr>
+                            <th class="p-2 w-10 text-center"><input type="checkbox" id="select-all-official-classes"></th>
                             <th class="px-4 py-2 text-left">Mã Lớp</th>
                             <th class="px-4 py-2 text-left">Ngành</th>
                             <th class="px-4 py-2 text-center">Sĩ số</th>
@@ -562,7 +605,12 @@
     <div id="manage-course-sections-modal" class="modal">
         <div class="modal-content max-w-3xl">
             <span class="close-button no-print" onclick="closeModal('manage-course-sections-modal')">&times;</span>
-            <h3 class="text-xl font-bold mb-4">Phân công Giảng dạy</h3>
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold">Phân công Giảng dạy</h3>
+                 <button id="delete-selected-course-sections-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg text-sm hidden">
+                    <i class="fas fa-trash-alt mr-2"></i>Xóa mục đã chọn
+                </button>
+            </div>
             <form id="course-section-form" class="mb-4 p-4 border rounded-lg bg-gray-50">
                 <input type="hidden" id="course-section-id">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
@@ -601,6 +649,7 @@
                 <table class="min-w-full bg-white">
                     <thead class="bg-gray-100 sticky top-0">
                         <tr>
+                            <th class="p-2 w-10 text-center"><input type="checkbox" id="select-all-course-sections"></th>
                             <th class="px-4 py-2 text-left">Mã Lớp HP</th>
                             <th class="px-4 py-2 text-left">Tên Môn học</th>
                             <th class="px-4 py-2 text-left">Giảng viên</th>

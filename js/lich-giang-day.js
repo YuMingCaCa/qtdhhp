@@ -261,6 +261,7 @@ function renderSemestersList() {
         row.className = "border-b";
         const formattedDate = new Date(semester.ngayBatDau).toLocaleDateString('vi-VN');
         row.innerHTML = `
+            <td class="p-2 w-10 text-center"><input type="checkbox" class="semester-checkbox" data-id="${semester.id}"></td>
             <td class="px-4 py-2">${semester.tenHocKy}</td>
             <td class="px-4 py-2">${semester.namHoc}</td>
             <td class="px-4 py-2 text-center">${formattedDate}</td>
@@ -304,16 +305,41 @@ window.deleteSemester = (id) => {
     });
 };
 
-// --- Subject (Môn học) Management ---
+// --- Subject (Môn học) Management (UPDATED) ---
+function populateSubjectFilters() {
+    const filterDepSelect = document.getElementById('filter-subject-by-department');
+    const formDepSelect = document.getElementById('subject-department-select');
+
+    filterDepSelect.innerHTML = '<option value="all">Tất cả Khoa</option>';
+    formDepSelect.innerHTML = '<option value="">-- Chọn Khoa --</option>';
+
+    departments.forEach(dep => {
+        const optionHtml = `<option value="${dep.id}">${dep.name}</option>`;
+        filterDepSelect.innerHTML += optionHtml;
+        formDepSelect.innerHTML += optionHtml;
+    });
+}
+
 function renderSubjectsList() {
     const listBody = document.getElementById('subjects-list-body');
     listBody.innerHTML = '';
-    subjects.forEach(subject => {
+
+    const departmentFilter = document.getElementById('filter-subject-by-department').value;
+
+    let filteredSubjects = subjects;
+    if (departmentFilter !== 'all') {
+        filteredSubjects = subjects.filter(s => s.departmentId === departmentFilter);
+    }
+
+    filteredSubjects.forEach(subject => {
+        const department = departments.find(d => d.id === subject.departmentId);
         const row = document.createElement('tr');
         row.className = "border-b";
         row.innerHTML = `
+            <td class="p-2 w-10 text-center"><input type="checkbox" class="subject-checkbox" data-id="${subject.id}"></td>
             <td class="px-4 py-2">${subject.tenMonHoc}</td>
             <td class="px-4 py-2">${subject.maHocPhan}</td>
+            <td class="px-4 py-2">${department ? department.name : '<i class="text-gray-400">Chưa phân loại</i>'}</td>
             <td class="px-4 py-2 text-center">${subject.soTinChi}</td>
             <td class="px-4 py-2 text-center">
                 <button class="text-blue-500 mr-2" onclick="window.editSubject('${subject.id}')" title="Sửa"><i class="fas fa-edit"></i></button>
@@ -336,6 +362,7 @@ window.editSubject = (id) => {
         document.getElementById('subject-name').value = subject.tenMonHoc;
         document.getElementById('subject-code').value = subject.maHocPhan;
         document.getElementById('subject-credits').value = subject.soTinChi;
+        document.getElementById('subject-department-select').value = subject.departmentId || "";
     }
 };
 
@@ -358,6 +385,7 @@ function renderRoomsList() {
         const row = document.createElement('tr');
         row.className = "border-b";
         row.innerHTML = `
+            <td class="p-2 w-10 text-center"><input type="checkbox" class="room-checkbox" data-id="${room.id}"></td>
             <td class="px-4 py-2">${room.tenPhong}</td>
             <td class="px-4 py-2 text-center">${room.loaiPhong}</td>
             <td class="px-4 py-2 text-center">${room.sucChua}</td>
@@ -406,6 +434,7 @@ function renderMajorsList() {
         const row = document.createElement('tr');
         row.className = "border-b";
         row.innerHTML = `
+            <td class="p-2 w-10 text-center"><input type="checkbox" class="major-checkbox" data-id="${major.id}"></td>
             <td class="px-4 py-2">${major.tenNganh}</td>
             <td class="px-4 py-2">${department ? department.name : 'N/A'}</td>
             <td class="px-4 py-2 text-center">
@@ -452,6 +481,7 @@ function renderOfficialClassesList() {
         const row = document.createElement('tr');
         row.className = "border-b";
         row.innerHTML = `
+            <td class="p-2 w-10 text-center"><input type="checkbox" class="official-class-checkbox" data-id="${oc.id}"></td>
             <td class="px-4 py-2">${oc.maLopCQ}</td>
             <td class="px-4 py-2">${major ? major.tenNganh : 'N/A'}</td>
             <td class="px-4 py-2 text-center">${oc.siSo}</td>
@@ -503,10 +533,8 @@ function populateDropdownsForCSModal() {
         semesterSelect.innerHTML += `<option value="${s.id}">${s.tenHocKy}</option>`;
     });
 
-    subjectSelect.innerHTML = '<option value="">-- Chọn môn học --</option>';
-    subjects.forEach(s => {
-        subjectSelect.innerHTML += `<option value="${s.id}">${s.tenMonHoc} (${s.maHocPhan})</option>`;
-    });
+    subjectSelect.innerHTML = '<option value="">-- Chọn lớp chính quy trước --</option>';
+    // Subjects will be populated by the official class change event listener
 
     departmentSelect.innerHTML = '<option value="">-- Chọn khoa --</option>';
     departments.forEach(d => {
@@ -559,6 +587,7 @@ function renderCourseSectionsList() {
         const row = document.createElement('tr');
         row.className = "border-b";
         row.innerHTML = `
+            <td class="p-2 w-10 text-center"><input type="checkbox" class="course-section-checkbox" data-id="${cs.id}"></td>
             <td class="px-4 py-2 font-semibold">${cs.maLopHP}</td>
             <td class="px-4 py-2">${subject ? subject.tenMonHoc : 'N/A'}</td>
             <td class="px-4 py-2">${lecturer ? lecturer.name : 'N/A'}</td>
@@ -585,6 +614,21 @@ window.editCourseSection = (id) => {
 
         document.getElementById('course-section-id').value = cs.id;
         document.getElementById('cs-semester-select').value = cs.hocKyId;
+        
+        // Populate subjects based on the class's department first
+        const officialClass = officialClasses.find(oc => oc.id === cs.lopChinhQuyId);
+        if (officialClass) {
+            const major = majors.find(m => m.id === officialClass.majorId);
+            if (major) {
+                const subjectSelect = document.getElementById('cs-subject-select');
+                const filteredSubjects = subjects.filter(s => s.departmentId === major.departmentId);
+                subjectSelect.innerHTML = '<option value="">-- Chọn môn học --</option>';
+                filteredSubjects.forEach(s => {
+                    subjectSelect.innerHTML += `<option value="${s.id}">${s.tenMonHoc} (${s.maHocPhan})</option>`;
+                });
+            }
+        }
+        
         document.getElementById('cs-subject-select').value = cs.monHocId;
         document.getElementById('cs-official-class-select').value = cs.lopChinhQuyId;
         document.getElementById('cs-code').value = cs.maLopHP;
@@ -1079,10 +1123,12 @@ function generatePrintableSchedule(options) {
                         const subject = subjects.find(sub => sub.id === section?.monHocId);
                         const lecturer = lecturers.find(l => l.id === section?.giangVienId);
                         const room = rooms.find(r => r.id === s.phongHocId);
+                        const phoneHtml = lecturer?.soDienThoai ? `<p>SĐT: ${lecturer.soDienThoai}</p>` : '';
                         cellHtml += `
                             <div class="print-schedule-item">
                                 <p><strong>${subject?.tenMonHoc || 'N/A'}</strong></p>
                                 <p>GV: ${lecturer?.name || 'N/A'}</p>
+                                ${phoneHtml}
                                 <p>Phòng: ${room?.tenPhong || 'N/A'}</p>
                                 <p>Tiết: ${s.tietBatDau}-${s.tietBatDau + s.soTiet - 1}</p>
                             </div>
@@ -1110,11 +1156,13 @@ function generatePrintableSchedule(options) {
                         const subject = subjects.find(sub => sub.id === section?.monHocId);
                         const lecturer = lecturers.find(l => l.id === section?.giangVienId);
                         const oClass = officialClasses.find(oc => oc.id === section?.lopChinhQuyId);
+                        const phoneHtml = lecturer?.soDienThoai ? `<p>SĐT: ${lecturer.soDienThoai}</p>` : '';
                         cellHtml += `
                             <div class="print-schedule-item">
                                 <p><strong>${subject?.tenMonHoc || 'N/A'}</strong></p>
                                 <p>Lớp: ${oClass?.maLopCQ || 'N/A'}</p>
                                 <p>GV: ${lecturer?.name || 'N/A'}</p>
+                                ${phoneHtml}
                                 <p>Tiết: ${s.tietBatDau}-${s.tietBatDau + s.soTiet - 1}</p>
                             </div>
                         `;
@@ -1165,7 +1213,7 @@ function generatePrintableSchedule(options) {
 }
 
 
-// --- Import Logic (NEW) ---
+// --- Import Logic (UPDATED) ---
 
 // Function to download a template Excel file
 function downloadTemplate() {
@@ -1174,7 +1222,7 @@ function downloadTemplate() {
 
     switch (type) {
         case 'subjects':
-            headers = ["tenMonHoc", "maHocPhan", "soTinChi"];
+            headers = ["tenMonHoc", "maHocPhan", "soTinChi", "tenKhoa"]; // CHANGED
             filename = "Mau_Import_MonHoc.xlsx";
             break;
         case 'rooms':
@@ -1182,7 +1230,7 @@ function downloadTemplate() {
             filename = "Mau_Import_PhongHoc.xlsx";
             break;
         case 'majors':
-             headers = ["tenNganh", "tenKhoa"]; // Use department name for simplicity
+             headers = ["tenNganh", "tenKhoa"];
             filename = "Mau_Import_NganhHoc.xlsx";
             break;
         case 'lecturers':
@@ -1190,7 +1238,7 @@ function downloadTemplate() {
             filename = "Mau_Import_GiangVien.xlsx";
             break;
         case 'officialClasses':
-            headers = ["maLopCQ", "siSo", "tenNganh"]; // Use major name
+            headers = ["maLopCQ", "siSo", "tenNganh"];
             filename = "Mau_Import_LopChinhQuy.xlsx";
             break;
         case 'courseSections':
@@ -1259,10 +1307,14 @@ async function handleFileImport() {
                     switch (type) {
                         case 'subjects':
                             collectionRef = monHocCol;
+                            const departmentNameForSubject = String(row.tenKhoa || '').trim().toLowerCase();
+                            const departmentForSubject = departments.find(d => d.name.toLowerCase() === departmentNameForSubject);
+                            if (!departmentForSubject) throw new Error(`Không tìm thấy khoa "${row.tenKhoa}"`);
                             docData = {
                                 tenMonHoc: String(row.tenMonHoc || '').trim(),
                                 maHocPhan: String(row.maHocPhan || '').trim(),
-                                soTinChi: parseFloat(row.soTinChi || 0)
+                                soTinChi: parseFloat(row.soTinChi || 0),
+                                departmentId: departmentForSubject.id
                             };
                             if (!docData.tenMonHoc || !docData.maHocPhan) throw new Error("Thiếu tên môn học hoặc mã học phần.");
                             break;
@@ -1280,7 +1332,6 @@ async function handleFileImport() {
                             const departmentNameFromExcel = String(row.tenKhoa || '').trim().toLowerCase();
                             const department = departments.find(d => {
                                 const dbName = d.name.toLowerCase();
-                                // Check for exact match OR match where DB name has "Khoa " prefix
                                 return dbName === departmentNameFromExcel || dbName === `khoa ${departmentNameFromExcel}`;
                             });
                             if (!department) throw new Error(`Không tìm thấy khoa "${row.tenKhoa}"`);
@@ -1526,7 +1577,7 @@ function addEventListeners() {
         closeModal('print-options-modal');
     });
 
-    // Import Modal Listeners (NEW)
+    // Import Modal Listeners
     document.getElementById('import-data-btn').addEventListener('click', () => {
         document.getElementById('import-file-input').value = '';
         document.getElementById('import-log').innerHTML = '';
@@ -1563,11 +1614,14 @@ function addEventListeners() {
     });
     document.getElementById('clear-semester-form-btn').addEventListener('click', clearSemesterForm);
 
-    // Subject listeners
+    // Subject listeners (UPDATED)
     document.getElementById('manage-subjects-btn').addEventListener('click', () => {
         clearSubjectForm();
+        populateSubjectFilters();
+        renderSubjectsList();
         window.openModal('manage-subjects-modal');
     });
+    document.getElementById('filter-subject-by-department').addEventListener('change', renderSubjectsList);
     document.getElementById('subject-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const btn = e.target.querySelector('button[type="submit"]');
@@ -1577,7 +1631,13 @@ function addEventListeners() {
             tenMonHoc: document.getElementById('subject-name').value.trim(),
             maHocPhan: document.getElementById('subject-code').value.trim(),
             soTinChi: parseFloat(document.getElementById('subject-credits').value),
+            departmentId: document.getElementById('subject-department-select').value,
         };
+        if (!data.departmentId) {
+            showAlert("Vui lòng chọn Khoa cho môn học.");
+            setButtonLoading(btn, false);
+            return;
+        }
         try {
             if (id) { await updateDoc(doc(monHocCol, id), data); } else { await addDoc(monHocCol, data); }
             clearSubjectForm();
@@ -1663,7 +1723,7 @@ function addEventListeners() {
     document.getElementById('clear-oc-form-btn').addEventListener('click', clearOfficialClassForm);
 
 
-    // Course Section listeners
+    // Course Section listeners (UPDATED)
     document.getElementById('manage-course-sections-btn').addEventListener('click', () => {
         clearCourseSectionForm();
         populateDropdownsForCSModal();
@@ -1673,7 +1733,27 @@ function addEventListeners() {
         populateLecturersByDepartment(e.target.value);
     });
     document.getElementById('cs-subject-select').addEventListener('change', updateCourseSectionCode);
-    document.getElementById('cs-official-class-select').addEventListener('change', updateCourseSectionCode);
+    document.getElementById('cs-official-class-select').addEventListener('change', (e) => {
+        updateCourseSectionCode();
+        const officialClass = officialClasses.find(oc => oc.id === e.target.value);
+        const subjectSelect = document.getElementById('cs-subject-select');
+        
+        if (officialClass) {
+            const major = majors.find(m => m.id === officialClass.majorId);
+            if (major) {
+                // Filter subjects by the department of the class's major
+                const filteredSubjects = subjects.filter(s => s.departmentId === major.departmentId);
+                subjectSelect.innerHTML = '<option value="">-- Chọn môn học --</option>';
+                filteredSubjects.forEach(s => {
+                    subjectSelect.innerHTML += `<option value="${s.id}">${s.tenMonHoc} (${s.maHocPhan})</option>`;
+                });
+            } else {
+                 subjectSelect.innerHTML = '<option value="">-- Lớp chưa có ngành --</option>';
+            }
+        } else {
+            subjectSelect.innerHTML = '<option value="">-- Chọn lớp trước --</option>';
+        }
+    });
     document.getElementById('course-section-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const btn = e.target.querySelector('button[type="submit"]');
@@ -1692,6 +1772,63 @@ function addEventListeners() {
         } catch (error) { showAlert(`Lỗi khi lưu phân công: ${error.message}`); } finally { setButtonLoading(btn, false); }
     });
     document.getElementById('clear-cs-form-btn').addEventListener('click', clearCourseSectionForm);
+
+    // --- Bulk Delete Logic for Modals ---
+    function setupBulkDelete(modalId, selectAllId, checkboxClass, deleteBtnId, collectionRef, itemName) {
+        const modal = document.getElementById(modalId);
+        if (!modal) return;
+
+        const selectAllCheckbox = document.getElementById(selectAllId);
+        const deleteBtn = document.getElementById(deleteBtnId);
+
+        // Event delegation for checkboxes
+        modal.addEventListener('change', (e) => {
+            if (e.target.matches(`.${checkboxClass}, #${selectAllId}`)) {
+                const checkboxes = modal.querySelectorAll(`.${checkboxClass}`);
+                if (e.target.id === selectAllId) {
+                    checkboxes.forEach(cb => cb.checked = e.target.checked);
+                }
+                
+                const anyChecked = Array.from(checkboxes).some(cb => cb.checked);
+                deleteBtn.classList.toggle('hidden', !anyChecked);
+            }
+        });
+
+        // Delete button click
+        deleteBtn.addEventListener('click', () => {
+            const selectedIds = Array.from(modal.querySelectorAll(`.${checkboxClass}:checked`)).map(cb => cb.dataset.id);
+
+            if (selectedIds.length === 0) {
+                showAlert('Vui lòng chọn ít nhất một mục để xóa.');
+                return;
+            }
+
+            showConfirm(`Bạn có chắc muốn xóa vĩnh viễn ${selectedIds.length} ${itemName} đã chọn?`, async () => {
+                setButtonLoading(deleteBtn, true);
+                try {
+                    const batch = writeBatch(db);
+                    selectedIds.forEach(id => {
+                        batch.delete(doc(collectionRef, id));
+                    });
+                    await batch.commit();
+                    showAlert(`Đã xóa ${selectedIds.length} ${itemName} thành công!`, true);
+                    deleteBtn.classList.add('hidden');
+                } catch (error) {
+                    console.error(`Error bulk deleting ${itemName}:`, error);
+                    showAlert(`Lỗi khi xóa hàng loạt: ${error.message}`);
+                } finally {
+                    setButtonLoading(deleteBtn, false);
+                }
+            });
+        });
+    }
+
+    setupBulkDelete('manage-semesters-modal', 'select-all-semesters', 'semester-checkbox', 'delete-selected-semesters-btn', hocKyCol, 'học kỳ');
+    setupBulkDelete('manage-majors-modal', 'select-all-majors', 'major-checkbox', 'delete-selected-majors-btn', nganhHocCol, 'ngành học');
+    setupBulkDelete('manage-subjects-modal', 'select-all-subjects', 'subject-checkbox', 'delete-selected-subjects-btn', monHocCol, 'môn học');
+    setupBulkDelete('manage-rooms-modal', 'select-all-rooms', 'room-checkbox', 'delete-selected-rooms-btn', phongHocCol, 'phòng học');
+    setupBulkDelete('manage-official-classes-modal', 'select-all-official-classes', 'official-class-checkbox', 'delete-selected-official-classes-btn', lopChinhQuyCol, 'lớp chính quy');
+    setupBulkDelete('manage-course-sections-modal', 'select-all-course-sections', 'course-section-checkbox', 'delete-selected-course-sections-btn', lopHocPhanCol, 'phân công');
 }
 
 // --- Data Snapshot Listeners ---
@@ -1707,6 +1844,7 @@ function checkAllDataReady() {
     if (Object.values(isDataReady).every(status => status === true)) {
         initialLoadDone = true;
         console.log("All initial data loaded.");
+        
         renderScheduleTable();
         populateClassSelect();
         
@@ -1739,7 +1877,13 @@ function setupOnSnapshotListeners() {
             
             if (c.render) c.render();
 
-            if (c.name === 'departments' || c.name === 'majors') {
+            // Re-render dependent lists
+            if (c.name === 'departments') {
+                renderMajorsList();
+                renderSubjectsList();
+                populateSubjectFilters();
+            }
+             if (c.name === 'majors') {
                 renderOfficialClassesList();
             }
             if (c.name === 'officialClasses' || c.name === 'subjects' || c.name === 'lecturers' || c.name === 'semesters') {
