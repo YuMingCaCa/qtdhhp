@@ -417,22 +417,38 @@ function renderDepartmentsList() {
 
 function renderLecturersList() {
     const listBody = document.getElementById('lecturers-list-body');
-    const depSelect = document.getElementById('lecturer-department');
-    const currentVal = depSelect.value;
-    depSelect.innerHTML = '<option value="">-- Chọn Khoa --</option>';
+    const formDepSelect = document.getElementById('lecturer-department');
+    const filterDepSelect = document.getElementById('filter-lecturer-by-department');
+
+    // Populate the department dropdown inside the form for adding/editing a lecturer
+    const currentFormDepVal = formDepSelect.value;
+    formDepSelect.innerHTML = '<option value="">-- Chọn Khoa --</option>';
     state.departments.forEach(dep => {
         const option = document.createElement('option');
         option.value = dep.id;
         option.textContent = dep.name;
-        depSelect.appendChild(option);
+        formDepSelect.appendChild(option);
     });
-    depSelect.value = currentVal;
+    formDepSelect.value = currentFormDepVal;
 
+    // Filter the list of lecturers based on the filter dropdown
+    const selectedFilterDepId = filterDepSelect.value;
+    let filteredLecturers = state.lecturers;
+    if (selectedFilterDepId && selectedFilterDepId !== 'all') {
+        filteredLecturers = state.lecturers.filter(l => l.departmentId === selectedFilterDepId);
+    }
+
+    // Render the filtered list into the table
     listBody.innerHTML = '';
-    state.lecturers.forEach(lecturer => {
+    if (filteredLecturers.length === 0) {
+        listBody.innerHTML = `<tr><td colspan="5" class="text-center p-6 text-gray-500">Không có giảng viên nào trong khoa được chọn.</td></tr>`;
+        return;
+    }
+    
+    filteredLecturers.forEach(lecturer => {
         const department = state.departments.find(d => d.id === lecturer.departmentId);
         const row = document.createElement('tr');
-         row.className = "border-b";
+        row.className = "border-b";
         row.innerHTML = `
             <td class="px-4 py-2">${lecturer.name}</td>
             <td class="px-4 py-2">${lecturer.code}</td>
@@ -1070,6 +1086,76 @@ function clearInactivityListeners() {
     clearTimeout(inactivityTimer);
 }
 
+// --- NEW: DUPLICATE CLEANUP LOGIC ---
+async function cleanupDuplicateLecturers(btn) {
+    setButtonLoading(btn, true);
+    try {
+        const allLecturersSnapshot = await getDocs(lecturersCol);
+        const allLecturers = allLecturersSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+
+        const lecturerGroups = new Map();
+        allLecturers.forEach(lecturer => {
+            if (!lecturer.code) return; // Skip lecturers without a code
+            const code = lecturer.code.trim().toLowerCase();
+            if (!lecturerGroups.has(code)) {
+                lecturerGroups.set(code, []);
+            }
+            lecturerGroups.get(code).push(lecturer);
+        });
+
+        const duplicatesToProcess = [];
+        for (const [code, group] of lecturerGroups.entries()) {
+            if (group.length > 1) {
+                // Sort by name to have a consistent master, or just pick the first one
+                group.sort((a, b) => a.name.localeCompare(b.name));
+                const master = group[0];
+                const duplicates = group.slice(1);
+                duplicatesToProcess.push({ master, duplicates });
+            }
+        }
+
+        if (duplicatesToProcess.length === 0) {
+            showAlert("Không tìm thấy giảng viên nào bị trùng lặp.", true);
+            setButtonLoading(btn, false);
+            return;
+        }
+
+        const batch = writeBatch(db);
+        let entriesToUpdateCount = 0;
+        let lecturersToDeleteCount = 0;
+
+        for (const group of duplicatesToProcess) {
+            const masterId = group.master.id;
+            const duplicateIds = group.duplicates.map(d => d.id);
+            
+            // Find all entries associated with duplicate lecturer IDs
+            const entriesQuery = query(entriesCol, where('lecturerId', 'in', duplicateIds));
+            const entriesSnapshot = await getDocs(entriesQuery);
+            
+            entriesSnapshot.forEach(entryDoc => {
+                batch.update(entryDoc.ref, { lecturerId: masterId });
+                entriesToUpdateCount++;
+            });
+
+            // Schedule duplicates for deletion
+            duplicateIds.forEach(id => {
+                batch.delete(doc(lecturersCol, id));
+                lecturersToDeleteCount++;
+            });
+        }
+
+        await batch.commit();
+        showAlert(`Dọn dẹp hoàn tất! Đã hợp nhất ${lecturersToDeleteCount} bản ghi giảng viên trùng lặp và cập nhật ${entriesToUpdateCount} mục giờ lao động liên quan.`, true);
+
+    } catch (error) {
+        console.error("Error cleaning up duplicates:", error);
+        showAlert(`Đã xảy ra lỗi khi dọn dẹp: ${error.message}`);
+    } finally {
+        setButtonLoading(btn, false);
+    }
+}
+
+
 // --- Firebase Initialization and Auth State ---
 let dataListenersAttached = false;
 function setupOnSnapshotListeners() {
@@ -1364,7 +1450,19 @@ function addEventListeners() {
 
     // Modal buttons
     document.getElementById('manage-tasks-btn').addEventListener('click', () => openModal('manage-tasks-modal'));
-    document.getElementById('manage-lecturers-btn').addEventListener('click', () => openModal('manage-lecturers-modal'));
+    
+    document.getElementById('manage-lecturers-btn').addEventListener('click', () => {
+        const filterSelect = document.getElementById('filter-lecturer-by-department');
+        filterSelect.innerHTML = '<option value="all">-- Tất cả các Khoa --</option>';
+        state.departments.forEach(dep => {
+            filterSelect.innerHTML += `<option value="${dep.id}">${dep.name}</option>`;
+        });
+        renderLecturersList(); 
+        openModal('manage-lecturers-modal');
+    });
+
+    document.getElementById('filter-lecturer-by-department').addEventListener('change', renderLecturersList);
+
     document.getElementById('manage-departments-btn').addEventListener('click', () => openModal('manage-departments-modal'));
 
     document.getElementById('add-year-btn').addEventListener('click', () => {
@@ -1741,145 +1839,12 @@ function addEventListeners() {
         });
     });
 
-    // Statistics Tool Logic
-    document.getElementById('statistics-tool-btn').addEventListener('click', () => {
-        const depSelect = document.getElementById('stats-department-select');
-        depSelect.innerHTML = '<option value="">-- Chọn Khoa --</option>';
-        state.departments.forEach(dep => { depSelect.innerHTML += `<option value="${dep.id}">${dep.name}</option>`; });
-
-        const yearSelect = document.getElementById('stats-year-select');
-        yearSelect.innerHTML = '<option value="">-- Chọn Năm học --</option>';
-        getYearsForSelect().forEach(year => { yearSelect.innerHTML += `<option value="${year}">${year}</option>`; });
-
-        document.getElementById('stats-lecturer-select').innerHTML = '<option value="">-- Chọn Giảng viên --</option>';
-        document.getElementById('statistics-results-container').classList.add('hidden');
-        document.getElementById('export-report-btn').classList.add('hidden');
-        openModal('statistics-modal');
-    });
-
-    document.getElementById('stats-department-select').addEventListener('change', (e) => {
-        const depId = e.target.value;
-        const lecturerSelect = document.getElementById('stats-lecturer-select');
-        lecturerSelect.innerHTML = '<option value="">-- Chọn Giảng viên (tùy chọn) --</option>';
-        if (depId) {
-            state.lecturers
-                .filter(l => l.departmentId === depId)
-                .forEach(l => {
-                    lecturerSelect.innerHTML += `<option value="${l.id}">${l.name}</option>`;
-                });
-        }
-        document.getElementById('statistics-results-container').classList.add('hidden');
-        document.getElementById('export-report-btn').classList.add('hidden');
-    });
-
-    document.getElementById('stats-year-select').addEventListener('change', () => {
-         document.getElementById('statistics-results-container').classList.add('hidden');
-         document.getElementById('export-report-btn').classList.add('hidden');
-    });
-     document.getElementById('stats-lecturer-select').addEventListener('change', () => {
-         document.getElementById('statistics-results-container').classList.add('hidden');
-         document.getElementById('export-report-btn').classList.add('hidden');
-    });
-
-    document.getElementById('view-statistics-btn').addEventListener('click', (e) => {
-        const btn = e.currentTarget;
-        setButtonLoading(btn, true);
-
-        setTimeout(() => {
-            try {
-                const lecturerId = document.getElementById('stats-lecturer-select').value;
-                const year = document.getElementById('stats-year-select').value;
-
-                if (!lecturerId || !year) {
-                    showAlert("Vui lòng chọn đầy đủ Khoa, Năm học và Giảng viên.");
-                    return;
-                }
-
-                state.statsSelectedLecturer = state.lecturers.find(l => l.id === lecturerId);
-                state.statsSelectedYear = year;
-                state.statsEntries = state.entries
-                    .filter(e => e.lecturerId === lecturerId && (e.academicYear ? e.academicYear === year : getAcademicYear(e.date) === year))
-                    .sort((a, b) => b.hours - a.hours); // Sắp xếp theo giờ giảm dần
-
-                const resultsContainer = document.getElementById('statistics-results-container');
-                const resultsTable = document.getElementById('statistics-results-table');
-                const resultsTitle = document.getElementById('statistics-results-title');
-                const exportBtn = document.getElementById('export-report-btn');
-
-                resultsTitle.textContent = `Kết quả thống kê cho ${state.statsSelectedLecturer.name} - Năm học ${year}`;
-
-                if (state.statsEntries.length === 0) {
-                    resultsTable.innerHTML = '<p class="p-4 text-center text-gray-500">Không tìm thấy dữ liệu.</p>';
-                    exportBtn.classList.add('hidden');
-                } else {
-                    const totalHours = state.statsEntries.reduce((sum, e) => sum + e.hours, 0);
-                    resultsTable.innerHTML = `
-                        <table class="min-w-full bg-white">
-                            <thead class="bg-gray-100">
-                                <tr>
-                                    <th class="px-4 py-2 text-left text-xs font-bold text-gray-600 uppercase">STT</th>
-                                    <th class="px-4 py-2 text-left text-xs font-bold text-gray-600 uppercase">Nội dung</th>
-                                    <th class="px-4 py-2 text-center text-xs font-bold text-gray-600 uppercase">Ngày</th>
-                                    <th class="px-4 py-2 text-center text-xs font-bold text-gray-600 uppercase">Giờ</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-gray-200">
-                                ${state.statsEntries.map((entry, index) => `
-                                    <tr>
-                                        <td class="px-4 py-2 text-center">${index + 1}</td>
-                                        <td class="px-4 py-2">${entry.description}</td>
-                                        <td class="px-4 py-2 text-center">${formatDate(entry.date)}</td>
-                                        <td class="px-4 py-2 text-center font-semibold">${entry.hours}</td>
-                                    </tr>
-                                `).join('')}
-                                <tr>
-                                    <td colspan="3" class="px-4 py-2 text-right font-bold">TỔNG CỘNG</td>
-                                    <td class="px-4 py-2 text-center font-bold text-red-600">${totalHours}</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    `;
-                    exportBtn.classList.remove('hidden');
-                }
-                resultsContainer.classList.remove('hidden');
-            } catch (error) {
-                showAlert(`Lỗi khi xem thống kê: ${error.message}`);
-            } finally {
-                setButtonLoading(btn, false);
-            }
-        }, 10);
-    });
-
-    document.getElementById('export-report-btn').addEventListener('click', (e) => {
-        const btn = e.currentTarget;
-        setButtonLoading(btn, true);
-        try {
-            const reportHtml = generateLecturerReportHtml();
-            const newWindow = window.open('', '_blank');
-            newWindow.document.write(reportHtml);
-            newWindow.document.close();
-        } catch (error) {
-            console.error("Lỗi khi xuất báo cáo giảng viên:", error);
-            showAlert(`Không thể xuất báo cáo: ${error.message}`);
-        } finally {
-            setButtonLoading(btn, false);
-        }
-    });
-
-    document.getElementById('export-department-report-btn').addEventListener('click', (e) => {
-        const btn = e.currentTarget;
-        setButtonLoading(btn, true);
-        try {
-            const reportHtml = generateDepartmentReportHtml();
-            const newWindow = window.open('', '_blank');
-            newWindow.document.write(reportHtml);
-            newWindow.document.close();
-        } catch (error) {
-            console.error("Lỗi khi xuất báo cáo khoa:", error);
-            showAlert(`Không thể xuất báo cáo: ${error.message}`);
-        } finally {
-            setButtonLoading(btn, false);
-        }
+    // NEW: Cleanup Duplicates Button
+    document.getElementById('cleanup-duplicates-btn').addEventListener('click', (e) => {
+        showConfirm(
+            'Bạn có chắc muốn chạy công cụ dọn dẹp dữ liệu giảng viên trùng lặp? Hành động này sẽ hợp nhất các giảng viên có cùng MÃ GIẢNG VIÊN và không thể hoàn tác.',
+            () => cleanupDuplicateLecturers(e.currentTarget)
+        );
     });
 
 

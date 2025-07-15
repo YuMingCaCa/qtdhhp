@@ -104,6 +104,110 @@ let officialClasses = [];
 let majors = [];
 let schedules = [];
 
+// --- NEW: Searchable Select Component Logic ---
+
+/**
+ * Initializes a container to be a searchable select dropdown.
+ * @param {string} containerId - The ID of the div container for the select component.
+ * @param {Array} options - The array of data objects.
+ * @param {object} config - Configuration object { valueField, labelField, placeholder, onSelectionChange }
+ */
+function initSearchableSelect(containerId, options, config) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    const { valueField, labelField, placeholder, onSelectionChange } = config;
+
+    // Create elements
+    container.innerHTML = `
+        <input type="text" class="searchable-select-input" placeholder="${placeholder || 'Tìm kiếm...'}">
+        <input type="hidden" class="searchable-select-value">
+        <div class="searchable-select-dropdown"></div>
+    `;
+
+    const input = container.querySelector('.searchable-select-input');
+    const hiddenInput = container.querySelector('.searchable-select-value');
+    const dropdown = container.querySelector('.searchable-select-dropdown');
+
+    // Function to render dropdown options
+    const renderOptions = (filter = '') => {
+        dropdown.innerHTML = '';
+        const filteredOptions = options.filter(option => 
+            option[labelField].toLowerCase().includes(filter.toLowerCase())
+        );
+
+        if (filteredOptions.length === 0) {
+            dropdown.innerHTML = `<div class="searchable-select-option text-gray-500">Không có kết quả</div>`;
+        } else {
+            filteredOptions.forEach(option => {
+                const optionEl = document.createElement('div');
+                optionEl.className = 'searchable-select-option';
+                optionEl.textContent = option[labelField];
+                optionEl.dataset.value = option[valueField];
+                
+                if (option[valueField] === hiddenInput.value) {
+                    optionEl.classList.add('selected');
+                }
+
+                optionEl.addEventListener('click', () => {
+                    input.value = option[labelField];
+                    hiddenInput.value = option[valueField];
+                    dropdown.style.display = 'none';
+                    if (onSelectionChange) {
+                        onSelectionChange(option[valueField]);
+                    }
+                });
+                dropdown.appendChild(optionEl);
+            });
+        }
+    };
+    
+    // Event Listeners
+    input.addEventListener('focus', () => {
+        renderOptions(input.value);
+        dropdown.style.display = 'block';
+    });
+
+    input.addEventListener('input', () => {
+        renderOptions(input.value);
+        hiddenInput.value = ''; // Clear selection if user types
+    });
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!container.contains(e.target)) {
+            dropdown.style.display = 'none';
+        }
+    });
+
+    // Public method to update options
+    container.updateOptions = (newOptions) => {
+        options = newOptions;
+    };
+    
+    // Public method to set value
+    container.setValue = (value) => {
+        const selectedOption = options.find(opt => opt[valueField] === value);
+        if (selectedOption) {
+            input.value = selectedOption[labelField];
+            hiddenInput.value = value;
+        } else {
+            input.value = '';
+            hiddenInput.value = '';
+        }
+    };
+    
+    // Public method to clear
+    container.clear = () => {
+        input.value = '';
+        hiddenInput.value = '';
+        if (onSelectionChange) {
+            onSelectionChange('');
+        }
+    };
+}
+
+
 // --- Schedule Grid Rendering ---
 
 function renderScheduleTable() {
@@ -523,53 +627,68 @@ window.deleteOfficialClass = (id) => {
 
 // --- Course Section (Lớp học phần) Management ---
 function populateDropdownsForCSModal() {
-    const semesterSelect = document.getElementById('cs-semester-select');
-    const subjectSelect = document.getElementById('cs-subject-select');
-    const departmentSelect = document.getElementById('cs-department-select');
-    const officialClassSelect = document.getElementById('cs-official-class-select');
+    // This function will now initialize the searchable selects
+    initSearchableSelect('cs-semester-select-container', semesters, {
+        valueField: 'id',
+        labelField: 'tenHocKy',
+        placeholder: 'Tìm học kỳ...'
+    });
+
+    initSearchableSelect('cs-official-class-select-container', officialClasses, {
+        valueField: 'id',
+        labelField: 'maLopCQ',
+        placeholder: 'Tìm lớp chính quy...',
+        onSelectionChange: (selectedClassId) => {
+            updateCourseSectionCode();
+            const subjectContainer = document.getElementById('cs-subject-select-container');
+            const officialClass = officialClasses.find(oc => oc.id === selectedClassId);
+            if (officialClass && officialClass.departmentId) {
+                const filteredSubjects = subjects.filter(s => s.departmentId === officialClass.departmentId);
+                subjectContainer.updateOptions(filteredSubjects);
+            } else {
+                subjectContainer.updateOptions([]);
+            }
+            subjectContainer.clear();
+        }
+    });
+
+    initSearchableSelect('cs-subject-select-container', [], { // Initially empty
+        valueField: 'id',
+        labelField: 'tenMonHoc',
+        placeholder: 'Tìm môn học...',
+        onSelectionChange: updateCourseSectionCode
+    });
     
-    semesterSelect.innerHTML = '<option value="">-- Chọn học kỳ --</option>';
-    semesters.forEach(s => {
-        semesterSelect.innerHTML += `<option value="${s.id}">${s.tenHocKy}</option>`;
+    initSearchableSelect('cs-department-select-container', departments, {
+        valueField: 'id',
+        labelField: 'name',
+        placeholder: 'Tìm khoa...',
+        onSelectionChange: (selectedDepId) => {
+            const lecturerContainer = document.getElementById('cs-lecturer-select-container');
+            if (selectedDepId) {
+                const filteredLecturers = lecturers.filter(l => l.departmentId === selectedDepId);
+                lecturerContainer.updateOptions(filteredLecturers);
+            } else {
+                lecturerContainer.updateOptions([]);
+            }
+            lecturerContainer.clear();
+        }
     });
 
-    subjectSelect.innerHTML = '<option value="">-- Chọn lớp chính quy trước --</option>';
-    // Subjects will be populated by the official class change event listener
-
-    departmentSelect.innerHTML = '<option value="">-- Chọn khoa --</option>';
-    departments.forEach(d => {
-        departmentSelect.innerHTML += `<option value="${d.id}">${d.name}</option>`;
+    initSearchableSelect('cs-lecturer-select-container', [], { // Initially empty
+        valueField: 'id',
+        labelField: 'name',
+        placeholder: 'Tìm giảng viên...'
     });
-    
-    officialClassSelect.innerHTML = '<option value="">-- Chọn lớp --</option>';
-    officialClasses.forEach(oc => {
-        officialClassSelect.innerHTML += `<option value="${oc.id}" data-size="${oc.siSo}">${oc.maLopCQ}</option>`;
-    });
-}
-
-function populateLecturersByDepartment(departmentId) {
-    const lecturerSelect = document.getElementById('cs-lecturer-select');
-    lecturerSelect.innerHTML = '<option value="">-- Chọn giảng viên --</option>';
-    
-    if (!departmentId) {
-        lecturerSelect.disabled = true;
-        return;
-    }
-
-    const filteredLecturers = lecturers.filter(l => l.departmentId === departmentId);
-    filteredLecturers.forEach(l => {
-        lecturerSelect.innerHTML += `<option value="${l.id}">${l.name} (${l.code})</option>`;
-    });
-    lecturerSelect.disabled = false;
 }
 
 function updateCourseSectionCode() {
-    const subjectSelect = document.getElementById('cs-subject-select');
-    const officialClassSelect = document.getElementById('cs-official-class-select');
+    const subjectId = document.querySelector('#cs-subject-select-container .searchable-select-value').value;
+    const officialClassId = document.querySelector('#cs-official-class-select-container .searchable-select-value').value;
     const codeInput = document.getElementById('cs-code');
 
-    const selectedSubject = subjects.find(s => s.id === subjectSelect.value);
-    const selectedOC = officialClasses.find(oc => oc.id === officialClassSelect.value);
+    const selectedSubject = subjects.find(s => s.id === subjectId);
+    const selectedOC = officialClasses.find(oc => oc.id === officialClassId);
 
     if (selectedSubject && selectedOC) {
         codeInput.value = `${selectedSubject.maHocPhan}-${selectedOC.maLopCQ}`;
@@ -603,7 +722,13 @@ function renderCourseSectionsList() {
 function clearCourseSectionForm() {
     document.getElementById('course-section-form').reset();
     document.getElementById('course-section-id').value = '';
-    document.getElementById('cs-lecturer-select').disabled = true;
+    
+    // Clear all searchable selects
+    document.getElementById('cs-semester-select-container').clear();
+    document.getElementById('cs-official-class-select-container').clear();
+    document.getElementById('cs-subject-select-container').clear();
+    document.getElementById('cs-department-select-container').clear();
+    document.getElementById('cs-lecturer-select-container').clear();
 }
 
 window.editCourseSection = (id) => {
@@ -613,30 +738,30 @@ window.editCourseSection = (id) => {
         const departmentId = lecturer ? lecturer.departmentId : '';
 
         document.getElementById('course-section-id').value = cs.id;
-        document.getElementById('cs-semester-select').value = cs.hocKyId;
         
-        // Populate subjects based on the class's department first
+        // Set values for searchable selects
+        document.getElementById('cs-semester-select-container').setValue(cs.hocKyId);
+        document.getElementById('cs-official-class-select-container').setValue(cs.lopChinhQuyId);
+        
+        // Trigger updates for dependent dropdowns
         const officialClass = officialClasses.find(oc => oc.id === cs.lopChinhQuyId);
         if (officialClass && officialClass.departmentId) {
-            const subjectSelect = document.getElementById('cs-subject-select');
+            const subjectContainer = document.getElementById('cs-subject-select-container');
             const filteredSubjects = subjects.filter(s => s.departmentId === officialClass.departmentId);
-            subjectSelect.innerHTML = '<option value="">-- Chọn môn học --</option>';
-            filteredSubjects.forEach(s => {
-                subjectSelect.innerHTML += `<option value="${s.id}">${s.tenMonHoc} (${s.maHocPhan})</option>`;
-            });
+            subjectContainer.updateOptions(filteredSubjects);
+            subjectContainer.setValue(cs.monHocId);
         }
-        
-        document.getElementById('cs-subject-select').value = cs.monHocId;
-        document.getElementById('cs-official-class-select').value = cs.lopChinhQuyId;
-        document.getElementById('cs-code').value = cs.maLopHP;
-        
-        const departmentSelect = document.getElementById('cs-department-select');
-        departmentSelect.value = departmentId;
-        departmentSelect.dispatchEvent(new Event('change'));
 
-        setTimeout(() => {
-            document.getElementById('cs-lecturer-select').value = cs.giangVienId; 
-        }, 100);
+        document.getElementById('cs-code').value = cs.maLopHP;
+
+        const departmentContainer = document.getElementById('cs-department-select-container');
+        departmentContainer.setValue(departmentId);
+        if (departmentId) {
+            const lecturerContainer = document.getElementById('cs-lecturer-select-container');
+            const filteredLecturers = lecturers.filter(l => l.departmentId === departmentId);
+            lecturerContainer.updateOptions(filteredLecturers);
+            lecturerContainer.setValue(cs.giangVienId);
+        }
     }
 };
 
@@ -1293,17 +1418,22 @@ async function handleFileImport() {
 
             const batch = writeBatch(db);
             let successCount = 0;
+            let updateCount = 0;
             let errorCount = 0;
 
             // Process data based on type
-            for (const row of jsonData) {
+            for (const [index, row] of jsonData.entries()) {
                 try {
                     let docData;
                     let collectionRef;
+                    let uniqueField;
+                    let uniqueValue;
+                    let queryRef;
 
                     switch (type) {
                         case 'subjects':
                             collectionRef = monHocCol;
+                            uniqueField = "maHocPhan";
                             const departmentNameForSubject = String(row.tenKhoa || '').trim().toLowerCase();
                             const departmentForSubject = departments.find(d => d.name.toLowerCase() === departmentNameForSubject);
                             if (!departmentForSubject) throw new Error(`Không tìm thấy khoa "${row.tenKhoa}"`);
@@ -1314,18 +1444,22 @@ async function handleFileImport() {
                                 departmentId: departmentForSubject.id
                             };
                             if (!docData.tenMonHoc || !docData.maHocPhan) throw new Error("Thiếu tên môn học hoặc mã học phần.");
+                            uniqueValue = docData.maHocPhan;
                             break;
                         case 'rooms':
                              collectionRef = phongHocCol;
+                             uniqueField = "tenPhong";
                              docData = {
                                 tenPhong: String(row.tenPhong || '').trim(),
                                 sucChua: parseInt(row.sucChua || 0, 10),
                                 loaiPhong: String(row.loaiPhong || 'Lý thuyết').trim()
                              };
                              if (!docData.tenPhong) throw new Error("Thiếu tên phòng.");
+                             uniqueValue = docData.tenPhong;
                              break;
                         case 'majors':
                             collectionRef = nganhHocCol;
+                            uniqueField = "tenNganh";
                             const departmentNameFromExcel = String(row.tenKhoa || '').trim().toLowerCase();
                             const departmentForMajor = departments.find(d => d.name.toLowerCase() === departmentNameFromExcel);
                             if (!departmentForMajor) throw new Error(`Không tìm thấy khoa "${row.tenKhoa}"`);
@@ -1334,9 +1468,11 @@ async function handleFileImport() {
                                 departmentId: departmentForMajor.id
                             };
                             if (!docData.tenNganh) throw new Error("Thiếu tên ngành.");
+                            uniqueValue = docData.tenNganh;
                             break;
                         case 'lecturers':
                             collectionRef = lecturersCol;
+                            uniqueField = "code";
                             const depName = String(row.tenKhoa || '').trim().toLowerCase();
                             const dept = departments.find(d => d.name.toLowerCase() === depName);
                             if (!dept) throw new Error(`Không tìm thấy khoa "${row.tenKhoa}"`);
@@ -1347,9 +1483,11 @@ async function handleFileImport() {
                                 departmentId: dept.id
                             };
                             if (!docData.name || !docData.code) throw new Error("Thiếu tên hoặc mã giảng viên.");
+                            uniqueValue = docData.code;
                             break;
                         case 'officialClasses':
                             collectionRef = lopChinhQuyCol;
+                            uniqueField = "maLopCQ";
                             const departmentNameForClass = String(row.tenKhoa || '').trim().toLowerCase();
                             const departmentForClass = departments.find(d => d.name.toLowerCase() === departmentNameForClass);
                             if (!departmentForClass) throw new Error(`Không tìm thấy khoa "${row.tenKhoa}"`);
@@ -1359,6 +1497,7 @@ async function handleFileImport() {
                                 departmentId: departmentForClass.id
                             };
                             if (!docData.maLopCQ) throw new Error("Thiếu mã lớp chính quy.");
+                            uniqueValue = docData.maLopCQ;
                             break;
                         case 'courseSections':
                             collectionRef = lopHocPhanCol;
@@ -1379,26 +1518,41 @@ async function handleFileImport() {
                                 giangVienId: lecturer.id,
                                 maLopHP: `${subject.maHocPhan}-${officialClass.maLopCQ}`
                             };
+                            uniqueField = "maLopHP";
+                            uniqueValue = docData.maLopHP;
                             break;
                         default:
                             throw new Error("Loại import không hợp lệ.");
                     }
                     
-                    batch.set(doc(collectionRef), docData);
-                    successCount++;
+                    // Check for existing document
+                    queryRef = query(collectionRef, where(uniqueField, "==", uniqueValue));
+                    const existingDocs = await getDocs(queryRef);
+
+                    if (!existingDocs.empty) {
+                        const docId = existingDocs.docs[0].id;
+                        batch.update(doc(collectionRef, docId), docData);
+                        updateCount++;
+                    } else {
+                        const newDocRef = doc(collectionRef);
+                        batch.set(newDocRef, docData);
+                        successCount++;
+                    }
+
                 } catch (rowError) {
                     errorCount++;
-                    logContainer.innerHTML += `<span class="text-orange-500">- Dòng ${successCount + errorCount}: Lỗi - ${rowError.message}</span><br>`;
+                    logContainer.innerHTML += `<span class="text-orange-500">- Dòng ${index + 2}: Lỗi - ${rowError.message}</span><br>`;
                 }
             }
 
-            if (successCount > 0) {
+            if (successCount > 0 || updateCount > 0) {
                 await batch.commit();
             }
             
             logContainer.innerHTML += `<hr class="my-2">`;
             logContainer.innerHTML += `<strong class="text-green-600">Hoàn thành!</strong><br>`;
-            logContainer.innerHTML += `<span>- Import thành công: ${successCount} mục.</span><br>`;
+            logContainer.innerHTML += `<span>- Thêm mới thành công: ${successCount} mục.</span><br>`;
+            logContainer.innerHTML += `<span class="text-blue-600">- Cập nhật mục đã có: ${updateCount} mục.</span><br>`;
             logContainer.innerHTML += `<span>- Bị lỗi: ${errorCount} mục.</span><br>`;
 
         } catch (error) {
@@ -1717,46 +1871,32 @@ function addEventListeners() {
 
     // Course Section listeners
     document.getElementById('manage-course-sections-btn').addEventListener('click', () => {
-        clearCourseSectionForm();
-        populateDropdownsForCSModal();
+        populateDropdownsForCSModal(); // Initialize first
+        clearCourseSectionForm();      // Then clear
         window.openModal('manage-course-sections-modal');
     });
-    document.getElementById('cs-department-select').addEventListener('change', (e) => {
-        populateLecturersByDepartment(e.target.value);
-    });
-    document.getElementById('cs-subject-select').addEventListener('change', updateCourseSectionCode);
-    document.getElementById('cs-official-class-select').addEventListener('change', (e) => {
-        updateCourseSectionCode();
-        const officialClass = officialClasses.find(oc => oc.id === e.target.value);
-        const subjectSelect = document.getElementById('cs-subject-select');
-        
-        if (officialClass && officialClass.departmentId) {
-            const filteredSubjects = subjects.filter(s => s.departmentId === officialClass.departmentId);
-            subjectSelect.innerHTML = '<option value="">-- Chọn môn học --</option>';
-            filteredSubjects.forEach(s => {
-                subjectSelect.innerHTML += `<option value="${s.id}">${s.tenMonHoc} (${s.maHocPhan})</option>`;
-            });
-        } else if (officialClass) {
-            subjectSelect.innerHTML = '<option value="">-- Lớp chưa thuộc khoa nào --</option>';
-        }
-        else {
-            subjectSelect.innerHTML = '<option value="">-- Chọn lớp trước --</option>';
-        }
-    });
+    
     document.getElementById('course-section-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const btn = e.target.querySelector('button[type="submit"]');
         setButtonLoading(btn, true);
         const id = document.getElementById('course-section-id').value;
         const data = {
-            hocKyId: document.getElementById('cs-semester-select').value,
-            monHocId: document.getElementById('cs-subject-select').value,
-            lopChinhQuyId: document.getElementById('cs-official-class-select').value,
+            hocKyId: document.querySelector('#cs-semester-select-container .searchable-select-value').value,
+            monHocId: document.querySelector('#cs-subject-select-container .searchable-select-value').value,
+            lopChinhQuyId: document.querySelector('#cs-official-class-select-container .searchable-select-value').value,
             maLopHP: document.getElementById('cs-code').value.trim(),
-            giangVienId: document.getElementById('cs-lecturer-select').value,
+            giangVienId: document.querySelector('#cs-lecturer-select-container .searchable-select-value').value,
         };
+        // Basic validation
+        if (!data.hocKyId || !data.monHocId || !data.lopChinhQuyId || !data.giangVienId) {
+            showAlert("Vui lòng điền đầy đủ tất cả các trường phân công.");
+            setButtonLoading(btn, false);
+            return;
+        }
         try {
             if (id) { await updateDoc(doc(lopHocPhanCol, id), data); } else { await addDoc(lopHocPhanCol, data); }
+            closeModal('manage-course-sections-modal');
             clearCourseSectionForm();
         } catch (error) { showAlert(`Lỗi khi lưu phân công: ${error.message}`); } finally { setButtonLoading(btn, false); }
     });
