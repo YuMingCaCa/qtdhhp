@@ -106,11 +106,15 @@
                             <select id="class-schedule-select" class="mt-1 block w-full md:w-60 p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"></select>
                         </div>
                         <div class="flex gap-2 w-full md:w-auto self-end">
-                             <button id="manual-schedule-btn" class="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg">
+                             <button id="manual-schedule-btn" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">
                                 <i class="fas fa-plus-circle mr-2"></i>Thủ công
                             </button>
                             <button id="auto-schedule-btn" class="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg">
                                 <i class="fas fa-magic mr-2"></i>Tự động
+                            </button>
+                            <!-- NEW: Print Button -->
+                            <button id="print-schedule-btn" class="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg">
+                                <i class="fas fa-print mr-2"></i>In Lịch
                             </button>
                         </div>
                     </div>
@@ -124,7 +128,74 @@
     </div>
 
     <!-- MODALS -->
-    <!-- Auto Schedule Results Modal (NEW) -->
+
+    <!-- NEW: Print Options Modal -->
+    <div id="print-options-modal" class="modal">
+        <div class="modal-content max-w-2xl">
+            <span class="close-button no-print" onclick="closeModal('print-options-modal')">&times;</span>
+            <h3 class="text-xl font-bold mb-4">Thống kê & In ấn Lịch biểu</h3>
+            <form id="print-options-form" class="p-4 border rounded-lg bg-gray-50 space-y-4">
+                <div>
+                    <label for="print-semester-select" class="block text-sm font-medium text-gray-700">1. Chọn Học kỳ</label>
+                    <select id="print-semester-select" required class="mt-1 p-2 border rounded-md w-full"></select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">2. Chọn Phạm vi xem</label>
+                    <div class="mt-2 flex gap-4">
+                        <label class="flex items-center">
+                            <input type="radio" name="print-view-type" value="department" checked class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500">
+                            <span class="ml-2 text-sm text-gray-700">Theo Khoa / Toàn trường</span>
+                        </label>
+                        <label class="flex items-center">
+                            <input type="radio" name="print-view-type" value="lecturer" class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500">
+                            <span class="ml-2 text-sm text-gray-700">Theo Giảng viên</span>
+                        </label>
+                    </div>
+                </div>
+                <div id="print-filter-details-container">
+                    <!-- Department Filter -->
+                    <div id="print-department-filter">
+                        <label for="print-department-select" class="block text-sm font-medium text-gray-700">3. Chọn Khoa</label>
+                        <select id="print-department-select" class="mt-1 p-2 border rounded-md w-full">
+                            <option value="all">-- Toàn trường --</option>
+                        </select>
+                    </div>
+                    <!-- Lecturer Filter (hidden by default) -->
+                    <div id="print-lecturer-filter" class="hidden">
+                        <label for="print-lecturer-select" class="block text-sm font-medium text-gray-700">3. Chọn Giảng viên</label>
+                        <select id="print-lecturer-select" required class="mt-1 p-2 border rounded-md w-full"></select>
+                    </div>
+                </div>
+
+                <div class="flex justify-end pt-4">
+                    <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg">
+                        <i class="fas fa-cogs mr-2"></i>Tạo Lịch để In
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Schedule Action Modal -->
+    <div id="schedule-action-modal" class="modal">
+        <div class="modal-content max-w-md">
+            <span class="close-button no-print" onclick="closeModal('schedule-action-modal')">&times;</span>
+            <h3 class="text-xl font-bold mb-4">Hành động</h3>
+            <div id="schedule-action-details" class="mb-6 p-4 bg-gray-50 rounded-lg border">
+                <!-- Details will be populated by JS -->
+            </div>
+            <div class="flex justify-end gap-3">
+                <button id="schedule-action-delete-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg">
+                    <i class="fas fa-trash mr-2"></i>Xóa Lịch
+                </button>
+                <button id="schedule-action-edit-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">
+                    <i class="fas fa-edit mr-2"></i>Sửa Lịch
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Auto Schedule Results Modal -->
     <div id="auto-schedule-results-modal" class="modal">
         <div class="modal-content max-w-3xl">
             <span class="close-button no-print" onclick="closeModal('auto-schedule-results-modal')">&times;</span>
@@ -146,12 +217,14 @@
         </div>
     </div>
 
-    <!-- Manual Schedule Modal -->
+    <!-- Manual Schedule Modal (Handles Create and Edit) -->
     <div id="manual-schedule-modal" class="modal">
         <div class="modal-content max-w-xl">
             <span class="close-button no-print" onclick="closeModal('manual-schedule-modal')">&times;</span>
             <h3 class="text-xl font-bold mb-4">Xếp lịch Thủ công</h3>
             <form id="manual-schedule-form" class="p-4 border rounded-lg bg-gray-50 space-y-4">
+                <!-- Hidden input to store the ID of the schedule being edited -->
+                <input type="hidden" id="ms-schedule-id">
                 <div>
                     <label for="ms-section-select" class="block text-sm font-medium text-gray-700">Chọn lớp học phần cần xếp</label>
                     <select id="ms-section-select" required class="mt-1 p-2 border rounded-md w-full"></select>
@@ -191,7 +264,7 @@
     </div>
 
 
-    <!-- Other Modals (No changes) -->
+    <!-- Other Modals -->
     <div id="manage-semesters-modal" class="modal">
         <div class="modal-content">
             <span class="close-button no-print" onclick="closeModal('manage-semesters-modal')">&times;</span>
@@ -487,4 +560,4 @@
     <!-- Liên kết tới tệp JS riêng của module này -->
     <script type="module" src="js/lich-giang-day.js"></script>
 </body>
-</html>
+</ht

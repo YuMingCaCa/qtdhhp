@@ -204,6 +204,8 @@ function displayScheduleForClass(classId) {
 
             const block = document.createElement('div');
             block.className = 'schedule-block';
+            block.dataset.scheduleId = scheduleInfo.id;
+            block.onclick = () => window.openScheduleActionModal(scheduleInfo.id);
             
             block.innerHTML = `
                 <p class="font-bold">${subject.tenMonHoc}</p>
@@ -628,9 +630,9 @@ function isOverlapping(start1, end1, start2, end2) {
     return Math.max(start1, start2) <= Math.min(end1, end2);
 }
 
-function checkLecturerConflict(lecturerId, day, startPeriod, numPeriods, excludeScheduleId = null) {
+function checkLecturerConflict(lecturerId, day, startPeriod, numPeriods, excludeScheduleId = null, scheduleList = schedules) {
     const endPeriod = startPeriod + numPeriods - 1;
-    const lecturerSchedules = schedules.filter(s => {
+    const lecturerSchedules = scheduleList.filter(s => {
         if (s.id === excludeScheduleId) return false;
         const section = courseSections.find(cs => cs.id === s.lopHocPhanId);
         return section && section.giangVienId === lecturerId;
@@ -646,9 +648,9 @@ function checkLecturerConflict(lecturerId, day, startPeriod, numPeriods, exclude
     return null;
 }
 
-function checkRoomConflict(roomId, day, startPeriod, numPeriods, excludeScheduleId = null) {
+function checkRoomConflict(roomId, day, startPeriod, numPeriods, excludeScheduleId = null, scheduleList = schedules) {
     const endPeriod = startPeriod + numPeriods - 1;
-    const roomSchedules = schedules.filter(s => s.id !== excludeScheduleId && s.phongHocId === roomId);
+    const roomSchedules = scheduleList.filter(s => s.id !== excludeScheduleId && s.phongHocId === roomId);
 
     for (const s of roomSchedules) {
         if (s.thu === day && isOverlapping(startPeriod, endPeriod, s.tietBatDau, s.tietBatDau + s.soTiet - 1)) {
@@ -660,11 +662,11 @@ function checkRoomConflict(roomId, day, startPeriod, numPeriods, excludeSchedule
     return null;
 }
 
-function checkClassConflict(officialClassId, day, startPeriod, numPeriods, excludeScheduleId = null) {
+function checkClassConflict(officialClassId, day, startPeriod, numPeriods, excludeScheduleId = null, scheduleList = schedules) {
     const endPeriod = startPeriod + numPeriods - 1;
     const sectionsInClass = courseSections.filter(cs => cs.lopChinhQuyId === officialClassId);
     const sectionIdsInClass = sectionsInClass.map(cs => cs.id);
-    const classSchedules = schedules.filter(s => s.id !== excludeScheduleId && sectionIdsInClass.includes(s.lopHocPhanId));
+    const classSchedules = scheduleList.filter(s => s.id !== excludeScheduleId && sectionIdsInClass.includes(s.lopHocPhanId));
 
     for (const s of classSchedules) {
         if (s.thu === day && isOverlapping(startPeriod, endPeriod, s.tietBatDau, s.tietBatDau + s.soTiet - 1)) {
@@ -695,36 +697,56 @@ function populateManualScheduleModal() {
     rooms.forEach(room => {
         roomSelect.innerHTML += `<option value="${room.id}">${room.tenPhong} (Sức chứa: ${room.sucChua})</option>`;
     });
+
+    document.getElementById('ms-schedule-id').value = '';
 }
 
 async function runAutoScheduler(btn) {
     setButtonLoading(btn, true);
-    const unscheduledSections = courseSections.filter(cs => !schedules.some(s => s.lopHocPhanId === cs.id));
     
+    let unscheduledSections = courseSections
+        .filter(cs => !schedules.some(s => s.lopHocPhanId === cs.id))
+        .map(cs => {
+            const officialClass = officialClasses.find(oc => oc.id === cs.lopChinhQuyId);
+            return { ...cs, siSo: officialClass?.siSo || 0 };
+        });
+
     if (unscheduledSections.length === 0) {
         showAlert("Tất cả các lớp học phần đã được xếp lịch.", true);
         setButtonLoading(btn, false);
         return;
     }
 
+    unscheduledSections.sort((a, b) => b.siSo - a.siSo);
+
     const successLog = [];
     const failureLog = [];
     const batch = writeBatch(db);
+    const tempSchedules = [...schedules]; 
 
     for (const section of unscheduledSections) {
         let scheduled = false;
         const subject = subjects.find(s => s.id === section.monHocId);
-        const numPeriods = subject ? Math.round(subject.soTinChi) : 3; // Default to 3 periods if not found
+        const numPeriods = subject ? (subject.soTinChi || 3) : 3;
 
-        // Loop through days, then periods, then rooms
+        mainLoop:
         for (let day = 2; day <= 7; day++) {
-            if (scheduled) break;
             for (let startPeriod = 1; startPeriod <= 15 - numPeriods + 1; startPeriod++) {
-                if (scheduled) break;
+                
+                const endPeriod = startPeriod + numPeriods - 1;
+                const isCrossingMorningAfternoon = (startPeriod <= 5 && endPeriod > 5);
+                const isCrossingAfternoonEvening = (startPeriod <= 10 && endPeriod > 10);
+                if (isCrossingMorningAfternoon || isCrossingAfternoonEvening) {
+                    continue; 
+                }
+
                 for (const room of rooms) {
-                    const lecturerConflict = checkLecturerConflict(section.giangVienId, day, startPeriod, numPeriods);
-                    const roomConflict = checkRoomConflict(room.id, day, startPeriod, numPeriods);
-                    const classConflict = checkClassConflict(section.lopChinhQuyId, day, startPeriod, numPeriods);
+                    const officialClass = officialClasses.find(oc => oc.id === section.lopChinhQuyId);
+                    if (room.sucChua < (officialClass?.siSo || 0)) continue;
+
+                    const lecturerConflict = checkLecturerConflict(section.giangVienId, day, startPeriod, numPeriods, null, tempSchedules);
+                    const roomConflict = checkRoomConflict(room.id, day, startPeriod, numPeriods, null, tempSchedules);
+                    const classConflict = checkClassConflict(section.lopChinhQuyId, day, startPeriod, numPeriods, null, tempSchedules);
 
                     if (!lecturerConflict && !roomConflict && !classConflict) {
                         const scheduleData = {
@@ -737,25 +759,24 @@ async function runAutoScheduler(btn) {
                         const newScheduleRef = doc(thoiKhoaBieuCol);
                         batch.set(newScheduleRef, scheduleData);
                         
-                        // Temporarily add to local schedules to avoid conflicts in the same run
-                        schedules.push({ id: newScheduleRef.id, ...scheduleData });
+                        tempSchedules.push({ id: newScheduleRef.id, ...scheduleData });
 
-                        successLog.push(`- ${section.maLopHP}: Xếp thành công vào Thứ ${day}, Tiết ${startPeriod}, Phòng ${room.tenPhong}`);
+                        successLog.push(`- <strong>${section.maLopHP}</strong>: Xếp thành công vào Thứ ${day}, Tiết ${startPeriod}-${endPeriod}, Phòng ${room.tenPhong}`);
                         scheduled = true;
-                        break; // Move to the next section
+                        break mainLoop;
                     }
                 }
             }
         }
         if (!scheduled) {
-            failureLog.push(`- ${section.maLopHP}: Không tìm được lịch trống.`);
+            failureLog.push(`- <strong>${section.maLopHP}</strong>: Không tìm được lịch trống phù hợp.`);
         }
     }
 
     try {
         await batch.commit();
-        document.getElementById('auto-schedule-success').innerHTML = successLog.length > 0 ? successLog.join('<br>') : "Không có lớp nào được xếp.";
-        document.getElementById('auto-schedule-failed').innerHTML = failureLog.length > 0 ? failureLog.join('<br>') : "Không có lớp nào thất bại.";
+        document.getElementById('auto-schedule-success').innerHTML = successLog.length > 0 ? successLog.join('<br>') : "Không có lớp nào được xếp thành công.";
+        document.getElementById('auto-schedule-failed').innerHTML = failureLog.length > 0 ? failureLog.join('<br>') : "Tất cả các lớp đều được xếp thành công.";
         openModal('auto-schedule-results-modal');
     } catch (error) {
         console.error("Error committing auto-schedule batch:", error);
@@ -763,6 +784,217 @@ async function runAutoScheduler(btn) {
     } finally {
         setButtonLoading(btn, false);
     }
+}
+
+// --- Direct schedule actions ---
+window.openScheduleActionModal = (scheduleId) => {
+    const schedule = schedules.find(s => s.id === scheduleId);
+    if (!schedule) return;
+
+    const section = courseSections.find(cs => cs.id === schedule.lopHocPhanId);
+    const subject = subjects.find(s => s.id === section?.monHocId);
+    const room = rooms.find(r => r.id === schedule.phongHocId);
+
+    const detailsDiv = document.getElementById('schedule-action-details');
+    detailsDiv.innerHTML = `
+        <p><strong>Môn học:</strong> ${subject?.tenMonHoc || 'N/A'}</p>
+        <p><strong>Phòng:</strong> ${room?.tenPhong || 'N/A'}</p>
+        <p><strong>Thời gian:</strong> Thứ ${schedule.thu}, Tiết ${schedule.tietBatDau} - ${schedule.tietBatDau + schedule.soTiet - 1}</p>
+    `;
+
+    const editBtn = document.getElementById('schedule-action-edit-btn');
+    const deleteBtn = document.getElementById('schedule-action-delete-btn');
+
+    editBtn.onclick = () => {
+        closeModal('schedule-action-modal');
+        openEditScheduleModal(scheduleId);
+    };
+    deleteBtn.onclick = () => {
+        closeModal('schedule-action-modal');
+        deleteSchedule(scheduleId);
+    };
+
+    openModal('schedule-action-modal');
+};
+
+window.openEditScheduleModal = (scheduleId) => {
+    const schedule = schedules.find(s => s.id === scheduleId);
+    if (!schedule) {
+        showAlert("Không tìm thấy lịch học để sửa.");
+        return;
+    }
+    
+    populateManualScheduleModal();
+    
+    document.getElementById('ms-schedule-id').value = schedule.id;
+    document.getElementById('ms-section-select').value = schedule.lopHocPhanId;
+    document.getElementById('ms-day-select').value = schedule.thu;
+    document.getElementById('ms-start-period').value = schedule.tietBatDau;
+    document.getElementById('ms-num-periods').value = schedule.soTiet;
+    document.getElementById('ms-room-select').value = schedule.phongHocId;
+    document.getElementById('ms-section-select').disabled = true;
+
+    openModal('manual-schedule-modal');
+};
+
+window.deleteSchedule = (scheduleId) => {
+    showConfirm("Bạn có chắc muốn xóa mục lịch này?", async () => {
+        try {
+            await deleteDoc(doc(thoiKhoaBieuCol, scheduleId));
+            showAlert("Xóa lịch học thành công!", true);
+        } catch (error) {
+            showAlert(`Lỗi khi xóa lịch học: ${error.message}`);
+        }
+    });
+};
+
+// --- Print and Statistics Logic ---
+function populatePrintModalDropdowns() {
+    const semesterSelect = document.getElementById('print-semester-select');
+    const departmentSelect = document.getElementById('print-department-select');
+    const lecturerSelect = document.getElementById('print-lecturer-select');
+
+    semesterSelect.innerHTML = '<option value="">-- Chọn học kỳ --</option>';
+    semesters.forEach(s => {
+        semesterSelect.innerHTML += `<option value="${s.id}">${s.tenHocKy}</option>`;
+    });
+
+    departmentSelect.innerHTML = '<option value="all">-- Toàn trường --</option>';
+    departments.forEach(d => {
+        departmentSelect.innerHTML += `<option value="${d.id}">${d.name}</option>`;
+    });
+
+    lecturerSelect.innerHTML = '<option value="">-- Chọn giảng viên --</option>';
+    lecturers.forEach(l => {
+        lecturerSelect.innerHTML += `<option value="${l.id}">${l.name}</option>`;
+    });
+}
+
+function generatePrintableSchedule(options) {
+    const { semesterId, viewType, filterId } = options;
+
+    const selectedSemester = semesters.find(s => s.id === semesterId);
+    if (!selectedSemester) {
+        showAlert("Vui lòng chọn một học kỳ hợp lệ.");
+        return;
+    }
+
+    // 1. Filter relevant course sections based on semester
+    const sectionsInSemester = courseSections.filter(cs => cs.hocKyId === semesterId);
+    let finalSections = [];
+
+    // 2. Further filter sections based on view type (department or lecturer)
+    if (viewType === 'department') {
+        if (filterId === 'all') { // Toàn trường
+            finalSections = sectionsInSemester;
+        } else { // Khoa cụ thể
+            const lecturersInDept = lecturers.filter(l => l.departmentId === filterId).map(l => l.id);
+            finalSections = sectionsInSemester.filter(cs => lecturersInDept.includes(cs.giangVienId));
+        }
+    } else if (viewType === 'lecturer') {
+        finalSections = sectionsInSemester.filter(cs => cs.giangVienId === filterId);
+    }
+    
+    const sectionIds = finalSections.map(cs => cs.id);
+    const relevantSchedules = schedules.filter(s => sectionIds.includes(s.lopHocPhanId));
+
+    if (relevantSchedules.length === 0) {
+        showAlert("Không có dữ liệu lịch học nào cho lựa chọn của bạn.");
+        return;
+    }
+
+    // 3. Group schedules by day and shift for easy rendering
+    const groupedSchedules = {};
+    const shifts = { Sáng: [], Chiều: [], Tối: [] };
+    relevantSchedules.forEach(s => {
+        const key = `${s.thu}-${s.tietBatDau}`;
+        if (!groupedSchedules[key]) {
+            groupedSchedules[key] = [];
+        }
+        groupedSchedules[key].push(s);
+
+        if (s.tietBatDau <= 5) shifts.Sáng.push(s);
+        else if (s.tietBatDau <= 10) shifts.Chiều.push(s);
+        else shifts.Tối.push(s);
+    });
+
+    // 4. Generate the HTML for the new tab
+    let tableRowsHtml = '';
+    const days = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
+    
+    Object.keys(shifts).forEach(shiftName => {
+        if (shifts[shiftName].length > 0) { // Only render shifts that have classes
+            tableRowsHtml += `<tr><td class="shift-header">${shiftName}</td>`;
+            for (let day = 2; day <= 7; day++) {
+                let cellHtml = '';
+                const schedulesInCell = relevantSchedules.filter(s => {
+                    const start = s.tietBatDau;
+                    const end = start + s.soTiet - 1;
+                    if (s.thu !== day) return false;
+                    if (shiftName === 'Sáng') return start >= 1 && end <= 5;
+                    if (shiftName === 'Chiều') return start >= 6 && end <= 10;
+                    if (shiftName === 'Tối') return start >= 11 && end <= 15;
+                    return false;
+                });
+
+                schedulesInCell.forEach(s => {
+                    const section = finalSections.find(cs => cs.id === s.lopHocPhanId);
+                    const subject = subjects.find(sub => sub.id === section?.monHocId);
+                    const room = rooms.find(r => r.id === s.phongHocId);
+                    const lecturer = lecturers.find(l => l.id === section?.giangVienId);
+                    const oClass = officialClasses.find(oc => oc.id === section?.lopChinhQuyId);
+                    cellHtml += `
+                        <div class="print-schedule-item">
+                            <p><strong>${subject?.tenMonHoc || 'N/A'}</strong></p>
+                            <p>Lớp: ${oClass?.maLopCQ || 'N/A'}</p>
+                            <p>GV: ${lecturer?.name || 'N/A'}</p>
+                            <p>Phòng: ${room?.tenPhong || 'N/A'}</p>
+                            <p>Tiết: ${s.tietBatDau}-${s.tietBatDau + s.soTiet - 1}</p>
+                        </div>
+                    `;
+                });
+                tableRowsHtml += `<td>${cellHtml}</td>`;
+            }
+            tableRowsHtml += '</tr>';
+        }
+    });
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+        showAlert("Không thể mở tab mới. Vui lòng kiểm tra và tắt trình chặn cửa sổ bật lên (pop-up blocker) của trình duyệt và thử lại.");
+        return;
+    }
+    printWindow.document.write(`
+        <html>
+            <head>
+                <title>Lịch giảng dạy - ${selectedSemester.tenHocKy}</title>
+                <style>
+                    body { font-family: Arial, sans-serif; margin: 20px; }
+                    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+                    th, td { border: 1px solid #ccc; padding: 8px; text-align: center; vertical-align: top; }
+                    th { background-color: #f2f2f2; }
+                    .print-schedule-item { border: 1px solid #eee; border-left: 3px solid #007bff; background: #f8f9fa; padding: 5px; margin-bottom: 5px; text-align: left; }
+                    .print-schedule-item p { margin: 2px 0; }
+                    .shift-header { font-weight: bold; }
+                    .print-header { text-align: center; margin-bottom: 20px; }
+                    .print-button { padding: 10px 20px; font-size: 16px; cursor: pointer; background: #28a745; color: white; border: none; border-radius: 5px; margin-bottom: 20px; }
+                    @media print { .print-button { display: none; } }
+                </style>
+            </head>
+            <body>
+                <div class="print-header">
+                    <h2>THỜI KHÓA BIỂU GIẢNG DẠY</h2>
+                    <h3>${selectedSemester.tenHocKy}</h3>
+                </div>
+                <button onclick="window.print()" class="print-button">In Lịch</button>
+                <table>
+                    <thead><tr><th>Ca</th>${days.map(d => `<th>${d}</th>`).join('')}</tr></thead>
+                    <tbody>${tableRowsHtml}</tbody>
+                </table>
+            </body>
+        </html>
+    `);
+    printWindow.document.close();
 }
 
 
@@ -776,12 +1008,15 @@ function addEventListeners() {
     // Manual Schedule Modal Listener
     document.getElementById('manual-schedule-btn').addEventListener('click', () => {
         populateManualScheduleModal();
+        document.getElementById('ms-section-select').disabled = false;
+        document.getElementById('manual-schedule-form').reset();
+        document.getElementById('ms-schedule-id').value = '';
         window.openModal('manual-schedule-modal');
     });
 
-    // Auto Schedule Button Listener (NEW)
+    // Auto Schedule Button Listener
     document.getElementById('auto-schedule-btn').addEventListener('click', (e) => {
-        showConfirm("Bạn có chắc muốn chạy xếp lịch tự động cho tất cả các lớp chưa có lịch? Việc này có thể mất một lúc.", () => {
+        showConfirm("Bạn có chắc muốn chạy xếp lịch tự động cho tất cả các lớp chưa có lịch?", () => {
              runAutoScheduler(e.currentTarget);
         });
     });
@@ -793,6 +1028,7 @@ function addEventListeners() {
         setButtonLoading(btn, true);
 
         try {
+            const scheduleId = document.getElementById('ms-schedule-id').value;
             const sectionId = document.getElementById('ms-section-select').value;
             const day = parseInt(document.getElementById('ms-day-select').value, 10);
             const startPeriod = parseInt(document.getElementById('ms-start-period').value, 10);
@@ -803,9 +1039,17 @@ function addEventListeners() {
                 showAlert("Vui lòng điền đầy đủ thông tin.");
                 return;
             }
-            if (startPeriod + numPeriods - 1 > 15) {
+            
+            const endPeriod = startPeriod + numPeriods - 1;
+            if (endPeriod > 15) {
                  showAlert("Lịch học không thể vượt quá tiết 15.");
                  return;
+            }
+            const isCrossingMorningAfternoon = (startPeriod <= 5 && endPeriod > 5);
+            const isCrossingAfternoonEvening = (startPeriod <= 10 && endPeriod > 10);
+            if (isCrossingMorningAfternoon || isCrossingAfternoonEvening) {
+                showAlert("Lịch học không được vắt ngang qua các ca Sáng-Chiều hoặc Chiều-Tối.");
+                return;
             }
 
             const section = courseSections.find(cs => cs.id === sectionId);
@@ -815,13 +1059,13 @@ function addEventListeners() {
             }
             
             let conflictError;
-            conflictError = checkLecturerConflict(section.giangVienId, day, startPeriod, numPeriods);
+            conflictError = checkLecturerConflict(section.giangVienId, day, startPeriod, numPeriods, scheduleId);
             if (conflictError) { showAlert(conflictError); return; }
 
-            conflictError = checkRoomConflict(roomId, day, startPeriod, numPeriods);
+            conflictError = checkRoomConflict(roomId, day, startPeriod, numPeriods, scheduleId);
             if (conflictError) { showAlert(conflictError); return; }
             
-            conflictError = checkClassConflict(section.lopChinhQuyId, day, startPeriod, numPeriods);
+            conflictError = checkClassConflict(section.lopChinhQuyId, day, startPeriod, numPeriods, scheduleId);
             if (conflictError) { showAlert(conflictError); return; }
 
             const scheduleData = {
@@ -832,10 +1076,17 @@ function addEventListeners() {
                 soTiet: numPeriods
             };
 
-            await addDoc(thoiKhoaBieuCol, scheduleData);
-            showAlert("Xếp lịch thành công!", true);
+            if (scheduleId) {
+                await updateDoc(doc(thoiKhoaBieuCol, scheduleId), scheduleData);
+                showAlert("Cập nhật lịch học thành công!", true);
+            } else {
+                await addDoc(thoiKhoaBieuCol, scheduleData);
+                showAlert("Xếp lịch thành công!", true);
+            }
+            
             closeModal('manual-schedule-modal');
             e.target.reset();
+            document.getElementById('ms-section-select').disabled = false;
 
         } catch (error) {
             console.error("Error saving manual schedule:", error);
@@ -843,6 +1094,41 @@ function addEventListeners() {
         } finally {
             setButtonLoading(btn, false);
         }
+    });
+
+    // --- NEW: Print Modal Listeners ---
+    document.getElementById('print-schedule-btn').addEventListener('click', () => {
+        populatePrintModalDropdowns();
+        openModal('print-options-modal');
+    });
+
+    document.querySelectorAll('input[name="print-view-type"]').forEach(radio => {
+        radio.addEventListener('change', (e) => {
+            const isDepartmentView = e.target.value === 'department';
+            document.getElementById('print-department-filter').style.display = isDepartmentView ? 'block' : 'none';
+            document.getElementById('print-lecturer-filter').style.display = !isDepartmentView ? 'block' : 'none';
+        });
+    });
+
+    document.getElementById('print-options-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const semesterId = document.getElementById('print-semester-select').value;
+        const viewType = document.querySelector('input[name="print-view-type"]:checked').value;
+        let filterId;
+
+        if (viewType === 'department') {
+            filterId = document.getElementById('print-department-select').value;
+        } else {
+            filterId = document.getElementById('print-lecturer-select').value;
+        }
+
+        if (!semesterId || (viewType === 'lecturer' && !filterId)) {
+            showAlert("Vui lòng điền đầy đủ các trường bắt buộc.");
+            return;
+        }
+
+        generatePrintableSchedule({ semesterId, viewType, filterId });
+        closeModal('print-options-modal');
     });
 
 
@@ -1007,6 +1293,7 @@ function addEventListeners() {
 let isDataReady = {
     semesters: false, subjects: false, rooms: false, courseSections: false,
     departments: false, lecturers: false, officialClasses: false, schedules: false,
+    majors: false
 };
 let initialLoadDone = false;
 
@@ -1035,7 +1322,8 @@ function setupOnSnapshotListeners() {
         { name: 'departments', col: departmentsCol, state: departments, render: renderMajorsList, sort: (a, b) => a.name.localeCompare(b.name) },
         { name: 'lecturers', col: lecturersCol, state: lecturers, render: null, sort: (a, b) => a.name.localeCompare(b.name) },
         { name: 'officialClasses', col: lopChinhQuyCol, state: officialClasses, render: renderOfficialClassesList, sort: (a, b) => a.maLopCQ.localeCompare(b.maLopCQ) },
-        { name: 'schedules', col: thoiKhoaBieuCol, state: schedules, render: null, sort: null }
+        { name: 'schedules', col: thoiKhoaBieuCol, state: schedules, render: null, sort: null },
+        { name: 'majors', col: nganhHocCol, state: majors, render: renderMajorsList, sort: (a, b) => a.tenNganh.localeCompare(b.tenNganh) }
     ];
 
     collections.forEach(c => {
@@ -1043,14 +1331,18 @@ function setupOnSnapshotListeners() {
             c.state.length = 0;
             snapshot.docs.forEach(doc => c.state.push({ id: doc.id, ...doc.data() }));
             if (c.sort) c.state.sort(c.sort);
+            
             if (c.render) c.render();
 
-            if (['subjects', 'lecturers', 'officialClasses'].includes(c.name)) {
+            if (c.name === 'departments' || c.name === 'majors') {
+                renderOfficialClassesList();
+            }
+            if (c.name === 'officialClasses' || c.name === 'subjects' || c.name === 'lecturers' || c.name === 'semesters') {
                 renderCourseSectionsList();
             }
-            if (c.name === 'majors') renderOfficialClassesList();
-            if (c.name === 'departments') renderMajorsList();
-            if (c.name === 'officialClasses') populateClassSelect();
+            if (c.name === 'officialClasses') {
+                populateClassSelect();
+            }
 
             const selectedClassId = document.getElementById('class-schedule-select').value;
             if (selectedClassId) {
