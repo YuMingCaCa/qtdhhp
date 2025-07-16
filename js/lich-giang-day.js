@@ -3,7 +3,7 @@
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-import { getFirestore, collection, onSnapshot, addDoc, doc, setDoc, getDocs, updateDoc, deleteDoc, query, where, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { getFirestore, collection, onSnapshot, addDoc, doc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 // --- Global Helper Functions ---
 function showAlert(message, isSuccess = false) {
@@ -46,7 +46,8 @@ function setButtonLoading(button, isLoading) {
 // --- Firebase Initialization ---
 let db, auth;
 let hocKyCol, monHocCol, lopHocPhanCol, lopChinhQuyCol, nganhHocCol, phongHocCol, thoiKhoaBieuCol;
-let departmentsCol, lecturersCol;
+let departmentsCol, lecturersCol, usersCol;
+let scheduleModuleUserInfo = null; // To store current user's role and info
 
 async function initializeFirebase() {
     const firebaseConfig = {
@@ -73,16 +74,26 @@ async function initializeFirebase() {
         thoiKhoaBieuCol = collection(db, `${basePath}/schedule_ThoiKhoaBieu`);
         departmentsCol = collection(db, `${basePath}/departments`);
         lecturersCol = collection(db, `${basePath}/lecturers`);
+        usersCol = collection(db, `${basePath}/users`); // Collection for user roles
         
-        onAuthStateChanged(auth, (user) => {
+        onAuthStateChanged(auth, async (user) => {
             if (user) {
+                const userDocRef = doc(usersCol, user.uid);
+                const userDoc = await getDoc(userDocRef);
+
+                if (userDoc.exists()) {
+                    scheduleModuleUserInfo = { uid: user.uid, ...userDoc.data() };
+                } else {
+                    scheduleModuleUserInfo = { uid: user.uid, email: user.email, role: 'viewer' };
+                }
+
                 document.getElementById('schedule-module-content').classList.remove('hidden');
+                updateUIForRole(); 
                 setupOnSnapshotListeners();
                 addEventListeners();
                 populateYearSelect();
                 updateSemesterName();
             } else {
-                console.log("User not authenticated. Redirecting to login page.");
                 window.location.href = 'index.html';
             }
         });
@@ -92,6 +103,38 @@ async function initializeFirebase() {
         showAlert("Không thể kết nối đến cơ sở dữ liệu cho module xếp lịch.");
     }
 }
+
+// --- Function to control UI based on user role (UPDATED) ---
+function updateUIForRole() {
+    if (!scheduleModuleUserInfo) return;
+    const isAdmin = scheduleModuleUserInfo.role === 'admin';
+
+    // Select all elements that require admin privileges
+    const adminElements = document.querySelectorAll('.admin-action');
+
+    adminElements.forEach(el => {
+        if (isAdmin) {
+            // Enable element for admin
+            if (el.tagName === 'FIELDSET') {
+                el.disabled = false;
+            } else {
+                 el.disabled = false;
+                 el.classList.remove('opacity-50', 'cursor-not-allowed');
+                 el.removeAttribute('title');
+            }
+        } else {
+            // Disable element for viewer
+            if (el.tagName === 'FIELDSET') {
+                el.disabled = true;
+            } else {
+                el.disabled = true;
+                el.classList.add('opacity-50', 'cursor-not-allowed');
+                el.setAttribute('title', 'Chức năng này yêu cầu quyền Admin');
+            }
+        }
+    });
+}
+
 
 // --- Global State for Shared Data ---
 let semesters = [];
@@ -104,21 +147,13 @@ let officialClasses = [];
 let majors = [];
 let schedules = [];
 
-// --- NEW: Searchable Select Component Logic ---
-
-/**
- * Initializes a container to be a searchable select dropdown.
- * @param {string} containerId - The ID of the div container for the select component.
- * @param {Array} options - The array of data objects.
- * @param {object} config - Configuration object { valueField, labelField, placeholder, onSelectionChange }
- */
+// --- Searchable Select Component Logic ---
 function initSearchableSelect(containerId, options, config) {
     const container = document.getElementById(containerId);
     if (!container) return;
 
     const { valueField, labelField, placeholder, onSelectionChange } = config;
 
-    // Create elements
     container.innerHTML = `
         <input type="text" class="searchable-select-input" placeholder="${placeholder || 'Tìm kiếm...'}">
         <input type="hidden" class="searchable-select-value">
@@ -129,7 +164,6 @@ function initSearchableSelect(containerId, options, config) {
     const hiddenInput = container.querySelector('.searchable-select-value');
     const dropdown = container.querySelector('.searchable-select-dropdown');
 
-    // Function to render dropdown options
     const renderOptions = (filter = '') => {
         dropdown.innerHTML = '';
         const filteredOptions = options.filter(option => 
@@ -162,7 +196,6 @@ function initSearchableSelect(containerId, options, config) {
         }
     };
     
-    // Event Listeners
     input.addEventListener('focus', () => {
         renderOptions(input.value);
         dropdown.style.display = 'block';
@@ -170,22 +203,19 @@ function initSearchableSelect(containerId, options, config) {
 
     input.addEventListener('input', () => {
         renderOptions(input.value);
-        hiddenInput.value = ''; // Clear selection if user types
+        hiddenInput.value = '';
     });
 
-    // Close dropdown when clicking outside
     document.addEventListener('click', (e) => {
         if (!container.contains(e.target)) {
             dropdown.style.display = 'none';
         }
     });
 
-    // Public method to update options
     container.updateOptions = (newOptions) => {
         options = newOptions;
     };
     
-    // Public method to set value
     container.setValue = (value) => {
         const selectedOption = options.find(opt => opt[valueField] === value);
         if (selectedOption) {
@@ -197,7 +227,6 @@ function initSearchableSelect(containerId, options, config) {
         }
     };
     
-    // Public method to clear
     container.clear = () => {
         input.value = '';
         hiddenInput.value = '';
@@ -209,7 +238,6 @@ function initSearchableSelect(containerId, options, config) {
 
 
 // --- Schedule Grid Rendering ---
-
 function renderScheduleTable() {
     const container = document.getElementById('schedule-container');
     container.innerHTML = '';
@@ -270,6 +298,8 @@ function displayScheduleForClass(classId) {
     const sectionsForClass = courseSections.filter(cs => cs.lopChinhQuyId === classId);
     if (sectionsForClass.length === 0) return;
 
+    const isAdmin = scheduleModuleUserInfo && scheduleModuleUserInfo.role === 'admin';
+
     sectionsForClass.forEach(section => {
         const schedulesForSection = schedules.filter(s => s.lopHocPhanId === section.id);
 
@@ -295,7 +325,14 @@ function displayScheduleForClass(classId) {
             const block = document.createElement('div');
             block.className = 'schedule-block';
             block.dataset.scheduleId = scheduleInfo.id;
-            block.onclick = () => window.openScheduleActionModal(scheduleInfo.id);
+            
+            if (isAdmin) {
+                block.classList.add('is-admin');
+                block.style.cursor = 'pointer';
+                block.onclick = () => window.openScheduleActionModal(scheduleInfo.id);
+            } else {
+                block.style.cursor = 'default';
+            }
             
             block.innerHTML = `
                 <p class="font-bold">${subject.tenMonHoc}</p>
@@ -360,22 +397,25 @@ function updateSemesterName() {
 function renderSemestersList() {
     const listBody = document.getElementById('semesters-list-body');
     listBody.innerHTML = '';
+    
     semesters.forEach(semester => {
         const row = document.createElement('tr');
         row.className = "border-b";
         const formattedDate = new Date(semester.ngayBatDau).toLocaleDateString('vi-VN');
+        
         row.innerHTML = `
-            <td class="p-2 w-10 text-center"><input type="checkbox" class="semester-checkbox" data-id="${semester.id}"></td>
+            <td class="p-2 w-10 text-center"><input type="checkbox" class="semester-checkbox admin-action" data-id="${semester.id}"></td>
             <td class="px-4 py-2">${semester.tenHocKy}</td>
             <td class="px-4 py-2">${semester.namHoc}</td>
             <td class="px-4 py-2 text-center">${formattedDate}</td>
             <td class="px-4 py-2 text-center">
-                <button class="text-blue-500 mr-2" onclick="window.editSemester('${semester.id}')" title="Sửa"><i class="fas fa-edit"></i></button>
-                <button class="text-red-500" onclick="window.deleteSemester('${semester.id}')" title="Xóa"><i class="fas fa-trash"></i></button>
+                <button class="text-blue-500 mr-2 admin-action" onclick="window.editSemester('${semester.id}')" title="Sửa"><i class="fas fa-edit"></i></button>
+                <button class="text-red-500 admin-action" onclick="window.deleteSemester('${semester.id}')" title="Xóa"><i class="fas fa-trash"></i></button>
             </td>
         `;
         listBody.appendChild(row);
     });
+    updateUIForRole(); // Re-apply disabled state after rendering
 }
 
 function clearSemesterForm() {
@@ -439,19 +479,21 @@ function renderSubjectsList() {
         const department = departments.find(d => d.id === subject.departmentId);
         const row = document.createElement('tr');
         row.className = "border-b";
+        
         row.innerHTML = `
-            <td class="p-2 w-10 text-center"><input type="checkbox" class="subject-checkbox" data-id="${subject.id}"></td>
+            <td class="p-2 w-10 text-center"><input type="checkbox" class="subject-checkbox admin-action" data-id="${subject.id}"></td>
             <td class="px-4 py-2">${subject.tenMonHoc}</td>
             <td class="px-4 py-2">${subject.maHocPhan}</td>
             <td class="px-4 py-2">${department ? department.name : '<i class="text-gray-400">Chưa phân loại</i>'}</td>
             <td class="px-4 py-2 text-center">${subject.soTinChi}</td>
             <td class="px-4 py-2 text-center">
-                <button class="text-blue-500 mr-2" onclick="window.editSubject('${subject.id}')" title="Sửa"><i class="fas fa-edit"></i></button>
-                <button class="text-red-500" onclick="window.deleteSubject('${subject.id}')" title="Xóa"><i class="fas fa-trash"></i></button>
+                <button class="text-blue-500 mr-2 admin-action" onclick="window.editSubject('${subject.id}')" title="Sửa"><i class="fas fa-edit"></i></button>
+                <button class="text-red-500 admin-action" onclick="window.deleteSubject('${subject.id}')" title="Xóa"><i class="fas fa-trash"></i></button>
             </td>
         `;
         listBody.appendChild(row);
     });
+    updateUIForRole();
 }
 
 function clearSubjectForm() {
@@ -485,21 +527,23 @@ window.deleteSubject = (id) => {
 function renderRoomsList() {
     const listBody = document.getElementById('rooms-list-body');
     listBody.innerHTML = '';
+
     rooms.forEach(room => {
         const row = document.createElement('tr');
         row.className = "border-b";
         row.innerHTML = `
-            <td class="p-2 w-10 text-center"><input type="checkbox" class="room-checkbox" data-id="${room.id}"></td>
+            <td class="p-2 w-10 text-center"><input type="checkbox" class="room-checkbox admin-action" data-id="${room.id}"></td>
             <td class="px-4 py-2">${room.tenPhong}</td>
             <td class="px-4 py-2 text-center">${room.loaiPhong}</td>
             <td class="px-4 py-2 text-center">${room.sucChua}</td>
             <td class="px-4 py-2 text-center">
-                <button class="text-blue-500 mr-2" onclick="window.editRoom('${room.id}')" title="Sửa"><i class="fas fa-edit"></i></button>
-                <button class="text-red-500" onclick="window.deleteRoom('${room.id}')" title="Xóa"><i class="fas fa-trash"></i></button>
+                <button class="text-blue-500 mr-2 admin-action" onclick="window.editRoom('${room.id}')" title="Sửa"><i class="fas fa-edit"></i></button>
+                <button class="text-red-500 admin-action" onclick="window.deleteRoom('${room.id}')" title="Xóa"><i class="fas fa-trash"></i></button>
             </td>
         `;
         listBody.appendChild(row);
     });
+    updateUIForRole();
 }
 
 function clearRoomForm() {
@@ -533,21 +577,23 @@ window.deleteRoom = (id) => {
 function renderMajorsList() {
     const listBody = document.getElementById('majors-list-body');
     listBody.innerHTML = '';
+
     majors.forEach(major => {
         const department = departments.find(d => d.id === major.departmentId);
         const row = document.createElement('tr');
         row.className = "border-b";
         row.innerHTML = `
-            <td class="p-2 w-10 text-center"><input type="checkbox" class="major-checkbox" data-id="${major.id}"></td>
+            <td class="p-2 w-10 text-center"><input type="checkbox" class="major-checkbox admin-action" data-id="${major.id}"></td>
             <td class="px-4 py-2">${major.tenNganh}</td>
             <td class="px-4 py-2">${department ? department.name : 'N/A'}</td>
             <td class="px-4 py-2 text-center">
-                <button class="text-blue-500 mr-2" onclick="window.editMajor('${major.id}')" title="Sửa"><i class="fas fa-edit"></i></button>
-                <button class="text-red-500" onclick="window.deleteMajor('${major.id}')" title="Xóa"><i class="fas fa-trash"></i></button>
+                <button class="text-blue-500 mr-2 admin-action" onclick="window.editMajor('${major.id}')" title="Sửa"><i class="fas fa-edit"></i></button>
+                <button class="text-red-500 admin-action" onclick="window.deleteMajor('${major.id}')" title="Xóa"><i class="fas fa-trash"></i></button>
             </td>
         `;
         listBody.appendChild(row);
     });
+    updateUIForRole();
 }
 
 function clearMajorForm() {
@@ -576,26 +622,28 @@ window.deleteMajor = (id) => {
 };
 
 
-// --- Official Class (Lớp Chính Quy) Management (UPDATED) ---
+// --- Official Class (Lớp Chính Quy) Management ---
 function renderOfficialClassesList() {
     const listBody = document.getElementById('official-classes-list-body');
     listBody.innerHTML = '';
+
     officialClasses.forEach(oc => {
         const department = departments.find(d => d.id === oc.departmentId);
         const row = document.createElement('tr');
         row.className = "border-b";
         row.innerHTML = `
-            <td class="p-2 w-10 text-center"><input type="checkbox" class="official-class-checkbox" data-id="${oc.id}"></td>
+            <td class="p-2 w-10 text-center"><input type="checkbox" class="official-class-checkbox admin-action" data-id="${oc.id}"></td>
             <td class="px-4 py-2">${oc.maLopCQ}</td>
             <td class="px-4 py-2">${department ? department.name : 'N/A'}</td>
             <td class="px-4 py-2 text-center">${oc.siSo}</td>
             <td class="px-4 py-2 text-center">
-                <button class="text-blue-500 mr-2" onclick="window.editOfficialClass('${oc.id}')" title="Sửa"><i class="fas fa-edit"></i></button>
-                <button class="text-red-500" onclick="window.deleteOfficialClass('${oc.id}')" title="Xóa"><i class="fas fa-trash"></i></button>
+                <button class="text-blue-500 mr-2 admin-action" onclick="window.editOfficialClass('${oc.id}')" title="Sửa"><i class="fas fa-edit"></i></button>
+                <button class="text-red-500 admin-action" onclick="window.deleteOfficialClass('${oc.id}')" title="Xóa"><i class="fas fa-trash"></i></button>
             </td>
         `;
         listBody.appendChild(row);
     });
+    updateUIForRole();
 }
 
 function clearOfficialClassForm() {
@@ -627,7 +675,6 @@ window.deleteOfficialClass = (id) => {
 
 // --- Course Section (Lớp học phần) Management ---
 function populateDropdownsForCSModal() {
-    // This function will now initialize the searchable selects
     initSearchableSelect('cs-semester-select-container', semesters, {
         valueField: 'id',
         labelField: 'tenHocKy',
@@ -700,30 +747,31 @@ function updateCourseSectionCode() {
 function renderCourseSectionsList() {
     const listBody = document.getElementById('course-sections-list-body');
     listBody.innerHTML = '';
+
     courseSections.forEach(cs => {
         const subject = subjects.find(s => s.id === cs.monHocId);
         const lecturer = lecturers.find(l => l.id === cs.giangVienId);
         const row = document.createElement('tr');
         row.className = "border-b";
         row.innerHTML = `
-            <td class="p-2 w-10 text-center"><input type="checkbox" class="course-section-checkbox" data-id="${cs.id}"></td>
+            <td class="p-2 w-10 text-center"><input type="checkbox" class="course-section-checkbox admin-action" data-id="${cs.id}"></td>
             <td class="px-4 py-2 font-semibold">${cs.maLopHP}</td>
             <td class="px-4 py-2">${subject ? subject.tenMonHoc : 'N/A'}</td>
             <td class="px-4 py-2">${lecturer ? lecturer.name : 'N/A'}</td>
             <td class="px-4 py-2 text-center">
-                <button class="text-blue-500 mr-2" onclick="window.editCourseSection('${cs.id}')" title="Sửa"><i class="fas fa-edit"></i></button>
-                <button class="text-red-500" onclick="window.deleteCourseSection('${cs.id}')" title="Xóa"><i class="fas fa-trash"></i></button>
+                <button class="text-blue-500 mr-2 admin-action" onclick="window.editCourseSection('${cs.id}')" title="Sửa"><i class="fas fa-edit"></i></button>
+                <button class="text-red-500 admin-action" onclick="window.deleteCourseSection('${cs.id}')" title="Xóa"><i class="fas fa-trash"></i></button>
             </td>
         `;
         listBody.appendChild(row);
     });
+    updateUIForRole();
 }
 
 function clearCourseSectionForm() {
     document.getElementById('course-section-form').reset();
     document.getElementById('course-section-id').value = '';
     
-    // Clear all searchable selects
     document.getElementById('cs-semester-select-container').clear();
     document.getElementById('cs-official-class-select-container').clear();
     document.getElementById('cs-subject-select-container').clear();
@@ -739,11 +787,9 @@ window.editCourseSection = (id) => {
 
         document.getElementById('course-section-id').value = cs.id;
         
-        // Set values for searchable selects
         document.getElementById('cs-semester-select-container').setValue(cs.hocKyId);
         document.getElementById('cs-official-class-select-container').setValue(cs.lopChinhQuyId);
         
-        // Trigger updates for dependent dropdowns
         const officialClass = officialClasses.find(oc => oc.id === cs.lopChinhQuyId);
         if (officialClass && officialClass.departmentId) {
             const subjectContainer = document.getElementById('cs-subject-select-container');
@@ -868,7 +914,6 @@ async function runAutoScheduler(btn) {
         return;
     }
 
-    // Reverted to simple sorting by class size
     unscheduledSections.sort((a, b) => b.siSo - a.siSo);
 
     const successLog = [];
@@ -897,10 +942,8 @@ async function runAutoScheduler(btn) {
                 }
 
                 for (const room of rooms) {
-                    // Constraint 1: Room Capacity
                     if (room.sucChua < section.siSo) continue;
 
-                    // Constraints 2, 3, 4: Time Conflicts
                     const lecturerConflict = checkLecturerConflict(section.giangVienId, day, startPeriod, numPeriods, null, tempSchedules);
                     const roomConflict = checkRoomConflict(room.id, day, startPeriod, numPeriods, null, tempSchedules);
                     const classConflict = checkClassConflict(section.lopChinhQuyId, day, startPeriod, numPeriods, null, tempSchedules);
@@ -951,17 +994,13 @@ function runConflictCheck() {
         class: []
     };
 
-    const checkedPairs = new Set();
-
     for (let i = 0; i < schedules.length; i++) {
         for (let j = i + 1; j < schedules.length; j++) {
             const s1 = schedules[i];
             const s2 = schedules[j];
 
-            // Only check schedules on the same day
             if (s1.thu !== s2.thu) continue;
             
-            // Check for time overlap
             const s1_start = s1.tietBatDau;
             const s1_end = s1.tietBatDau + s1.soTiet - 1;
             const s2_start = s2.tietBatDau;
@@ -969,21 +1008,17 @@ function runConflictCheck() {
 
             if (!isOverlapping(s1_start, s1_end, s2_start, s2_end)) continue;
 
-            // If overlapping, check for resource conflicts
             const section1 = courseSections.find(cs => cs.id === s1.lopHocPhanId);
             const section2 = courseSections.find(cs => cs.id === s2.lopHocPhanId);
 
             if (!section1 || !section2) continue;
 
-            // 1. Lecturer conflict
             if (section1.giangVienId === section2.giangVienId) {
                 conflicts.lecturer.push({ s1, s2, section1, section2 });
             }
-            // 2. Room conflict
             if (s1.phongHocId === s2.phongHocId) {
                 conflicts.room.push({ s1, s2, section1, section2 });
             }
-            // 3. Class conflict
             if (section1.lopChinhQuyId === section2.lopChinhQuyId) {
                 conflicts.class.push({ s1, s2, section1, section2 });
             }
@@ -1335,9 +1370,7 @@ function generatePrintableSchedule(options) {
 }
 
 
-// --- Import Logic (UPDATED) ---
-
-// Function to download a template Excel file
+// --- Import Logic ---
 function downloadTemplate() {
     const type = document.getElementById('import-type-select').value;
     let headers, filename;
@@ -1360,7 +1393,7 @@ function downloadTemplate() {
             filename = "Mau_Import_GiangVien.xlsx";
             break;
         case 'officialClasses':
-            headers = ["maLopCQ", "siSo", "tenKhoa"]; // CHANGED
+            headers = ["maLopCQ", "siSo", "tenKhoa"];
             filename = "Mau_Import_LopChinhQuy.xlsx";
             break;
         case 'courseSections':
@@ -1378,7 +1411,6 @@ function downloadTemplate() {
     XLSX.writeFile(wb, filename);
 }
 
-// Main function to handle file import
 async function handleFileImport() {
     const btn = document.getElementById('start-import-btn');
     setButtonLoading(btn, true);
@@ -1421,7 +1453,6 @@ async function handleFileImport() {
             let updateCount = 0;
             let errorCount = 0;
 
-            // Process data based on type
             for (const [index, row] of jsonData.entries()) {
                 try {
                     let docData;
@@ -1525,7 +1556,6 @@ async function handleFileImport() {
                             throw new Error("Loại import không hợp lệ.");
                     }
                     
-                    // Check for existing document
                     queryRef = query(collectionRef, where(uniqueField, "==", uniqueValue));
                     const existingDocs = await getDocs(queryRef);
 
@@ -1560,7 +1590,7 @@ async function handleFileImport() {
             logContainer.innerHTML += `<span class="text-red-500">Đã xảy ra lỗi nghiêm trọng: ${error.message}</span><br>`;
         } finally {
             setButtonLoading(btn, false);
-            fileInput.value = ''; // Reset file input
+            fileInput.value = '';
         }
     };
 
@@ -1683,7 +1713,6 @@ function addEventListeners() {
     // Print Modal Listeners
     document.getElementById('print-schedule-btn').addEventListener('click', () => {
         populatePrintModalDropdowns();
-        // Trigger change event to set initial visibility
         document.querySelector('input[name="print-view-type"]:checked').dispatchEvent(new Event('change'));
         openModal('print-options-modal');
     });
@@ -1701,7 +1730,7 @@ function addEventListeners() {
         const semesterId = document.getElementById('print-semester-select').value;
         const viewType = document.querySelector('input[name="print-view-type"]:checked').value;
         let filterId;
-        let groupBy = 'room'; // Default value
+        let groupBy = 'room';
 
         if (viewType === 'department') {
             filterId = document.getElementById('print-department-select').value;
@@ -1841,7 +1870,7 @@ function addEventListeners() {
     document.getElementById('clear-major-form-btn').addEventListener('click', clearMajorForm);
 
 
-    // Official Class listeners (UPDATED)
+    // Official Class listeners
     document.getElementById('manage-official-classes-btn').addEventListener('click', () => {
         const departmentSelect = document.getElementById('oc-department-select');
         departmentSelect.innerHTML = '<option value="">-- Chọn Khoa --</option>';
@@ -1871,8 +1900,8 @@ function addEventListeners() {
 
     // Course Section listeners
     document.getElementById('manage-course-sections-btn').addEventListener('click', () => {
-        populateDropdownsForCSModal(); // Initialize first
-        clearCourseSectionForm();      // Then clear
+        populateDropdownsForCSModal();
+        clearCourseSectionForm();
         window.openModal('manage-course-sections-modal');
     });
     
@@ -1888,7 +1917,6 @@ function addEventListeners() {
             maLopHP: document.getElementById('cs-code').value.trim(),
             giangVienId: document.querySelector('#cs-lecturer-select-container .searchable-select-value').value,
         };
-        // Basic validation
         if (!data.hocKyId || !data.monHocId || !data.lopChinhQuyId || !data.giangVienId) {
             showAlert("Vui lòng điền đầy đủ tất cả các trường phân công.");
             setButtonLoading(btn, false);
@@ -1910,7 +1938,6 @@ function addEventListeners() {
         const selectAllCheckbox = document.getElementById(selectAllId);
         const deleteBtn = document.getElementById(deleteBtnId);
 
-        // Event delegation for checkboxes
         modal.addEventListener('change', (e) => {
             if (e.target.matches(`.${checkboxClass}, #${selectAllId}`)) {
                 const checkboxes = modal.querySelectorAll(`.${checkboxClass}`);
@@ -1919,11 +1946,10 @@ function addEventListeners() {
                 }
                 
                 const anyChecked = Array.from(checkboxes).some(cb => cb.checked);
-                deleteBtn.classList.toggle('hidden', !anyChecked);
+                deleteBtn.style.display = anyChecked ? 'inline-flex' : 'none';
             }
         });
 
-        // Delete button click
         deleteBtn.addEventListener('click', () => {
             const selectedIds = Array.from(modal.querySelectorAll(`.${checkboxClass}:checked`)).map(cb => cb.dataset.id);
 
@@ -1941,7 +1967,7 @@ function addEventListeners() {
                     });
                     await batch.commit();
                     showAlert(`Đã xóa ${selectedIds.length} ${itemName} thành công!`, true);
-                    deleteBtn.classList.add('hidden');
+                    deleteBtn.style.display = 'none';
                 } catch (error) {
                     console.error(`Error bulk deleting ${itemName}:`, error);
                     showAlert(`Lỗi khi xóa hàng loạt: ${error.message}`);
@@ -2006,15 +2032,11 @@ function setupOnSnapshotListeners() {
             
             if (c.render) c.render();
 
-            // Re-render dependent lists
             if (c.name === 'departments') {
                 renderMajorsList();
                 renderSubjectsList();
                 populateSubjectFilters();
-                renderOfficialClassesList(); // Re-render classes when departments change
-            }
-             if (c.name === 'majors') {
-                // No longer the primary driver for class rendering
+                renderOfficialClassesList();
             }
             if (c.name === 'officialClasses' || c.name === 'subjects' || c.name === 'lecturers' || c.name === 'semesters') {
                 renderCourseSectionsList();
