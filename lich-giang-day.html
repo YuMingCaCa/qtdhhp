@@ -13,11 +13,9 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- SheetJS for Excel file reading -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link rel="stylesheet" href="../css/style.css">
     <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f0f4f8;
-        }
+        /* Additional styles specific to this page */
         .schedule-table {
             width: 100%;
             border-collapse: collapse;
@@ -57,16 +55,6 @@
             transform: translateY(-2px);
             box-shadow: 0 4px 10px rgba(0,0,0,0.1);
         }
-        /* Basic modal styles */
-        .modal { display: none; position: fixed; z-index: 50; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5); -webkit-animation-name: fadeIn; -webkit-animation-duration: 0.4s; animation-name: fadeIn; animation-duration: 0.4s; }
-        .modal-content { background-color: #fefefe; margin: 5% auto; padding: 24px; border: 1px solid #888; width: 90%; max-width: 800px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1); -webkit-animation-name: slideIn; -webkit-animation-duration: 0.4s; animation-name: slideIn; animation-duration: 0.4s; }
-        @-webkit-keyframes slideIn { from {top: -300px; opacity: 0} to {top: 0; opacity: 1} }
-        @keyframes slideIn { from {margin-top: -5%; opacity: 0} to {margin-top: 5%; opacity: 1} }
-        @-webkit-keyframes fadeIn { from {opacity: 0} to {opacity: 1} }
-        @keyframes fadeIn { from {opacity: 0} to {opacity: 1} }
-        .close-button { color: #aaa; float: right; font-size: 28px; font-weight: bold; }
-        .close-button:hover, .close-button:focus { color: black; text-decoration: none; cursor: pointer; }
-
         /* Searchable Select Styles */
         .searchable-select-container {
             position: relative;
@@ -101,6 +89,37 @@
         .searchable-select-option.selected {
             background-color: #dbeafe;
             font-weight: 600;
+        }
+        /* Preference Modal Styles */
+        .preference-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 8px;
+        }
+        .preference-cell {
+            padding: 12px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-weight: 500;
+        }
+        .preference-cell:hover {
+            background-color: #f3f4f6;
+            border-color: #d1d5db;
+        }
+        .preference-cell.selected {
+            background-color: #dbeafe;
+            border-color: #3b82f6;
+            color: #1e40af;
+            font-weight: 700;
+        }
+        .preference-header {
+            font-weight: bold;
+            text-align: center;
+            padding-bottom: 8px;
+            color: #4b5563;
         }
     </style>
 </head>
@@ -154,9 +173,12 @@
                             <label for="class-schedule-select" class="block text-sm font-medium text-gray-700">Xem TKB cho lớp:</label>
                             <select id="class-schedule-select" class="mt-1 block w-full md:w-60 p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"></select>
                         </div>
-                        <div class="flex gap-2 w-full md:w-auto self-end">
+                        <div class="flex gap-2 w-full md:w-auto self-end flex-wrap">
                             <button id="manual-schedule-btn" class="admin-action flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">
                                 <i class="fas fa-plus-circle mr-2"></i>Thủ công
+                            </button>
+                             <button id="lecturer-preference-btn" class="admin-action flex-1 bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-lg">
+                                <i class="fas fa-star mr-2"></i>Đặt ưu tiên
                             </button>
                             <button id="auto-schedule-btn" class="admin-action flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg">
                                 <i class="fas fa-magic mr-2"></i>Tự động
@@ -179,6 +201,23 @@
     </div>
 
     <!-- MODALS -->
+
+    <!-- NEW: Lecturer Preference Modal -->
+    <div id="lecturer-preference-modal" class="modal">
+        <div class="modal-content max-w-3xl">
+            <span class="close-button no-print" onclick="closeModal('lecturer-preference-modal')">&times;</span>
+            <h3 class="text-xl font-bold mb-2">Chọn Buổi học Ưu tiên</h3>
+            <p class="text-gray-600 mb-4">Chọn các buổi học ưu tiên cho giảng viên được chỉ định. Hệ thống sẽ cố gắng xếp lịch vào các buổi này trước.</p>
+            <div id="preference-grid-container" class="p-4 border rounded-lg bg-gray-50 space-y-2">
+                <!-- Preference grid will be generated by JS -->
+            </div>
+            <div class="flex justify-end pt-4 mt-4 border-t">
+                <button id="save-preferences-btn" class="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-lg">
+                    <i class="fas fa-save mr-2"></i>Lưu Lựa chọn
+                </button>
+            </div>
+        </div>
+    </div>
 
     <!-- Import Data Modal -->
     <div id="import-data-modal" class="modal">

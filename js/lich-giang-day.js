@@ -46,8 +46,10 @@ function setButtonLoading(button, isLoading) {
 // --- Firebase Initialization ---
 let db, auth;
 let hocKyCol, monHocCol, lopHocPhanCol, lopChinhQuyCol, nganhHocCol, phongHocCol, thoiKhoaBieuCol;
-let departmentsCol, lecturersCol, usersCol;
+let departmentsCol, lecturersCol, usersCol, settingsCol;
 let scheduleModuleUserInfo = null; // To store current user's role and info
+let prioritySchedulerUID = null; // UID of the priority user for scheduling
+let priorityLecturerPreferences = []; // NEW: To store preferred time slots
 
 async function initializeFirebase() {
     const firebaseConfig = {
@@ -75,7 +77,8 @@ async function initializeFirebase() {
         departmentsCol = collection(db, `${basePath}/departments`);
         lecturersCol = collection(db, `${basePath}/lecturers`);
         usersCol = collection(db, `${basePath}/users`); // Collection for user roles
-        
+        settingsCol = collection(db, `${basePath}/settings`); 
+
         onAuthStateChanged(auth, async (user) => {
             if (user) {
                 const userDocRef = doc(usersCol, user.uid);
@@ -89,7 +92,7 @@ async function initializeFirebase() {
 
                 document.getElementById('schedule-module-content').classList.remove('hidden');
                 updateUIForRole(); 
-                setupOnSnapshotListeners();
+                setupOnSnapshotListeners(); 
                 addEventListeners();
                 populateYearSelect();
                 updateSemesterName();
@@ -876,7 +879,8 @@ function checkClassConflict(officialClassId, day, startPeriod, numPeriods, exclu
 }
 
 
-// --- Manual & Auto Scheduling Logic ---
+// --- Manual & Auto Scheduling Logic (REFACTORED) ---
+
 function populateManualScheduleModal() {
     const sectionSelect = document.getElementById('ms-section-select');
     sectionSelect.innerHTML = '<option value="">-- Chọn Lớp học phần --</option>';
@@ -898,6 +902,166 @@ function populateManualScheduleModal() {
     document.getElementById('ms-schedule-id').value = '';
 }
 
+/**
+ * Generates a prioritized list of start periods for the priority lecturer.
+ * @param {number} numPeriods - The number of periods for the class.
+ * @returns {number[]} An array of valid start periods, sorted by preference.
+ */
+function getPriorityTimeSlots(numPeriods) {
+    const preferences = [
+        // 1. Edges of day shifts (start of afternoon, end of morning)
+        6, 7, 5, 4,
+        // 2. End of afternoon
+        10, 9, 8,
+        // 3. Start of morning
+        1, 2, 3,
+        // 4. Evening shifts
+        11, 12, 13, 14, 15
+    ];
+
+    return preferences.filter(start => start + numPeriods - 1 <= 15);
+}
+
+/**
+ * The core scheduling engine for a list of sections.
+ * @param {Array} sectionsToSchedule - The list of course sections to schedule.
+ * @param {Array} currentSchedules - The list of already placed schedules.
+ * @param {boolean} isPriority - Flag to determine which scheduling strategy to use.
+ * @returns {Object} An object containing logs and the updated list of schedules.
+ */
+function scheduleSections(sectionsToSchedule, currentSchedules, isPriority = false) {
+    let tempSchedules = [...currentSchedules];
+    const successLog = [];
+    const failureLog = [];
+    const newSchedules = [];
+    const lecturerScheduledDays = {};
+
+    for (const section of sectionsToSchedule) {
+        let scheduled = false;
+        const subject = subjects.find(s => s.id === section.monHocId);
+        if (!subject) {
+            failureLog.push(`- <strong>${section.maLopHP}</strong>: Lỗi - Không tìm thấy thông tin môn học.`);
+            continue;
+        }
+        const numPeriods = subject.soTinChi || 3;
+
+        const tryToSchedule = (day, startPeriod) => {
+            if (scheduled) return false;
+            const endPeriod = startPeriod + numPeriods - 1;
+            if (endPeriod > 15 || (startPeriod <= 5 && endPeriod > 5) || (startPeriod <= 10 && endPeriod > 10)) {
+                return false;
+            }
+
+            for (const room of rooms) {
+                if (room.sucChua < section.siSo) continue;
+
+                const lecturerConflict = checkLecturerConflict(section.giangVienId, day, startPeriod, numPeriods, null, tempSchedules);
+                const roomConflict = checkRoomConflict(room.id, day, startPeriod, numPeriods, null, tempSchedules);
+                const classConflict = checkClassConflict(section.lopChinhQuyId, day, startPeriod, numPeriods, null, tempSchedules);
+
+                if (!lecturerConflict && !roomConflict && !classConflict) {
+                    const scheduleData = {
+                        lopHocPhanId: section.id,
+                        phongHocId: room.id,
+                        thu: day,
+                        tietBatDau: startPeriod,
+                        soTiet: numPeriods
+                    };
+                    
+                    newSchedules.push(scheduleData);
+                    tempSchedules.push({ id: `temp-${Math.random()}`, ...scheduleData });
+                    successLog.push(`- <strong>${section.maLopHP}</strong>: Xếp thành công vào Thứ ${day}, Tiết ${startPeriod}-${endPeriod}, Phòng ${room.tenPhong}`);
+                    
+                    if(isPriority) {
+                        if (!lecturerScheduledDays[section.giangVienId]) {
+                             lecturerScheduledDays[section.giangVienId] = new Set();
+                        }
+                        lecturerScheduledDays[section.giangVienId].add(day);
+                    }
+                    scheduled = true;
+                    return true;
+                }
+            }
+            return false;
+        };
+
+        // --- Scheduling Loop ---
+        if (isPriority) {
+            const hasPreferences = priorityLecturerPreferences && priorityLecturerPreferences.length > 0;
+
+            if (hasPreferences) {
+                // --- NEW LOGIC: Hard constraint on preferred slots ---
+                const preferredSlots = priorityLecturerPreferences;
+                for (const pref of preferredSlots) {
+                    let shiftStart, shiftEnd;
+                    if (pref.shift === 'Sáng') { shiftStart = 1; shiftEnd = 5; }
+                    else if (pref.shift === 'Chiều') { shiftStart = 6; shiftEnd = 10; }
+                    else { shiftStart = 11; shiftEnd = 15; }
+
+                    for (let p = shiftStart; p <= shiftEnd - numPeriods + 1; p++) {
+                        if (tryToSchedule(pref.day, p)) {
+                            break;
+                        }
+                    }
+                    if (scheduled) break;
+                }
+            } else {
+                // --- Fallback LOGIC: No preferences set, use default priority logic ---
+                const timeSlots = getPriorityTimeSlots(numPeriods);
+                const lecturerId = section.giangVienId;
+                 if (!lecturerScheduledDays[lecturerId]) {
+                    lecturerScheduledDays[lecturerId] = new Set();
+                }
+                const existingDays = Array.from(lecturerScheduledDays[lecturerId]);
+                const remainingDays = [2, 3, 4, 5, 6, 7].filter(d => !existingDays.includes(d));
+                
+                const allDaysInOrder = [...existingDays, ...remainingDays];
+
+                for (const day of allDaysInOrder) {
+                    for (const p of timeSlots) {
+                        if (tryToSchedule(day, p)) break;
+                    }
+                    if (scheduled) break;
+                }
+            }
+        } else {
+            // --- STANDARD LOGIC for non-priority lecturers ---
+            const days = [2, 3, 4, 5, 6];
+            
+            // 1. Try Mon-Fri, Morning/Afternoon
+            for (const day of days) {
+                for (let p = 1; p <= 10 - numPeriods + 1; p++) {
+                    if (tryToSchedule(day, p)) break;
+                }
+                if (scheduled) break;
+            }
+
+            // 2. Try Mon-Fri, Evening
+            if (!scheduled) {
+                for (const day of days) {
+                    for (let p = 11; p <= 15 - numPeriods + 1; p++) {
+                        if (tryToSchedule(day, p)) break;
+                    }
+                    if (scheduled) break;
+                }
+            }
+
+            // 3. Try Saturday, all day
+            if (!scheduled) {
+                for (let p = 1; p <= 15 - numPeriods + 1; p++) {
+                    if (tryToSchedule(7, p)) break;
+                }
+            }
+        }
+
+        if (!scheduled) {
+            failureLog.push(`- <strong>${section.maLopHP}</strong>: Không tìm được lịch trống phù hợp (đã xét các ràng buộc).`);
+        }
+    }
+
+    return { successLog, failureLog, newSchedules };
+}
+
 async function runAutoScheduler(btn) {
     setButtonLoading(btn, true);
     
@@ -914,69 +1078,51 @@ async function runAutoScheduler(btn) {
         return;
     }
 
-    unscheduledSections.sort((a, b) => b.siSo - a.siSo);
+    // Find priority lecturer
+    const priorityLecturer = lecturers.find(l => l.linkedUid === prioritySchedulerUID);
+    const priorityLecturerId = priorityLecturer ? priorityLecturer.id : null;
 
-    const successLog = [];
-    const failureLog = [];
+    // Partition sections
+    const prioritySections = priorityLecturerId ? unscheduledSections.filter(cs => cs.giangVienId === priorityLecturerId) : [];
+    const otherSections = priorityLecturerId ? unscheduledSections.filter(cs => cs.giangVienId !== priorityLecturerId) : unscheduledSections;
+    
+    // Sort by class size (largest first)
+    prioritySections.sort((a, b) => b.siSo - a.siSo);
+    otherSections.sort((a, b) => b.siSo - a.siSo);
+
     const batch = writeBatch(db);
-    const tempSchedules = [...schedules]; 
+    let allSuccessLogs = [];
+    let allFailureLogs = [];
 
-    for (const section of unscheduledSections) {
-        let scheduled = false;
-        const subject = subjects.find(s => s.id === section.monHocId);
-        if (!subject) {
-            failureLog.push(`- <strong>${section.maLopHP}</strong>: Lỗi - Không tìm thấy thông tin môn học.`);
-            continue;
-        }
-        const numPeriods = subject.soTinChi ? (subject.soTinChi || 3) : 3;
+    // 1. Schedule priority lecturer
+    const priorityResult = scheduleSections(prioritySections, schedules, true);
+    allSuccessLogs = allSuccessLogs.concat(priorityResult.successLog);
+    allFailureLogs = allFailureLogs.concat(priorityResult.failureLog);
+    
+    // Create a temporary schedule list that includes the newly scheduled priority classes
+    let schedulesAfterPriority = [...schedules];
+    priorityResult.newSchedules.forEach(s => {
+        schedulesAfterPriority.push({ id: `temp-${Math.random()}`, ...s });
+    });
 
-        mainLoop:
-        for (let day = 2; day <= 7; day++) {
-            for (let startPeriod = 1; startPeriod <= 15 - numPeriods + 1; startPeriod++) {
-                
-                const endPeriod = startPeriod + numPeriods - 1;
-                const isCrossingMorningAfternoon = (startPeriod <= 5 && endPeriod > 5);
-                const isCrossingAfternoonEvening = (startPeriod <= 10 && endPeriod > 10);
-                if (isCrossingMorningAfternoon || isCrossingAfternoonEvening) {
-                    continue; 
-                }
-
-                for (const room of rooms) {
-                    if (room.sucChua < section.siSo) continue;
-
-                    const lecturerConflict = checkLecturerConflict(section.giangVienId, day, startPeriod, numPeriods, null, tempSchedules);
-                    const roomConflict = checkRoomConflict(room.id, day, startPeriod, numPeriods, null, tempSchedules);
-                    const classConflict = checkClassConflict(section.lopChinhQuyId, day, startPeriod, numPeriods, null, tempSchedules);
-
-                    if (!lecturerConflict && !roomConflict && !classConflict) {
-                        const scheduleData = {
-                            lopHocPhanId: section.id,
-                            phongHocId: room.id,
-                            thu: day,
-                            tietBatDau: startPeriod,
-                            soTiet: numPeriods
-                        };
-                        const newScheduleRef = doc(thoiKhoaBieuCol);
-                        batch.set(newScheduleRef, scheduleData);
-                        
-                        tempSchedules.push({ id: newScheduleRef.id, ...scheduleData });
-
-                        successLog.push(`- <strong>${section.maLopHP}</strong>: Xếp thành công vào Thứ ${day}, Tiết ${startPeriod}-${endPeriod}, Phòng ${room.tenPhong}`);
-                        scheduled = true;
-                        break mainLoop;
-                    }
-                }
-            }
-        }
-        if (!scheduled) {
-            failureLog.push(`- <strong>${section.maLopHP}</strong>: Không tìm được lịch trống phù hợp (đã xét các ràng buộc).`);
-        }
-    }
+    // 2. Schedule other lecturers
+    const otherResult = scheduleSections(otherSections, schedulesAfterPriority, false);
+    allSuccessLogs = allSuccessLogs.concat(otherResult.successLog);
+    allFailureLogs = allFailureLogs.concat(otherResult.failureLog);
+    
+    // Add all new schedules to the batch
+    const allNewSchedules = [...priorityResult.newSchedules, ...otherResult.newSchedules];
+    allNewSchedules.forEach(scheduleData => {
+        const newScheduleRef = doc(thoiKhoaBieuCol);
+        batch.set(newScheduleRef, scheduleData);
+    });
 
     try {
-        await batch.commit();
-        document.getElementById('auto-schedule-success').innerHTML = successLog.length > 0 ? successLog.join('<br>') : "Không có lớp nào được xếp thành công.";
-        document.getElementById('auto-schedule-failed').innerHTML = failureLog.length > 0 ? failureLog.join('<br>') : "Tất cả các lớp đều được xếp thành công.";
+        if (allNewSchedules.length > 0) {
+            await batch.commit();
+        }
+        document.getElementById('auto-schedule-success').innerHTML = allSuccessLogs.length > 0 ? allSuccessLogs.join('<br>') : "Không có lớp nào được xếp thành công.";
+        document.getElementById('auto-schedule-failed').innerHTML = allFailureLogs.length > 0 ? allFailureLogs.join('<br>') : "Tất cả các lớp đều được xếp thành công.";
         openModal('auto-schedule-results-modal');
     } catch (error) {
         console.error("Error committing auto-schedule batch:", error);
@@ -985,6 +1131,7 @@ async function runAutoScheduler(btn) {
         setButtonLoading(btn, false);
     }
 }
+
 
 // --- Conflict Check Tool ---
 function runConflictCheck() {
@@ -1603,6 +1750,95 @@ async function handleFileImport() {
 }
 
 
+// --- NEW: Lecturer Preference Modal Logic ---
+function openLecturerPreferenceModal() {
+    const container = document.getElementById('preference-grid-container');
+    container.innerHTML = ''; // Clear previous grid
+
+    const priorityLecturer = lecturers.find(l => l.linkedUid === prioritySchedulerUID);
+    if (!priorityLecturer) {
+        showAlert("Chưa có giảng viên ưu tiên nào được liên kết với tài khoản Admin. Vui lòng vào module 'Quản lý giờ lao động' để liên kết.");
+        return;
+    }
+    document.querySelector('#lecturer-preference-modal h3').textContent = `Chọn Buổi học Ưu tiên cho GV: ${priorityLecturer.name}`;
+
+    const grid = document.createElement('div');
+    grid.className = 'preference-grid';
+
+    // --- FIX: Use appendChild instead of innerHTML += to preserve event listeners ---
+
+    // Header row
+    const corner = document.createElement('div');
+    grid.appendChild(corner);
+    for (let day = 2; day <= 7; day++) {
+        const headerCell = document.createElement('div');
+        headerCell.className = 'preference-header';
+        headerCell.textContent = `Thứ ${day}`;
+        grid.appendChild(headerCell);
+    }
+
+    // Data rows
+    const shifts = ['Sáng', 'Chiều', 'Tối'];
+    shifts.forEach(shift => {
+        const shiftHeader = document.createElement('div');
+        shiftHeader.className = 'preference-header';
+        shiftHeader.textContent = shift;
+        grid.appendChild(shiftHeader);
+
+        for (let day = 2; day <= 7; day++) {
+            const cell = document.createElement('div');
+            cell.className = 'preference-cell';
+            cell.dataset.day = day;
+            cell.dataset.shift = shift;
+            
+            const isSelected = priorityLecturerPreferences.some(p => p.day === day && p.shift === shift);
+            if (isSelected) {
+                cell.classList.add('selected');
+                cell.textContent = 'Đã chọn';
+            } else {
+                cell.textContent = 'Chọn';
+            }
+
+            cell.addEventListener('click', () => {
+                cell.classList.toggle('selected');
+                if (cell.classList.contains('selected')) {
+                    cell.textContent = 'Đã chọn';
+                } else {
+                    cell.textContent = 'Chọn';
+                }
+            });
+            grid.appendChild(cell);
+        }
+    });
+
+    container.appendChild(grid);
+    openModal('lecturer-preference-modal');
+}
+
+async function saveLecturerPreferences() {
+    const btn = document.getElementById('save-preferences-btn');
+    setButtonLoading(btn, true);
+
+    const selectedCells = document.querySelectorAll('#lecturer-preference-modal .preference-cell.selected');
+    const preferences = Array.from(selectedCells).map(cell => ({
+        day: parseInt(cell.dataset.day, 10),
+        shift: cell.dataset.shift
+    }));
+
+    try {
+        const settingsDocRef = doc(settingsCol, 'appSettings');
+        await setDoc(settingsDocRef, { priorityLecturerPreferences: preferences }, { merge: true });
+        showAlert("Đã lưu các buổi học ưu tiên thành công!", true);
+        closeModal('lecturer-preference-modal');
+    } catch (error) {
+        console.error("Error saving preferences:", error);
+        showAlert(`Lỗi khi lưu lựa chọn: ${error.message}`);
+    } finally {
+        setButtonLoading(btn, false);
+    }
+}
+
+
 // --- Event Listeners and Initial Setup ---
 function addEventListeners() {
     // Schedule view listener
@@ -1630,6 +1866,10 @@ function addEventListeners() {
     document.getElementById('conflict-check-btn').addEventListener('click', () => {
         runConflictCheck();
     });
+
+    // NEW: Lecturer Preference Button Listener
+    document.getElementById('lecturer-preference-btn').addEventListener('click', openLecturerPreferenceModal);
+    document.getElementById('save-preferences-btn').addEventListener('click', saveLecturerPreferences);
 
     // Manual Schedule Form Submission
     document.getElementById('manual-schedule-form').addEventListener('submit', async (e) => {
@@ -1990,7 +2230,7 @@ function addEventListeners() {
 let isDataReady = {
     semesters: false, subjects: false, rooms: false, courseSections: false,
     departments: false, lecturers: false, officialClasses: false, schedules: false,
-    majors: false
+    majors: false, settings: false // Add settings to ready check
 };
 let initialLoadDone = false;
 
@@ -2056,6 +2296,23 @@ function setupOnSnapshotListeners() {
             }
         }, (error) => console.error(`Error listening to ${c.name}:`, error));
     });
+
+    // Listener for settings document
+    const settingsDocRef = doc(settingsCol, 'appSettings');
+    onSnapshot(settingsDocRef, (docSnap) => {
+        if (docSnap.exists()) {
+            const data = docSnap.data();
+            prioritySchedulerUID = data.prioritySchedulerUID || null;
+            priorityLecturerPreferences = data.priorityLecturerPreferences || [];
+        } else {
+            prioritySchedulerUID = null;
+            priorityLecturerPreferences = [];
+        }
+        if (!isDataReady.settings) {
+            isDataReady.settings = true;
+            checkAllDataReady();
+        }
+    }, (error) => console.error("Error listening to settings:", error));
 }
 
 // --- Global Functions for Modals ---
