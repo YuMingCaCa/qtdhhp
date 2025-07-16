@@ -25,7 +25,7 @@ import {
     writeBatch,
     query,
     where,
-    deleteField 
+    deleteField
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 /**
@@ -1946,6 +1946,183 @@ function addEventListeners() {
             () => cleanupDuplicateLecturers(e.currentTarget)
         );
     });
+
+    // ===================================================================
+    // START: STATISTICS & REPORTING LOGIC (FIX)
+    // ===================================================================
+
+    // Function to populate lecturer dropdown in stats modal
+    function populateStatsLecturerSelect(departmentId) {
+        const lecturerSelect = document.getElementById('stats-lecturer-select');
+        lecturerSelect.innerHTML = '<option value="all">-- Tất cả giảng viên --</option>';
+        
+        let lecturersToList = state.lecturers;
+        if (departmentId && departmentId !== 'all') {
+            lecturersToList = state.lecturers.filter(l => l.departmentId === departmentId);
+        }
+
+        lecturersToList.forEach(lecturer => {
+            const option = document.createElement('option');
+            option.value = lecturer.id;
+            option.textContent = `${lecturer.name} (${lecturer.code})`;
+            lecturerSelect.appendChild(option);
+        });
+    }
+
+    // Open the statistics modal
+    document.getElementById('statistics-tool-btn').addEventListener('click', () => {
+        const depSelect = document.getElementById('stats-department-select');
+        const yearSelect = document.getElementById('stats-year-select');
+        
+        // Populate departments
+        depSelect.innerHTML = '<option value="all">-- Toàn trường --</option>';
+        state.departments.forEach(dep => {
+            depSelect.innerHTML += `<option value="${dep.id}">${dep.name}</option>`;
+        });
+        
+        // Populate years
+        yearSelect.innerHTML = '';
+        getYearsForSelect().forEach(year => {
+            yearSelect.innerHTML += `<option value="${year}" ${year === state.selectedYear ? 'selected' : ''}>Năm học ${year}</option>`;
+        });
+
+        // Populate lecturers based on initial department selection
+        populateStatsLecturerSelect(depSelect.value);
+
+        // Reset results area
+        document.getElementById('statistics-results-container').classList.add('hidden');
+        document.getElementById('export-report-btn').classList.add('hidden');
+        document.getElementById('statistics-results-table').innerHTML = '';
+        
+        openModal('statistics-modal');
+    });
+
+    // Update lecturer list when department changes in stats modal
+    document.getElementById('stats-department-select').addEventListener('change', (e) => {
+        populateStatsLecturerSelect(e.target.value);
+    });
+
+    // "View Statistics" button click
+    document.getElementById('view-statistics-btn').addEventListener('click', (e) => {
+        const btn = e.currentTarget;
+        setButtonLoading(btn, true);
+
+        const depId = document.getElementById('stats-department-select').value;
+        const year = document.getElementById('stats-year-select').value;
+        const lecturerId = document.getElementById('stats-lecturer-select').value;
+
+        if (!year) {
+            showAlert("Vui lòng chọn một năm học.");
+            setButtonLoading(btn, false);
+            return;
+        }
+
+        // Filter entries
+        const filteredEntries = state.entries.filter(entry => {
+            const entryYear = entry.academicYear || getAcademicYear(entry.date);
+            if (entryYear !== year) return false;
+
+            const lecturer = state.lecturers.find(l => l.id === entry.lecturerId);
+            if (!lecturer) return false;
+
+            if (depId !== 'all' && lecturer.departmentId !== depId) return false;
+            if (lecturerId !== 'all' && entry.lecturerId !== lecturerId) return false;
+            
+            return true;
+        });
+
+        // Store results in state for report generation
+        state.statsEntries = filteredEntries;
+        state.statsSelectedYear = year;
+        state.statsSelectedLecturer = lecturerId !== 'all' ? state.lecturers.find(l => l.id === lecturerId) : null;
+
+        // Render results table
+        const tableContainer = document.getElementById('statistics-results-table');
+        const resultsTitle = document.getElementById('statistics-results-title');
+        const exportBtn = document.getElementById('export-report-btn');
+
+        if (filteredEntries.length === 0) {
+            resultsTitle.textContent = "Không tìm thấy dữ liệu phù hợp.";
+            tableContainer.innerHTML = '';
+            exportBtn.classList.add('hidden');
+        } else {
+            let totalHours = 0;
+            let tableHtml = `
+                <table class="min-w-full bg-white border">
+                    <thead class="bg-gray-100">
+                        <tr>
+                            <th class="px-4 py-2 text-left">Giảng viên</th>
+                            <th class="px-4 py-2 text-left">Nội dung</th>
+                            <th class="px-4 py-2 text-center">Ngày</th>
+                            <th class="px-4 py-2 text-center">Giờ</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            filteredEntries.sort((a,b) => new Date(b.date) - new Date(a.date)).forEach(entry => {
+                const lecturer = state.lecturers.find(l => l.id === entry.lecturerId);
+                totalHours += entry.hours;
+                tableHtml += `
+                    <tr class="border-b">
+                        <td class="px-4 py-2">${lecturer ? lecturer.name : 'N/A'}</td>
+                        <td class="px-4 py-2">${entry.description}</td>
+                        <td class="px-4 py-2 text-center">${formatDate(entry.date)}</td>
+                        <td class="px-4 py-2 text-center font-semibold">${entry.hours}</td>
+                    </tr>
+                `;
+            });
+            tableHtml += `
+                    <tr class="bg-gray-200 font-bold">
+                        <td colspan="3" class="px-4 py-2 text-right">Tổng cộng</td>
+                        <td class="px-4 py-2 text-center">${totalHours}</td>
+                    </tr>
+                </tbody></table>
+            `;
+            
+            resultsTitle.textContent = `Kết quả thống kê (${filteredEntries.length} mục):`;
+            tableContainer.innerHTML = tableHtml;
+            
+            // Show export button only if a single lecturer was selected
+            if (lecturerId !== 'all') {
+                exportBtn.classList.remove('hidden');
+            } else {
+                exportBtn.classList.add('hidden');
+            }
+        }
+        
+        document.getElementById('statistics-results-container').classList.remove('hidden');
+        setButtonLoading(btn, false);
+    });
+
+    // "Export Lecturer Report" button click
+    document.getElementById('export-report-btn').addEventListener('click', () => {
+        try {
+            const reportHtml = generateLecturerReportHtml();
+            const reportWindow = window.open('', '_blank');
+            reportWindow.document.write(reportHtml);
+            reportWindow.document.close();
+        } catch (error) {
+            showAlert(error.message);
+            console.error(error);
+        }
+    });
+    
+    // "Export Department Report" button click
+    document.getElementById('export-department-report-btn').addEventListener('click', () => {
+        try {
+            const reportHtml = generateDepartmentReportHtml();
+            const reportWindow = window.open('', '_blank');
+            reportWindow.document.write(reportHtml);
+            reportWindow.document.close();
+        } catch (error) {
+            showAlert(error.message);
+            console.error(error);
+        }
+    });
+
+    // ===================================================================
+    // END: STATISTICS & REPORTING LOGIC (FIX)
+    // ===================================================================
 
 
     // Other forms
