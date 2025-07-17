@@ -5,7 +5,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebas
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import { getFirestore, collection, onSnapshot, addDoc, doc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-// --- NEW: Function to inject shared styles, avoiding external file load errors ---
+// --- Function to inject shared styles, avoiding external file load errors ---
 function injectSharedStyles() {
     const style = document.createElement('style');
     style.textContent = `
@@ -105,7 +105,7 @@ let hocKyCol, monHocCol, lopHocPhanCol, lopChinhQuyCol, nganhHocCol, phongHocCol
 let departmentsCol, lecturersCol, usersCol, settingsCol;
 let scheduleModuleUserInfo = null; // To store current user's role and info
 let prioritySchedulerUID = null; // UID of the priority user for scheduling
-let priorityLecturerPreferences = []; // NEW: To store preferred time slots
+let priorityLecturerPreferences = []; // To store preferred time slots
 
 async function initializeFirebase() {
     // WARNING: Do not expose your Firebase config in client-side code in production.
@@ -165,12 +165,7 @@ async function initializeFirebase() {
     }
 }
 
-// --- Function to control UI based on user role (UPDATED & FIXED) ---
-/**
- * Updates the UI visibility and state based on the current user's role.
- * This version explicitly handles the display property for all admin buttons
- * to prevent them from becoming unintentionally hidden.
- */
+// --- Function to control UI based on user role ---
 function updateUIForRole() {
     if (!scheduleModuleUserInfo) return;
     const isAdmin = scheduleModuleUserInfo.role === 'admin';
@@ -180,34 +175,24 @@ function updateUIForRole() {
         const isPriorityEl = el.classList.contains('priority-admin-only');
 
         if (isAdmin) {
-            // --- ADMINS ---
-            // 1. Enable the element and remove viewer styles
             el.disabled = false;
             el.classList.remove('opacity-50', 'cursor-not-allowed');
             el.removeAttribute('title');
             if (el.tagName === 'FIELDSET') {
                 el.disabled = false;
             }
-
-            // 2. Set visibility based on priority
             if (isPriorityEl) {
-                // Special visibility for the priority button
                 el.style.display = isPriorityAdmin ? 'flex' : 'none';
             } else {
-                // *** ROBUST FIX: Explicitly ensure other admin buttons are visible. ***
-                // The buttons are designed with flex properties, so setting display to 'flex' is safe.
                 el.style.display = 'flex';
             }
         } else {
-            // --- VIEWERS ---
-            // 1. Disable the element and add viewer styles
             el.disabled = true;
             el.classList.add('opacity-50', 'cursor-not-allowed');
             el.setAttribute('title', 'Chức năng này yêu cầu quyền Admin');
             if (el.tagName === 'FIELDSET') {
                 el.disabled = true;
             }
-            // 2. Hide all admin-only elements from viewers
             el.style.display = 'none';
         }
     });
@@ -364,7 +349,19 @@ function displayScheduleForClass(classId) {
     
     const scheduleTitle = document.getElementById('schedule-title');
     
+    // Clear previous schedule blocks
     document.querySelectorAll('.schedule-block').forEach(block => block.remove());
+
+    // Handle case where no class is selected
+    if (!classId) {
+        const selectedDepartment = departments.find(d => d.id === document.getElementById('department-filter-select').value);
+        if (selectedDepartment) {
+            scheduleTitle.textContent = `Thời khóa biểu Khoa: ${selectedDepartment.name}`;
+        } else {
+            scheduleTitle.textContent = 'Vui lòng chọn Khoa và Lớp';
+        }
+        return;
+    }
 
     const selectedClass = officialClasses.find(oc => oc.id === classId);
     if (!selectedClass) {
@@ -424,17 +421,45 @@ function displayScheduleForClass(classId) {
     });
 }
 
-function populateClassSelect() {
-    const select = document.getElementById('class-schedule-select');
+// --- NEW: Functions for Department and Class Filtering ---
+function populateDepartmentFilterSelect() {
+    const select = document.getElementById('department-filter-select');
     const currentValue = select.value;
-    select.innerHTML = '<option value="">-- Chọn lớp để xem TKB --</option>';
-    officialClasses.forEach(oc => {
+    select.innerHTML = '<option value="">-- Chọn khoa --</option>';
+    departments.forEach(dep => {
         const option = document.createElement('option');
-        option.value = oc.id;
-        option.textContent = oc.maLopCQ;
+        option.value = dep.id;
+        option.textContent = dep.name;
         select.appendChild(option);
     });
-    select.value = currentValue;
+    // Restore previous selection if it exists
+    if (currentValue && departments.some(d => d.id === currentValue)) {
+        select.value = currentValue;
+    }
+}
+
+function populateClassFilterSelect(departmentId) {
+    const select = document.getElementById('class-filter-select');
+    const currentValue = select.value;
+    select.innerHTML = '<option value="">-- Chọn lớp --</option>';
+
+    if (departmentId) {
+        const filteredClasses = officialClasses
+            .filter(oc => oc.departmentId === departmentId)
+            .sort((a, b) => a.maLopCQ.localeCompare(b.maLopCQ)); // Sort classes alphabetically
+        
+        filteredClasses.forEach(oc => {
+            const option = document.createElement('option');
+            option.value = oc.id;
+            option.textContent = oc.maLopCQ;
+            select.appendChild(option);
+        });
+    }
+    // Restore previous selection if it exists and belongs to the current department
+    const currentClassIsValid = officialClasses.some(oc => oc.id === currentValue && oc.departmentId === departmentId);
+    if (currentValue && currentClassIsValid) {
+        select.value = currentValue;
+    }
 }
 
 
@@ -954,7 +979,7 @@ function checkClassConflict(officialClassId, day, startPeriod, numPeriods, exclu
 }
 
 
-// --- Manual & Auto Scheduling Logic (REFACTORED) ---
+// --- Manual & Auto Scheduling Logic ---
 
 function populateManualScheduleModal() {
     const sectionSelect = document.getElementById('ms-section-select');
@@ -977,33 +1002,11 @@ function populateManualScheduleModal() {
     document.getElementById('ms-schedule-id').value = '';
 }
 
-/**
- * Generates a prioritized list of start periods for the priority lecturer.
- * @param {number} numPeriods - The number of periods for the class.
- * @returns {number[]} An array of valid start periods, sorted by preference.
- */
 function getPriorityTimeSlots(numPeriods) {
-    const preferences = [
-        // 1. Edges of day shifts (start of afternoon, end of morning)
-        6, 7, 5, 4,
-        // 2. End of afternoon
-        10, 9, 8,
-        // 3. Start of morning
-        1, 2, 3,
-        // 4. Evening shifts
-        11, 12, 13, 14, 15
-    ];
-
+    const preferences = [ 6, 7, 5, 4, 10, 9, 8, 1, 2, 3, 11, 12, 13, 14, 15 ];
     return preferences.filter(start => start + numPeriods - 1 <= 15);
 }
 
-/**
- * The core scheduling engine for a list of sections.
- * @param {Array} sectionsToSchedule - The list of course sections to schedule.
- * @param {Array} currentSchedules - The list of already placed schedules.
- * @param {boolean} isPriority - Flag to determine which scheduling strategy to use.
- * @returns {Object} An object containing logs and the updated list of schedules.
- */
 function scheduleSections(sectionsToSchedule, currentSchedules, isPriority = false) {
     let tempSchedules = [...currentSchedules];
     const successLog = [];
@@ -1060,12 +1063,9 @@ function scheduleSections(sectionsToSchedule, currentSchedules, isPriority = fal
             return false;
         };
 
-        // --- Scheduling Loop ---
         if (isPriority) {
             const hasPreferences = priorityLecturerPreferences && priorityLecturerPreferences.length > 0;
-
             if (hasPreferences) {
-                // --- NEW LOGIC: Hard constraint on preferred slots ---
                 const preferredSlots = priorityLecturerPreferences;
                 for (const pref of preferredSlots) {
                     let shiftStart, shiftEnd;
@@ -1074,14 +1074,11 @@ function scheduleSections(sectionsToSchedule, currentSchedules, isPriority = fal
                     else { shiftStart = 11; shiftEnd = 15; }
 
                     for (let p = shiftStart; p <= shiftEnd - numPeriods + 1; p++) {
-                        if (tryToSchedule(pref.day, p)) {
-                            break;
-                        }
+                        if (tryToSchedule(pref.day, p)) break;
                     }
                     if (scheduled) break;
                 }
             } else {
-                // --- Fallback LOGIC: No preferences set, use default priority logic ---
                 const timeSlots = getPriorityTimeSlots(numPeriods);
                 const lecturerId = section.giangVienId;
                  if (!lecturerScheduledDays[lecturerId]) {
@@ -1089,7 +1086,6 @@ function scheduleSections(sectionsToSchedule, currentSchedules, isPriority = fal
                 }
                 const existingDays = Array.from(lecturerScheduledDays[lecturerId]);
                 const remainingDays = [2, 3, 4, 5, 6, 7].filter(d => !existingDays.includes(d));
-                
                 const allDaysInOrder = [...existingDays, ...remainingDays];
 
                 for (const day of allDaysInOrder) {
@@ -1100,18 +1096,13 @@ function scheduleSections(sectionsToSchedule, currentSchedules, isPriority = fal
                 }
             }
         } else {
-            // --- STANDARD LOGIC for non-priority lecturers ---
             const days = [2, 3, 4, 5, 6];
-            
-            // 1. Try Mon-Fri, Morning/Afternoon
             for (const day of days) {
                 for (let p = 1; p <= 10 - numPeriods + 1; p++) {
                     if (tryToSchedule(day, p)) break;
                 }
                 if (scheduled) break;
             }
-
-            // 2. Try Mon-Fri, Evening
             if (!scheduled) {
                 for (const day of days) {
                     for (let p = 11; p <= 15 - numPeriods + 1; p++) {
@@ -1120,8 +1111,6 @@ function scheduleSections(sectionsToSchedule, currentSchedules, isPriority = fal
                     if (scheduled) break;
                 }
             }
-
-            // 3. Try Saturday, all day
             if (!scheduled) {
                 for (let p = 1; p <= 15 - numPeriods + 1; p++) {
                     if (tryToSchedule(7, p)) break;
@@ -1153,15 +1142,12 @@ async function runAutoScheduler(btn) {
         return;
     }
 
-    // Find priority lecturer
     const priorityLecturer = lecturers.find(l => l.linkedUid === prioritySchedulerUID);
     const priorityLecturerId = priorityLecturer ? priorityLecturer.id : null;
 
-    // Partition sections
     const prioritySections = priorityLecturerId ? unscheduledSections.filter(cs => cs.giangVienId === priorityLecturerId) : [];
     const otherSections = priorityLecturerId ? unscheduledSections.filter(cs => cs.giangVienId !== priorityLecturerId) : unscheduledSections;
     
-    // Sort by class size (largest first)
     prioritySections.sort((a, b) => b.siSo - a.siSo);
     otherSections.sort((a, b) => b.siSo - a.siSo);
 
@@ -1169,23 +1155,19 @@ async function runAutoScheduler(btn) {
     let allSuccessLogs = [];
     let allFailureLogs = [];
 
-    // 1. Schedule priority lecturer
     const priorityResult = scheduleSections(prioritySections, schedules, true);
     allSuccessLogs = allSuccessLogs.concat(priorityResult.successLog);
     allFailureLogs = allFailureLogs.concat(priorityResult.failureLog);
     
-    // Create a temporary schedule list that includes the newly scheduled priority classes
     let schedulesAfterPriority = [...schedules];
     priorityResult.newSchedules.forEach(s => {
         schedulesAfterPriority.push({ id: `temp-${Math.random()}`, ...s });
     });
 
-    // 2. Schedule other lecturers
     const otherResult = scheduleSections(otherSections, schedulesAfterPriority, false);
     allSuccessLogs = allSuccessLogs.concat(otherResult.successLog);
     allFailureLogs = allFailureLogs.concat(otherResult.failureLog);
     
-    // Add all new schedules to the batch
     const allNewSchedules = [...priorityResult.newSchedules, ...otherResult.newSchedules];
     allNewSchedules.forEach(scheduleData => {
         const newScheduleRef = doc(thoiKhoaBieuCol);
@@ -1840,8 +1822,6 @@ function openLecturerPreferenceModal() {
     const grid = document.createElement('div');
     grid.className = 'preference-grid';
 
-    // --- FIX: Use appendChild instead of innerHTML += to preserve event listeners ---
-
     // Header row
     const corner = document.createElement('div');
     grid.appendChild(corner);
@@ -1916,8 +1896,15 @@ async function saveLecturerPreferences() {
 
 // --- Event Listeners and Initial Setup ---
 function addEventListeners() {
-    // Schedule view listener
-    document.getElementById('class-schedule-select').addEventListener('change', (e) => {
+    // --- NEW: Department and Class filter listeners ---
+    document.getElementById('department-filter-select').addEventListener('change', (e) => {
+        const departmentId = e.target.value;
+        populateClassFilterSelect(departmentId);
+        // Clear the schedule when department changes
+        displayScheduleForClass(''); 
+    });
+
+    document.getElementById('class-filter-select').addEventListener('change', (e) => {
         displayScheduleForClass(e.target.value);
     });
 
@@ -2305,7 +2292,7 @@ function addEventListeners() {
 let isDataReady = {
     semesters: false, subjects: false, rooms: false, courseSections: false,
     departments: false, lecturers: false, officialClasses: false, schedules: false,
-    majors: false, settings: false // Add settings to ready check
+    majors: false, settings: false
 };
 let initialLoadDone = false;
 
@@ -2316,13 +2303,16 @@ function checkAllDataReady() {
         console.log("All initial data loaded.");
         
         renderScheduleTable();
-        populateClassSelect();
         
-        const classSelect = document.getElementById('class-schedule-select');
-        if (officialClasses.length > 0) {
-            classSelect.value = officialClasses[0].id;
-            displayScheduleForClass(officialClasses[0].id);
+        // NEW: Populate the new filter dropdowns
+        populateDepartmentFilterSelect();
+        const initialDeptId = document.getElementById('department-filter-select').value;
+        if (initialDeptId) {
+            populateClassFilterSelect(initialDeptId);
         }
+        
+        // Start with a clean slate
+        displayScheduleForClass('');
     }
 }
 
@@ -2347,20 +2337,25 @@ function setupOnSnapshotListeners() {
             
             if (c.render) c.render();
 
+            // Re-render dependent UI elements
             if (c.name === 'departments') {
                 renderMajorsList();
                 renderSubjectsList();
                 populateSubjectFilters();
                 renderOfficialClassesList();
-            }
-            if (c.name === 'officialClasses' || c.name === 'subjects' || c.name === 'lecturers' || c.name === 'semesters') {
-                renderCourseSectionsList();
+                populateDepartmentFilterSelect(); // NEW
             }
             if (c.name === 'officialClasses') {
-                populateClassSelect();
+                 // NEW: Repopulate class filter based on current department
+                const currentDepId = document.getElementById('department-filter-select').value;
+                populateClassFilterSelect(currentDepId);
             }
-
-            const selectedClassId = document.getElementById('class-schedule-select').value;
+            if (c.name === 'courseSections' || c.name === 'subjects' || c.name === 'lecturers' || c.name === 'semesters') {
+                renderCourseSectionsList();
+            }
+            
+            // Re-display schedule for the currently selected class
+            const selectedClassId = document.getElementById('class-filter-select').value;
             if (selectedClassId) {
                 displayScheduleForClass(selectedClassId);
             }
@@ -2384,7 +2379,6 @@ function setupOnSnapshotListeners() {
             priorityLecturerPreferences = [];
         }
         
-        // After getting the priority UID, update the UI roles
         updateUIForRole();
 
         if (!isDataReady.settings) {
@@ -2406,6 +2400,6 @@ window.onclick = (event) => {
 // --- Initial Load ---
 document.addEventListener('DOMContentLoaded', () => {
     console.log('Trang Sắp xếp Lịch giảng dạy đang được tải và kiểm tra đăng nhập...');
-    injectSharedStyles(); // <-- CRITICAL FIX: Call the function to inject styles
+    injectSharedStyles();
     initializeFirebase();
 });

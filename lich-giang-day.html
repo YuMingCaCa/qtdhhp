@@ -13,10 +13,9 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- SheetJS for Excel file reading -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <!-- Sửa đường dẫn file CSS -->
-    <link rel="stylesheet" href="style.css">
+    <!-- Custom styles will be injected by JS -->
     <style>
-        /* Additional styles specific to this page */
+        /* Additional styles specific to this page, injected by JS */
         .schedule-table {
             width: 100%;
             border-collapse: collapse;
@@ -170,15 +169,20 @@
                 <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
                     <h2 id="schedule-title" class="text-2xl font-semibold text-gray-700 mb-2 md:mb-0">Thời khóa biểu</h2>
                     <div class="flex flex-col md:flex-row items-start md:items-center gap-4 w-full md:w-auto">
+                        <!-- NEW: Department and Class Filters -->
                         <div class="w-full md:w-auto">
-                            <label for="class-schedule-select" class="block text-sm font-medium text-gray-700">Xem TKB cho lớp:</label>
-                            <select id="class-schedule-select" class="mt-1 block w-full md:w-60 p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"></select>
+                            <label for="department-filter-select" class="block text-sm font-medium text-gray-700">Chọn Khoa:</label>
+                            <select id="department-filter-select" class="mt-1 block w-full md:w-60 p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"></select>
                         </div>
+                        <div class="w-full md:w-auto">
+                            <label for="class-filter-select" class="block text-sm font-medium text-gray-700">Chọn Lớp:</label>
+                            <select id="class-filter-select" class="mt-1 block w-full md:w-60 p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"></select>
+                        </div>
+                        <!-- End New Filters -->
                         <div class="flex gap-2 w-full md:w-auto self-end flex-wrap">
                             <button id="manual-schedule-btn" class="admin-action flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">
                                 <i class="fas fa-plus-circle mr-2"></i>Thủ công
                             </button>
-                             <!-- Thêm class 'priority-admin-only' -->
                              <button id="lecturer-preference-btn" class="admin-action priority-admin-only flex-1 bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-lg">
                                 <i class="fas fa-star mr-2"></i>Đặt ưu tiên
                             </button>
@@ -202,7 +206,7 @@
         </div>
     </div>
 
-    <!-- MODALS -->
+    <!-- MODALS (The rest of the modals remain unchanged) -->
 
     <!-- NEW: Lecturer Preference Modal -->
     <div id="lecturer-preference-modal" class="modal">
@@ -772,7 +776,7 @@
         </div>
     </div>
 
-    <!-- Liên kết tới tệp JS riêng của module này ok ok -->
+    <!-- Liên kết tới tệp JS riêng của module này -->
     <script type="module" src="js/lich-giang-day.js"></script>
 </body>
 </html>
