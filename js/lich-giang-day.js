@@ -301,7 +301,7 @@ function initSearchableSelect(containerId, options, config) {
 
 
 // --- Schedule Grid Rendering ---
-function renderScheduleTable() {
+function renderClassScheduleTable() {
     const container = document.getElementById('schedule-container');
     container.innerHTML = '';
 
@@ -341,27 +341,25 @@ function renderScheduleTable() {
     container.appendChild(table);
 }
 
-function displayScheduleForClass(classId) {
+function renderScheduleForClass(classId) {
+    const classWrapper = document.getElementById('class-schedule-view-wrapper');
     const table = document.querySelector('.schedule-table');
     if (!table) {
-        renderScheduleTable();
+        renderClassScheduleTable();
     }
     
-    const scheduleTitle = document.getElementById('schedule-title');
+    const scheduleTitle = document.getElementById('class-schedule-title');
     
     // Clear previous schedule blocks
-    document.querySelectorAll('.schedule-block').forEach(block => block.remove());
+    document.querySelectorAll('.schedule-table .schedule-block').forEach(block => block.remove());
 
-    // Handle case where no class is selected
     if (!classId) {
-        const selectedDepartment = departments.find(d => d.id === document.getElementById('department-filter-select').value);
-        if (selectedDepartment) {
-            scheduleTitle.textContent = `Thời khóa biểu Khoa: ${selectedDepartment.name}`;
-        } else {
-            scheduleTitle.textContent = 'Vui lòng chọn Khoa và Lớp';
-        }
+        scheduleTitle.textContent = 'Vui lòng chọn một lớp để xem chi tiết';
+        classWrapper.classList.add('hidden');
         return;
     }
+
+    classWrapper.classList.remove('hidden');
 
     const selectedClass = officialClasses.find(oc => oc.id === classId);
     if (!selectedClass) {
@@ -394,7 +392,7 @@ function displayScheduleForClass(classId) {
             else if (startPeriod >= 11 && startPeriod <= 15) shiftIndex = 3;
             else return;
 
-            const targetCell = document.querySelector(`td[data-day='${scheduleInfo.thu}'][data-shift='${shiftIndex}']`);
+            const targetCell = document.querySelector(`.schedule-table td[data-day='${scheduleInfo.thu}'][data-shift='${shiftIndex}']`);
             if (!targetCell) return;
 
             const block = document.createElement('div');
@@ -421,7 +419,111 @@ function displayScheduleForClass(classId) {
     });
 }
 
-// --- NEW: Functions for Department and Class Filtering ---
+// --- NEW: Department-wide Schedule Rendering ---
+function renderDepartmentSchedule(departmentId) {
+    const container = document.getElementById('department-schedule-container');
+    const title = document.getElementById('department-schedule-title');
+    container.innerHTML = ''; // Clear previous content
+
+    const selectedDepartment = departments.find(d => d.id === departmentId);
+
+    if (!departmentId || !selectedDepartment) {
+        title.textContent = 'Thời khóa biểu Toàn khoa';
+        container.innerHTML = '<p class="text-gray-500 p-4 text-center">Vui lòng chọn một khoa để xem thời khóa biểu tổng hợp.</p>';
+        return;
+    }
+
+    title.textContent = `Thời khóa biểu tổng hợp Khoa: ${selectedDepartment.name}`;
+
+    const classesInDept = officialClasses
+        .filter(oc => oc.departmentId === departmentId)
+        .sort((a, b) => a.maLopCQ.localeCompare(b.maLopCQ));
+
+    if (classesInDept.length === 0) {
+        container.innerHTML = '<p class="text-gray-500 p-4 text-center">Khoa này chưa có lớp chính quy nào.</p>';
+        return;
+    }
+
+    const table = document.createElement('table');
+    table.className = 'department-schedule-table'; // New class for styling
+
+    // Create table header
+    const thead = document.createElement('thead');
+    const headerRow = document.createElement('tr');
+    const headers = ['Lớp', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
+    headers.forEach(text => {
+        const th = document.createElement('th');
+        th.textContent = text;
+        headerRow.appendChild(th);
+    });
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+
+    // Create table body
+    const tbody = document.createElement('tbody');
+    const isAdmin = scheduleModuleUserInfo && scheduleModuleUserInfo.role === 'admin';
+
+    classesInDept.forEach(oClass => {
+        const row = document.createElement('tr');
+        
+        const classNameCell = document.createElement('td');
+        classNameCell.className = 'class-name-cell';
+        classNameCell.textContent = oClass.maLopCQ;
+        row.appendChild(classNameCell);
+
+        const sectionsForClass = courseSections.filter(cs => cs.lopChinhQuyId === oClass.id);
+        const sectionIdsForClass = sectionsForClass.map(cs => cs.id);
+
+        for (let day = 2; day <= 7; day++) {
+            const dayCell = document.createElement('td');
+            dayCell.dataset.day = day;
+            dayCell.dataset.classId = oClass.id;
+
+            const schedulesInCell = schedules
+                .filter(s => sectionIdsForClass.includes(s.lopHocPhanId) && s.thu === day)
+                .sort((a, b) => a.tietBatDau - b.tietBatDau);
+
+            schedulesInCell.forEach(scheduleInfo => {
+                const section = sectionsForClass.find(cs => cs.id === scheduleInfo.lopHocPhanId);
+                const subject = subjects.find(s => s.id === section?.monHocId);
+                const lecturer = lecturers.find(l => l.id === section?.giangVienId);
+                const room = rooms.find(r => r.id === scheduleInfo.phongHocId);
+
+                if (!subject || !lecturer || !room) return;
+
+                const startPeriod = scheduleInfo.tietBatDau;
+                const endPeriod = startPeriod + scheduleInfo.soTiet - 1;
+
+                const block = document.createElement('div');
+                block.className = 'schedule-block';
+                block.dataset.scheduleId = scheduleInfo.id;
+                
+                if (isAdmin) {
+                    block.classList.add('is-admin');
+                    block.style.cursor = 'pointer';
+                    block.onclick = () => window.openScheduleActionModal(scheduleInfo.id);
+                } else {
+                    block.style.cursor = 'default';
+                }
+                
+                block.innerHTML = `
+                    <p class="font-bold">${subject.tenMonHoc}</p>
+                    <p><strong>Phòng:</strong> ${room.tenPhong}</p>
+                    <p><strong>Tiết:</strong> ${startPeriod}-${endPeriod}</p>
+                    <p><strong>GV:</strong> ${lecturer.name}</p>
+                `;
+                dayCell.appendChild(block);
+            });
+            row.appendChild(dayCell);
+        }
+        tbody.appendChild(row);
+    });
+
+    table.appendChild(tbody);
+    container.appendChild(table);
+}
+
+// --- Department and Class Filtering ---
 function populateDepartmentFilterSelect() {
     const select = document.getElementById('department-filter-select');
     const currentValue = select.value;
@@ -432,7 +534,6 @@ function populateDepartmentFilterSelect() {
         option.textContent = dep.name;
         select.appendChild(option);
     });
-    // Restore previous selection if it exists
     if (currentValue && departments.some(d => d.id === currentValue)) {
         select.value = currentValue;
     }
@@ -446,7 +547,7 @@ function populateClassFilterSelect(departmentId) {
     if (departmentId) {
         const filteredClasses = officialClasses
             .filter(oc => oc.departmentId === departmentId)
-            .sort((a, b) => a.maLopCQ.localeCompare(b.maLopCQ)); // Sort classes alphabetically
+            .sort((a, b) => a.maLopCQ.localeCompare(b.maLopCQ));
         
         filteredClasses.forEach(oc => {
             const option = document.createElement('option');
@@ -455,7 +556,6 @@ function populateClassFilterSelect(departmentId) {
             select.appendChild(option);
         });
     }
-    // Restore previous selection if it exists and belongs to the current department
     const currentClassIsValid = officialClasses.some(oc => oc.id === currentValue && oc.departmentId === departmentId);
     if (currentValue && currentClassIsValid) {
         select.value = currentValue;
@@ -518,7 +618,7 @@ function renderSemestersList() {
         `;
         listBody.appendChild(row);
     });
-    updateUIForRole(); // Re-apply disabled state after rendering
+    updateUIForRole();
 }
 
 function clearSemesterForm() {
@@ -2038,16 +2138,16 @@ async function saveLecturerPreferences() {
 
 // --- Event Listeners and Initial Setup ---
 function addEventListeners() {
-    // --- NEW: Department and Class filter listeners ---
+    // --- Department and Class filter listeners ---
     document.getElementById('department-filter-select').addEventListener('change', (e) => {
         const departmentId = e.target.value;
         populateClassFilterSelect(departmentId);
-        // Clear the schedule when department changes
-        displayScheduleForClass(''); 
+        renderDepartmentSchedule(departmentId);
+        renderScheduleForClass(''); 
     });
 
     document.getElementById('class-filter-select').addEventListener('change', (e) => {
-        displayScheduleForClass(e.target.value);
+        renderScheduleForClass(e.target.value);
     });
 
     // Manual Schedule Modal Listener
@@ -2444,17 +2544,17 @@ function checkAllDataReady() {
         initialLoadDone = true;
         console.log("All initial data loaded.");
         
-        renderScheduleTable();
+        // Render the class-specific table structure
+        renderClassScheduleTable();
         
-        // NEW: Populate the new filter dropdowns
+        // Populate filters
         populateDepartmentFilterSelect();
         const initialDeptId = document.getElementById('department-filter-select').value;
-        if (initialDeptId) {
-            populateClassFilterSelect(initialDeptId);
-        }
         
-        // Start with a clean slate
-        displayScheduleForClass('');
+        // Render initial views
+        renderDepartmentSchedule(initialDeptId);
+        populateClassFilterSelect(initialDeptId);
+        renderScheduleForClass(''); // Start with the class view hidden
     }
 }
 
@@ -2479,28 +2579,29 @@ function setupOnSnapshotListeners() {
             
             if (c.render) c.render();
 
-            // Re-render dependent UI elements
+            // --- REVISED RE-RENDERING LOGIC ---
+            const scheduleAffectingCollections = [
+                'schedules', 'courseSections', 'subjects', 'lecturers', 'rooms', 
+                'officialClasses', 'departments'
+            ];
+
             if (c.name === 'departments') {
-                renderMajorsList();
-                renderSubjectsList();
+                populateDepartmentFilterSelect();
                 populateSubjectFilters();
-                renderOfficialClassesList();
-                populateDepartmentFilterSelect(); // NEW
-            }
-            if (c.name === 'officialClasses') {
-                 // NEW: Repopulate class filter based on current department
-                const currentDepId = document.getElementById('department-filter-select').value;
-                populateClassFilterSelect(currentDepId);
-            }
-            if (c.name === 'courseSections' || c.name === 'subjects' || c.name === 'lecturers' || c.name === 'semesters') {
-                renderCourseSectionsList();
             }
             
-            // Re-display schedule for the currently selected class
-            const selectedClassId = document.getElementById('class-filter-select').value;
-            if (selectedClassId) {
-                displayScheduleForClass(selectedClassId);
+            if (c.name === 'officialClasses' || c.name === 'departments') {
+                 const currentDepId = document.getElementById('department-filter-select').value;
+                 populateClassFilterSelect(currentDepId);
             }
+
+            if (scheduleAffectingCollections.includes(c.name)) {
+                const currentDepId = document.getElementById('department-filter-select').value;
+                const currentClassId = document.getElementById('class-filter-select').value;
+                renderDepartmentSchedule(currentDepId);
+                renderScheduleForClass(currentClassId);
+            }
+            // --- END OF REVISED LOGIC ---
 
             if (!isDataReady[c.name]) {
                 isDataReady[c.name] = true;
