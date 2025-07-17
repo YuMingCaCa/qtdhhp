@@ -5,6 +5,62 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebas
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import { getFirestore, collection, onSnapshot, addDoc, doc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
+// --- NEW: Function to inject shared styles, avoiding external file load errors ---
+function injectSharedStyles() {
+    const style = document.createElement('style');
+    style.textContent = `
+        /* Styles from shared style.css, injected by JS */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8;
+        }
+        .modal {
+            display: none; position: fixed; z-index: 50;
+            left: 0; top: 0; width: 100%; height: 100%;
+            overflow: auto; background-color: rgba(0,0,0,0.5);
+            -webkit-animation-name: fadeIn; -webkit-animation-duration: 0.4s;
+            animation-name: fadeIn; animation-duration: 0.4s
+        }
+        .modal-content {
+            background-color: #fefefe; margin: 5% auto; padding: 24px;
+            border: 1px solid #888; width: 90%; max-width: 800px;
+            border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            -webkit-animation-name: slideIn; -webkit-animation-duration: 0.4s;
+            animation-name: slideIn; animation-duration: 0.4s
+        }
+        @-webkit-keyframes slideIn { from {top: -300px; opacity: 0} to {top: 0; opacity: 1} }
+        @keyframes slideIn { from {margin-top: -5%; opacity: 0} to {margin-top: 5%; opacity: 1} }
+        @-webkit-keyframes fadeIn { from {opacity: 0} to {opacity: 1} }
+        @keyframes fadeIn { from {opacity: 0} to {opacity: 1} }
+        .close-button {
+            color: #aaa; float: right; font-size: 28px; font-weight: bold;
+        }
+        .close-button:hover, .close-button:focus {
+            color: black; text-decoration: none; cursor: pointer;
+        }
+        .tab-button.active {
+            border-color: #2563eb; color: #2563eb; background-color: #eff6ff;
+        }
+        .hidden { display: none; }
+        .dropdown { position: relative; display: inline-block; }
+        .dropdown-content {
+            display: none; position: absolute; right: 0;
+            background-color: #f9f9f9; min-width: 220px;
+            box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+            z-index: 10; border-radius: 8px; overflow: hidden;
+        }
+        .dropdown-content button {
+            color: black; padding: 12px 16px; text-decoration: none;
+            display: flex; align-items: center; gap: 10px;
+            width: 100%; text-align: left; font-weight: 500;
+        }
+        .dropdown-content button:hover { background-color: #e5e7eb; }
+        .dropdown:hover .dropdown-content { display: block; }
+    `;
+    document.head.appendChild(style);
+}
+
+
 // --- Global Helper Functions ---
 function showAlert(message, isSuccess = false) {
     const modal = document.getElementById('alert-modal');
@@ -52,6 +108,8 @@ let prioritySchedulerUID = null; // UID of the priority user for scheduling
 let priorityLecturerPreferences = []; // NEW: To store preferred time slots
 
 async function initializeFirebase() {
+    // WARNING: Do not expose your Firebase config in client-side code in production.
+    // Use environment variables or a backend proxy.
     const firebaseConfig = {
       apiKey: "AIzaSyCJcTMUwO-w7V0YsGUKWeaW-zl42Ww7fxo",
       authDomain: "qlylaodongbdhhp.firebaseapp.com",
@@ -107,33 +165,50 @@ async function initializeFirebase() {
     }
 }
 
-// --- Function to control UI based on user role (UPDATED) ---
+// --- Function to control UI based on user role (UPDATED & FIXED) ---
+/**
+ * Updates the UI visibility and state based on the current user's role.
+ * This version explicitly handles the display property for all admin buttons
+ * to prevent them from becoming unintentionally hidden.
+ */
 function updateUIForRole() {
     if (!scheduleModuleUserInfo) return;
     const isAdmin = scheduleModuleUserInfo.role === 'admin';
+    const isPriorityAdmin = isAdmin && scheduleModuleUserInfo.uid === prioritySchedulerUID;
 
-    // Select all elements that require admin privileges
-    const adminElements = document.querySelectorAll('.admin-action');
+    document.querySelectorAll('.admin-action').forEach(el => {
+        const isPriorityEl = el.classList.contains('priority-admin-only');
 
-    adminElements.forEach(el => {
         if (isAdmin) {
-            // Enable element for admin
+            // --- ADMINS ---
+            // 1. Enable the element and remove viewer styles
+            el.disabled = false;
+            el.classList.remove('opacity-50', 'cursor-not-allowed');
+            el.removeAttribute('title');
             if (el.tagName === 'FIELDSET') {
                 el.disabled = false;
+            }
+
+            // 2. Set visibility based on priority
+            if (isPriorityEl) {
+                // Special visibility for the priority button
+                el.style.display = isPriorityAdmin ? 'flex' : 'none';
             } else {
-                 el.disabled = false;
-                 el.classList.remove('opacity-50', 'cursor-not-allowed');
-                 el.removeAttribute('title');
+                // *** ROBUST FIX: Explicitly ensure other admin buttons are visible. ***
+                // The buttons are designed with flex properties, so setting display to 'flex' is safe.
+                el.style.display = 'flex';
             }
         } else {
-            // Disable element for viewer
+            // --- VIEWERS ---
+            // 1. Disable the element and add viewer styles
+            el.disabled = true;
+            el.classList.add('opacity-50', 'cursor-not-allowed');
+            el.setAttribute('title', 'Chức năng này yêu cầu quyền Admin');
             if (el.tagName === 'FIELDSET') {
                 el.disabled = true;
-            } else {
-                el.disabled = true;
-                el.classList.add('opacity-50', 'cursor-not-allowed');
-                el.setAttribute('title', 'Chức năng này yêu cầu quyền Admin');
             }
+            // 2. Hide all admin-only elements from viewers
+            el.style.display = 'none';
         }
     });
 }
@@ -2308,6 +2383,10 @@ function setupOnSnapshotListeners() {
             prioritySchedulerUID = null;
             priorityLecturerPreferences = [];
         }
+        
+        // After getting the priority UID, update the UI roles
+        updateUIForRole();
+
         if (!isDataReady.settings) {
             isDataReady.settings = true;
             checkAllDataReady();
@@ -2327,5 +2406,6 @@ window.onclick = (event) => {
 // --- Initial Load ---
 document.addEventListener('DOMContentLoaded', () => {
     console.log('Trang Sắp xếp Lịch giảng dạy đang được tải và kiểm tra đăng nhập...');
+    injectSharedStyles(); // <-- CRITICAL FIX: Call the function to inject styles
     initializeFirebase();
 });
