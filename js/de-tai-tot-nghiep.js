@@ -203,15 +203,27 @@ function renderTopicsList() {
 
 function populateFilterDropdowns() {
     const depSelect = document.getElementById('filter-department');
-    const lecSelect = document.getElementById('filter-lecturer');
-
+    
     depSelect.innerHTML = '<option value="all">Tất cả Khoa</option>';
     allDepartments.forEach(dep => {
         depSelect.innerHTML += `<option value="${dep.id}">${dep.name}</option>`;
     });
 
+    // Initially populate lecturers for "All Departments"
+    updateLecturerFilterDropdown('all');
+}
+
+// Function to update lecturer filter based on department
+function updateLecturerFilterDropdown(departmentId) {
+    const lecSelect = document.getElementById('filter-lecturer');
     lecSelect.innerHTML = '<option value="all">Tất cả Giảng viên</option>';
-    allLecturers.forEach(lec => {
+
+    let lecturersToList = allLecturers;
+    if (departmentId && departmentId !== 'all') {
+        lecturersToList = allLecturers.filter(l => l.departmentId === departmentId);
+    }
+
+    lecturersToList.forEach(lec => {
         lecSelect.innerHTML += `<option value="${lec.id}">${lec.name}</option>`;
     });
 }
@@ -504,7 +516,11 @@ function addEventListeners() {
     document.getElementById('start-import-btn').addEventListener('click', handleTopicImport);
 
     // Filter listeners
-    document.getElementById('filter-department').addEventListener('change', renderTopicsList);
+    document.getElementById('filter-department').addEventListener('change', () => {
+        const selectedDepId = document.getElementById('filter-department').value;
+        updateLecturerFilterDropdown(selectedDepId);
+        renderTopicsList();
+    });
     document.getElementById('filter-lecturer').addEventListener('change', renderTopicsList);
     document.getElementById('filter-status').addEventListener('change', renderTopicsList);
 }
