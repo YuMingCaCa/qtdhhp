@@ -1,9 +1,10 @@
 // File: js/de-tai-tot-nghiep.js
 // Logic for the "Graduation Thesis Management" module.
+// UPDATED: Added functionality for students to register for approved topics and import topics from Excel.
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-import { getFirestore, collection, onSnapshot, addDoc, doc, setDoc, getDocs, updateDoc, deleteDoc, query, where, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { getFirestore, collection, onSnapshot, addDoc, doc, getDoc, setDoc, getDocs, updateDoc, deleteDoc, query, where, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 // --- Global Helper Functions ---
 function showAlert(message, isSuccess = false) {
@@ -29,13 +30,33 @@ function showConfirm(message, onConfirm) {
     modal.style.display = 'block';
 }
 
+function setButtonLoading(button, isLoading) {
+    if (!button) return;
+    if (isLoading) {
+        button.disabled = true;
+        button.dataset.originalHtml = button.innerHTML;
+        button.innerHTML = `<i class="fas fa-spinner fa-spin mr-2"></i>Đang xử lý...`;
+    } else {
+        button.disabled = false;
+        if (button.dataset.originalHtml) {
+            button.innerHTML = button.dataset.originalHtml;
+        }
+    }
+}
+
+function getCurrentAcademicYear() {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = d.getMonth();
+    return month >= 7 ? `${year}-${year + 1}` : `${year - 1}-${year}`;
+}
+
 // --- Firebase Initialization ---
 let db, auth;
-let topicsCol, lecturersCol, departmentsCol, usersCol;
+let topicsCol, lecturersCol, departmentsCol, usersCol, settingsCol;
 let currentUserInfo = null;
 
 async function initializeFirebase() {
-    // IMPORTANT: Replace with your actual Firebase config
     const firebaseConfig = {
       apiKey: "AIzaSyCJcTMUwO-w7V0YsGUKWeaW-zl42Ww7fxo",
       authDomain: "qlylaodongbdhhp.firebaseapp.com",
@@ -51,22 +72,18 @@ async function initializeFirebase() {
         const appId = firebaseConfig.projectId || 'hpu-workload-tracker-app';
         const basePath = `artifacts/${appId}/public/data`; 
         
-        // Collections for this module
         topicsCol = collection(db, `${basePath}/thesis_topics`);
-        
-        // Shared collections from other modules
         lecturersCol = collection(db, `${basePath}/lecturers`);
         departmentsCol = collection(db, `${basePath}/departments`);
         usersCol = collection(db, `${basePath}/users`);
+        settingsCol = collection(db, `${basePath}/settings`);
         
         onAuthStateChanged(auth, async (user) => {
             if (user) {
-                // Get user role
                 const userDoc = await getDocs(query(usersCol, where("email", "==", user.email)));
                 if (!userDoc.empty) {
                     currentUserInfo = { uid: user.uid, ...userDoc.docs[0].data() };
                 } else {
-                    // Fallback for safety, default to viewer
                     currentUserInfo = { uid: user.uid, email: user.email, role: 'viewer' };
                 }
                 
@@ -75,8 +92,6 @@ async function initializeFirebase() {
                 addEventListeners();
                 updateUIForRole();
             } else {
-                console.log("User not authenticated. Redirecting to login page.");
-                // Redirect to login if not authenticated
                 window.location.href = 'index.html';
             }
         });
@@ -91,6 +106,7 @@ async function initializeFirebase() {
 let allTopics = [];
 let allLecturers = [];
 let allDepartments = [];
+let academicYears = [];
 
 // --- UI Rendering & Logic ---
 
@@ -98,25 +114,19 @@ function updateUIForRole() {
     if (!currentUserInfo) return;
     const isAdmin = currentUserInfo.role === 'admin';
     
-    // Show/hide admin-only sections in modals and main page
     document.querySelectorAll('.admin-only').forEach(el => {
-        el.style.display = isAdmin ? 'block' : 'none';
+        el.style.display = isAdmin ? 'flex' : 'none';
     });
     document.getElementById('admin-topic-section').style.display = isAdmin ? 'block' : 'none';
 }
 
 function getStatusBadge(status) {
     switch (status) {
-        case 'pending':
-            return `<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">Chờ duyệt</span>`;
-        case 'approved':
-            return `<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Đã duyệt</span>`;
-        case 'taken':
-            return `<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">Đã có SV</span>`;
-        case 'rejected':
-             return `<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">Bị từ chối</span>`;
-        default:
-            return `<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">Không rõ</span>`;
+        case 'pending': return `<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">Chờ duyệt</span>`;
+        case 'approved': return `<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Đã duyệt</span>`;
+        case 'taken': return `<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">Đã có SV</span>`;
+        case 'rejected': return `<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">Bị từ chối</span>`;
+        default: return `<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">Không rõ</span>`;
     }
 }
 
@@ -124,14 +134,13 @@ function renderTopicsList() {
     const listBody = document.getElementById('topics-list-body');
     listBody.innerHTML = '';
 
-    // Apply filters
     const depFilter = document.getElementById('filter-department').value;
     const lecFilter = document.getElementById('filter-lecturer').value;
     const statusFilter = document.getElementById('filter-status').value;
+    const isAdmin = currentUserInfo.role === 'admin';
 
     const filteredTopics = allTopics.filter(topic => {
-        const lecturer = allLecturers.find(l => l.id === topic.lecturerId);
-        if (depFilter !== 'all' && (!lecturer || lecturer.departmentId !== depFilter)) return false;
+        if (depFilter !== 'all' && topic.departmentId !== depFilter) return false;
         if (lecFilter !== 'all' && topic.lecturerId !== lecFilter) return false;
         if (statusFilter !== 'all' && topic.status !== statusFilter) return false;
         return true;
@@ -146,23 +155,46 @@ function renderTopicsList() {
         const row = document.createElement('tr');
         const lecturer = allLecturers.find(l => l.id === topic.lecturerId);
         
-        // Determine if current user can edit/delete
-        const canEdit = currentUserInfo.role === 'admin' || currentUserInfo.uid === topic.proposerUid;
+        let studentInfoHtml = '';
+        if (topic.status === 'taken' && topic.studentName) {
+            studentInfoHtml = `
+                <div class="mt-2 text-xs text-gray-500">
+                    <span class="font-semibold text-blue-600">SV:</span> ${topic.studentName} - 
+                    <span class="font-semibold text-blue-600">MSV:</span> ${topic.studentId || 'N/A'} - 
+                    <span class="font-semibold text-blue-600">Lớp:</span> ${topic.studentClass || 'N/A'}
+                </div>`;
+        }
+        
+        let actionButtonHtml = '';
+        if (isAdmin) {
+            actionButtonHtml = `
+                <button class="text-indigo-600 hover:text-indigo-900 mr-3" onclick="window.editTopic('${topic.id}')" title="Sửa"><i class="fas fa-edit"></i></button>
+                <button class="text-red-600 hover:text-red-900" onclick="window.deleteTopic('${topic.id}')" title="Xóa"><i class="fas fa-trash"></i></button>
+            `;
+        } else {
+            if (topic.status === 'approved') {
+                 actionButtonHtml = `<button class="bg-green-500 hover:bg-green-600 text-white font-bold py-1 px-3 rounded-full text-xs" onclick="window.openRegisterModal('${topic.id}')">Đăng ký</button>`;
+            } else if (topic.status === 'taken') {
+                if (topic.registeredByUid === currentUserInfo.uid) {
+                    actionButtonHtml = `<span class="text-xs text-gray-500 italic">Bạn đã đăng ký</span>`;
+                } else {
+                    actionButtonHtml = `<span class="text-xs text-gray-500 italic">Đã có người ĐK</span>`;
+                }
+            } else {
+                actionButtonHtml = `<span class="text-gray-400 cursor-not-allowed" title="Không thể đăng ký đề tài này"><i class="fas fa-ban"></i></span>`;
+            }
+        }
 
         row.innerHTML = `
             <td class="px-6 py-4">
                 <div class="font-bold text-gray-900">${topic.name}</div>
                 <div class="text-sm text-gray-500 truncate">${topic.description}</div>
+                ${studentInfoHtml}
             </td>
             <td class="px-6 py-4 whitespace-nowrap">${lecturer ? lecturer.name : 'N/A'}</td>
             <td class="px-6 py-4 whitespace-nowrap text-center">${getStatusBadge(topic.status)}</td>
             <td class="px-6 py-4 whitespace-nowrap text-center">
-                ${canEdit ? `
-                <button class="text-indigo-600 hover:text-indigo-900 mr-3" onclick="window.editTopic('${topic.id}')" title="Sửa"><i class="fas fa-edit"></i></button>
-                <button class="text-red-600 hover:text-red-900" onclick="window.deleteTopic('${topic.id}')" title="Xóa"><i class="fas fa-trash"></i></button>
-                ` : `
-                <span class="text-gray-400 cursor-not-allowed" title="Bạn không có quyền sửa/xóa"><i class="fas fa-lock"></i></span>
-                `}
+                ${actionButtonHtml}
             </td>
         `;
         listBody.appendChild(row);
@@ -172,7 +204,6 @@ function renderTopicsList() {
 function populateFilterDropdowns() {
     const depSelect = document.getElementById('filter-department');
     const lecSelect = document.getElementById('filter-lecturer');
-    const topicLecSelect = document.getElementById('topic-lecturer-select');
 
     depSelect.innerHTML = '<option value="all">Tất cả Khoa</option>';
     allDepartments.forEach(dep => {
@@ -180,10 +211,33 @@ function populateFilterDropdowns() {
     });
 
     lecSelect.innerHTML = '<option value="all">Tất cả Giảng viên</option>';
-    topicLecSelect.innerHTML = '<option value="">-- Chọn giảng viên --</option>';
     allLecturers.forEach(lec => {
         lecSelect.innerHTML += `<option value="${lec.id}">${lec.name}</option>`;
-        topicLecSelect.innerHTML += `<option value="${lec.id}">${lec.name}</option>`;
+    });
+}
+
+function populateModalDropdowns() {
+    const yearSelect = document.getElementById('topic-year-select');
+    const depSelect = document.getElementById('topic-department-select');
+
+    yearSelect.innerHTML = '';
+    academicYears.forEach(year => {
+        yearSelect.innerHTML += `<option value="${year}">Năm học ${year}</option>`;
+    });
+    yearSelect.value = getCurrentAcademicYear();
+
+    depSelect.innerHTML = '<option value="">-- Chọn Khoa --</option>';
+    allDepartments.forEach(dep => {
+        depSelect.innerHTML += `<option value="${dep.id}">${dep.name}</option>`;
+    });
+}
+
+function updateLecturerDropdownInModal(departmentId) {
+    const lecSelect = document.getElementById('topic-lecturer-select');
+    lecSelect.innerHTML = '<option value="">-- Chọn giảng viên --</option>';
+    const filteredLecturers = allLecturers.filter(l => l.departmentId === departmentId);
+    filteredLecturers.forEach(lec => {
+        lecSelect.innerHTML += `<option value="${lec.id}">${lec.name}</option>`;
     });
 }
 
@@ -192,17 +246,21 @@ function clearTopicForm() {
     form.reset();
     document.getElementById('topic-id').value = '';
     document.getElementById('topic-modal-title').textContent = 'Đề xuất Đề tài mới';
+    updateLecturerDropdownInModal('');
 }
 
 // --- CRUD Functions (exposed to window for onclick) ---
 window.editTopic = (id) => {
     const topic = allTopics.find(t => t.id === id);
     if (topic) {
+        populateModalDropdowns();
         document.getElementById('topic-id').value = topic.id;
         document.getElementById('topic-name').value = topic.name;
         document.getElementById('topic-description').value = topic.description;
+        document.getElementById('topic-year-select').value = topic.academicYear || '';
+        document.getElementById('topic-department-select').value = topic.departmentId || '';
         
-        // For admin
+        updateLecturerDropdownInModal(topic.departmentId);
         document.getElementById('topic-lecturer-select').value = topic.lecturerId;
         document.getElementById('topic-status-select').value = topic.status;
         
@@ -223,59 +281,178 @@ window.deleteTopic = (id) => {
     });
 };
 
+window.openRegisterModal = (id) => {
+    const topic = allTopics.find(t => t.id === id);
+    if (topic) {
+        document.getElementById('register-topic-id').value = id;
+        document.getElementById('register-topic-name').textContent = topic.name;
+        document.getElementById('student-register-form').reset();
+        openModal('student-register-modal');
+    }
+};
+
+// --- Import/Export Functions ---
+function downloadTemplateForTopics() {
+    const headers = ["tenDeTai", "moTa", "tenKhoa", "maGiangVien"];
+    const filename = "Mau_Import_DeTai.xlsx";
+    const ws = XLSX.utils.json_to_sheet([{}], { header: headers });
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Data");
+    XLSX.writeFile(wb, filename);
+}
+
+async function handleTopicImport() {
+    const btn = document.getElementById('start-import-btn');
+    setButtonLoading(btn, true);
+
+    const fileInput = document.getElementById('import-file-input');
+    const logContainer = document.getElementById('import-log');
+    const resultsContainer = document.getElementById('import-results-container');
+    
+    resultsContainer.classList.remove('hidden');
+    logContainer.innerHTML = 'Bắt đầu quá trình import...<br>';
+
+    if (!fileInput.files || fileInput.files.length === 0) {
+        showAlert("Vui lòng chọn một file Excel.");
+        setButtonLoading(btn, false);
+        return;
+    }
+
+    const file = fileInput.files[0];
+    const reader = new FileReader();
+
+    reader.onload = async (e) => {
+        try {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+            const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+            if (jsonData.length === 0) {
+                logContainer.innerHTML += '<span class="text-red-500">Lỗi: File không có dữ liệu.</span><br>';
+                setButtonLoading(btn, false);
+                return;
+            }
+
+            logContainer.innerHTML += `Đã đọc ${jsonData.length} dòng từ file. Đang xử lý...<br>`;
+
+            const batch = writeBatch(db);
+            let successCount = 0;
+            let errorCount = 0;
+            const currentYear = getCurrentAcademicYear();
+
+            for (const [index, row] of jsonData.entries()) {
+                try {
+                    const tenDeTai = String(row.tenDeTai || '').trim();
+                    const moTa = String(row.moTa || '').trim();
+                    const tenKhoa = String(row.tenKhoa || '').trim().toLowerCase();
+                    const maGiangVien = String(row.maGiangVien || '').trim().toLowerCase();
+
+                    if (!tenDeTai || !moTa || !tenKhoa || !maGiangVien) {
+                        throw new Error("Thiếu thông tin bắt buộc (Tên đề tài, Mô tả, Tên khoa, Mã GV).");
+                    }
+
+                    const department = allDepartments.find(d => d.name.toLowerCase() === tenKhoa);
+                    if (!department) throw new Error(`Không tìm thấy khoa "${row.tenKhoa}"`);
+
+                    const lecturer = allLecturers.find(l => l.code.toLowerCase() === maGiangVien);
+                    if (!lecturer) throw new Error(`Không tìm thấy giảng viên có mã "${row.maGiangVien}"`);
+                    
+                    if (lecturer.departmentId !== department.id) {
+                         throw new Error(`Giảng viên "${lecturer.name}" không thuộc khoa "${department.name}"`);
+                    }
+
+                    const newTopicData = {
+                        name: tenDeTai,
+                        description: moTa,
+                        academicYear: currentYear,
+                        departmentId: department.id,
+                        lecturerId: lecturer.id,
+                        status: 'pending', // Imported topics are pending by default
+                        proposerUid: currentUserInfo.uid,
+                        createdAt: new Date().toISOString(),
+                        lastUpdated: new Date().toISOString(),
+                    };
+
+                    const newDocRef = doc(topicsCol);
+                    batch.set(newDocRef, newTopicData);
+                    successCount++;
+
+                } catch (rowError) {
+                    errorCount++;
+                    logContainer.innerHTML += `<span class="text-orange-500">- Dòng ${index + 2}: Lỗi - ${rowError.message}</span><br>`;
+                }
+            }
+
+            if (successCount > 0) {
+                await batch.commit();
+            }
+            
+            logContainer.innerHTML += `<hr class="my-2">`;
+            logContainer.innerHTML += `<strong class="text-green-600">Hoàn thành!</strong><br>`;
+            logContainer.innerHTML += `<span>- Thêm mới thành công: ${successCount} đề tài.</span><br>`;
+            logContainer.innerHTML += `<span>- Bị lỗi: ${errorCount} dòng.</span><br>`;
+
+        } catch (error) {
+            console.error("Import error:", error);
+            logContainer.innerHTML += `<span class="text-red-500">Đã xảy ra lỗi nghiêm trọng: ${error.message}</span><br>`;
+        } finally {
+            setButtonLoading(btn, false);
+            fileInput.value = '';
+        }
+    };
+    reader.readAsArrayBuffer(file);
+}
 
 // --- Event Listeners ---
 function addEventListeners() {
-    // Modal buttons
     document.getElementById('add-topic-btn').addEventListener('click', () => {
         clearTopicForm();
-        // If not an admin, automatically assign the current user as the lecturer
-        if (currentUserInfo.role !== 'admin') {
-            const lecturerSelf = allLecturers.find(l => l.code === currentUserInfo.email.split('@')[0]); // Assumption: lecturer code is part of email
-            if (lecturerSelf) {
-                 document.getElementById('topic-lecturer-select').value = lecturerSelf.id;
-            }
-        }
+        populateModalDropdowns();
         openModal('topic-modal');
     });
 
-    // Form submission
+    document.getElementById('topic-department-select').addEventListener('change', (e) => {
+        updateLecturerDropdownInModal(e.target.value);
+    });
+
     document.getElementById('topic-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const id = document.getElementById('topic-id').value;
         const isAdmin = currentUserInfo.role === 'admin';
-
-        // Find the lecturer record associated with the current logged-in user
-        // This assumes lecturer's 'code' field matches the part of their email before the '@'
-        const selfLecturer = allLecturers.find(l => l.code.toLowerCase() === currentUserInfo.email.split('@')[0].toLowerCase());
+        const departmentId = document.getElementById('topic-department-select').value;
+        const selfLecturer = allLecturers.find(l => l.code && currentUserInfo.email && l.code.toLowerCase() === currentUserInfo.email.split('@')[0].toLowerCase());
 
         const data = {
             name: document.getElementById('topic-name').value.trim(),
             description: document.getElementById('topic-description').value.trim(),
-            // If admin is editing, use the dropdown. Otherwise, use the proposer's ID.
+            academicYear: document.getElementById('topic-year-select').value,
+            departmentId: departmentId,
             lecturerId: isAdmin ? document.getElementById('topic-lecturer-select').value : (selfLecturer ? selfLecturer.id : null),
-            // If admin is editing, use dropdown. If new, set to pending. If editing own, keep original status.
             status: isAdmin ? document.getElementById('topic-status-select').value : 'pending',
-            proposerUid: id ? allTopics.find(t=>t.id === id).proposerUid : currentUserInfo.uid, // Keep original proposer
+            proposerUid: id ? allTopics.find(t=>t.id === id).proposerUid : currentUserInfo.uid,
             lastUpdated: new Date().toISOString(),
         };
 
-        if (!data.name || !data.description) {
-            showAlert("Vui lòng điền đầy đủ tên và mô tả đề tài.");
+        if (!data.name || !data.description || !data.academicYear || !data.departmentId) {
+            showAlert("Vui lòng điền đầy đủ các trường bắt buộc.");
             return;
         }
-        if (!data.lecturerId) {
-            showAlert("Không thể xác định giảng viên. Vui lòng đảm bảo thông tin giảng viên của bạn có trong hệ thống.");
+        if (isAdmin && !data.lecturerId) {
+            showAlert("Admin phải chọn một giảng viên hướng dẫn.");
+            return;
+        }
+        if (!isAdmin && !data.lecturerId) {
+            showAlert("Không thể xác định giảng viên đề xuất. Vui lòng đảm bảo thông tin giảng viên của bạn (mã GV) có trong hệ thống và khớp với email.");
             return;
         }
 
         try {
             if (id) {
-                // Update existing topic
                 await updateDoc(doc(topicsCol, id), data);
                 showAlert('Cập nhật đề tài thành công!', true);
             } else {
-                // Add new topic
                 data.createdAt = new Date().toISOString();
                 await addDoc(topicsCol, data);
                 showAlert('Đề xuất đề tài mới thành công!', true);
@@ -283,9 +460,48 @@ function addEventListeners() {
             closeModal('topic-modal');
         } catch (error) {
             showAlert(`Lỗi khi lưu đề tài: ${error.message}`);
-            console.error("Error saving topic: ", error);
         }
     });
+
+    document.getElementById('student-register-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const topicId = document.getElementById('register-topic-id').value;
+        const studentName = document.getElementById('student-name').value.trim();
+        const studentId = document.getElementById('student-id-input').value.trim();
+        const studentClass = document.getElementById('student-class-input').value.trim();
+
+        if (!studentName || !studentId || !studentClass) {
+            showAlert("Vui lòng điền đầy đủ thông tin của bạn.");
+            return;
+        }
+
+        const updateData = {
+            status: 'taken',
+            studentName,
+            studentId,
+            studentClass,
+            registeredByUid: currentUserInfo.uid,
+            registeredAt: new Date().toISOString()
+        };
+
+        try {
+            await updateDoc(doc(topicsCol, topicId), updateData);
+            showAlert('Đăng ký đề tài thành công!', true);
+            closeModal('student-register-modal');
+        } catch (error) {
+            showAlert(`Lỗi khi đăng ký: ${error.message}`);
+        }
+    });
+
+    // Import listeners
+    document.getElementById('import-topics-btn').addEventListener('click', () => {
+        document.getElementById('import-file-input').value = '';
+        document.getElementById('import-log').innerHTML = '';
+        document.getElementById('import-results-container').classList.add('hidden');
+        openModal('import-data-modal');
+    });
+    document.getElementById('download-template-btn').addEventListener('click', downloadTemplateForTopics);
+    document.getElementById('start-import-btn').addEventListener('click', handleTopicImport);
 
     // Filter listeners
     document.getElementById('filter-department').addEventListener('change', renderTopicsList);
@@ -295,6 +511,12 @@ function addEventListeners() {
 
 // --- Data Snapshot Listeners ---
 function setupOnSnapshotListeners() {
+    onSnapshot(doc(settingsCol, 'appSettings'), (docSnapshot) => {
+        const customYears = docSnapshot.exists() ? (docSnapshot.data().customYears || []) : [];
+        const allYears = new Set([getCurrentAcademicYear(), ...customYears]);
+        academicYears = Array.from(allYears).sort().reverse();
+    }, (error) => console.error("Error listening to settings:", error));
+
     onSnapshot(query(departmentsCol), (snapshot) => {
         allDepartments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         allDepartments.sort((a, b) => a.name.localeCompare(b.name));
@@ -311,7 +533,7 @@ function setupOnSnapshotListeners() {
 
     onSnapshot(query(topicsCol), (snapshot) => {
         allTopics = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        allTopics.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || '')); // Sort by newest first
+        allTopics.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
         renderTopicsList();
     }, (error) => console.error("Error listening to topics:", error));
 }

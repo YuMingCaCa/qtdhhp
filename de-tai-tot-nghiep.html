@@ -11,6 +11,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- SheetJS for Excel file reading -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -42,9 +44,14 @@
                     <h1 class="text-3xl font-bold text-gray-800">Quản lý Đề tài Tốt nghiệp</h1>
                     <p class="text-gray-600 mt-2">Nơi quản lý, đề xuất và theo dõi các đề tài tốt nghiệp.</p>
                 </div>
-                <button id="add-topic-btn" class="mt-4 md:mt-0 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center transition-all">
-                    <i class="fas fa-plus-circle mr-2"></i> Đề xuất Đề tài mới
-                </button>
+                <div class="flex gap-2 mt-4 md:mt-0">
+                    <button id="import-topics-btn" class="admin-only bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center transition-all">
+                        <i class="fas fa-file-import mr-2"></i> Import Excel
+                    </button>
+                    <button id="add-topic-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center transition-all">
+                        <i class="fas fa-plus-circle mr-2"></i> Đề xuất Đề tài mới
+                    </button>
+                </div>
             </div>
 
             <!-- Filters -->
@@ -62,7 +69,7 @@
                     <select id="filter-status" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
                         <option value="all">Tất cả</option>
                         <option value="pending">Chờ duyệt</option>
-                        <option value="approved">Đã duyệt</option>
+                        <option value="approved">Đã duyệt (chưa có SV)</option>
                         <option value="taken">Đã có SV</option>
                         <option value="rejected">Bị từ chối</option>
                     </select>
@@ -74,7 +81,7 @@
                 <table class="min-w-full bg-white border border-gray-200 rounded-lg">
                     <thead class="bg-gray-100">
                         <tr>
-                            <th class="px-6 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Tên Đề tài</th>
+                            <th class="px-6 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Tên Đề tài & Sinh viên</th>
                             <th class="px-6 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Giảng viên HD</th>
                             <th class="px-6 py-3 text-center text-xs font-bold text-gray-600 uppercase tracking-wider">Trạng thái</th>
                             <th class="px-6 py-3 text-center text-xs font-bold text-gray-600 uppercase tracking-wider">Hành động</th>
@@ -97,15 +104,28 @@
             <h3 id="topic-modal-title" class="text-xl font-bold mb-4">Đề xuất Đề tài mới</h3>
             <form id="topic-form" class="space-y-4">
                 <input type="hidden" id="topic-id">
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="topic-year-select" class="block text-sm font-medium text-gray-700">Năm học</label>
+                        <select id="topic-year-select" required class="mt-1 block w-full p-2 border border-gray-300 rounded-md"></select>
+                    </div>
+                    <div>
+                        <label for="topic-department-select" class="block text-sm font-medium text-gray-700">Khoa</label>
+                        <select id="topic-department-select" required class="mt-1 block w-full p-2 border border-gray-300 rounded-md"></select>
+                    </div>
+                </div>
+                
                 <div>
                     <label for="topic-name" class="block text-sm font-medium text-gray-700">Tên đề tài</label>
-                    <input type="text" id="topic-name" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-green-500 focus:border-green-500">
+                    <input type="text" id="topic-name" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                 </div>
                 <div>
                     <label for="topic-description" class="block text-sm font-medium text-gray-700">Mô tả chi tiết</label>
-                    <textarea id="topic-description" rows="4" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-green-500 focus:border-green-500"></textarea>
+                    <textarea id="topic-description" rows="4" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500"></textarea>
                 </div>
-                <!-- Admin-only section for assigning lecturer and status -->
+
+                <!-- Admin-only section -->
                 <div id="admin-topic-section" class="space-y-4 hidden">
                      <div>
                         <label for="topic-lecturer-select" class="block text-sm font-medium text-gray-700">Giảng viên hướng dẫn</label>
@@ -117,17 +137,76 @@
                             <option value="pending">Chờ duyệt</option>
                             <option value="approved">Đã duyệt</option>
                             <option value="rejected">Từ chối</option>
-                             <option value="taken">Đã có SV</option>
+                            <option value="taken">Đã có SV</option>
                         </select>
                     </div>
                 </div>
 
                 <div class="flex justify-end pt-4">
-                    <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg">
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">
                         <i class="fas fa-save mr-2"></i>Lưu Đề tài
                     </button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Student Registration Modal -->
+    <div id="student-register-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button no-print" onclick="closeModal('student-register-modal')">&times;</span>
+            <h3 class="text-xl font-bold mb-4">Đăng ký Đề tài Tốt nghiệp</h3>
+            <form id="student-register-form" class="space-y-4">
+                <input type="hidden" id="register-topic-id">
+                
+                <div class="p-4 bg-gray-100 rounded-lg">
+                    <p class="text-sm text-gray-600">Bạn đang đăng ký đề tài:</p>
+                    <p id="register-topic-name" class="font-bold text-lg text-blue-700"></p>
+                </div>
+
+                <div>
+                    <label for="student-name" class="block text-sm font-medium text-gray-700">Họ và tên sinh viên</label>
+                    <input type="text" id="student-name" required placeholder="Nguyễn Văn A" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm">
+                </div>
+                <div>
+                    <label for="student-id-input" class="block text-sm font-medium text-gray-700">Mã sinh viên</label>
+                    <input type="text" id="student-id-input" required placeholder="12345678" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm">
+                </div>
+                <div>
+                    <label for="student-class-input" class="block text-sm font-medium text-gray-700">Lớp</label>
+                    <input type="text" id="student-class-input" required placeholder="CNTT1-K14" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm">
+                </div>
+
+                <div class="flex justify-end pt-4">
+                    <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg">
+                        <i class="fas fa-check-circle mr-2"></i>Xác nhận Đăng ký
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- NEW: Import Data Modal -->
+    <div id="import-data-modal" class="modal">
+        <div class="modal-content max-w-2xl">
+            <span class="close-button no-print" onclick="closeModal('import-data-modal')">&times;</span>
+            <h3 class="text-xl font-bold mb-4">Import Đề tài từ Excel</h3>
+            <div class="p-4 border rounded-lg bg-gray-50 space-y-4">
+                <div>
+                     <label for="import-file-input" class="block text-sm font-medium text-gray-700">1. Chọn file Excel (.xlsx)</label>
+                     <input type="file" id="import-file-input" accept=".xlsx" class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                </div>
+                <div class="flex justify-between items-center">
+                    <button id="download-template-btn" type="button" class="text-blue-600 hover:underline text-sm"><i class="fas fa-download mr-1"></i> Tải file mẫu</button>
+                    <button id="start-import-btn" class="bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-2 px-4 rounded-lg">
+                        <i class="fas fa-rocket mr-2"></i>Bắt đầu Import
+                    </button>
+                </div>
+            </div>
+             <div id="import-results-container" class="mt-4 hidden">
+                <h4 class="font-semibold text-gray-800 mb-2">Kết quả Import:</h4>
+                <div id="import-log" class="max-h-60 overflow-y-auto border rounded-md p-3 bg-gray-50 text-sm"></div>
+            </div>
         </div>
     </div>
 

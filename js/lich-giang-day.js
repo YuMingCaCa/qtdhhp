@@ -1,5 +1,6 @@
 // File: js/lich-giang-day.js
 // Logic for the "Teaching Schedule" module.
+// FIXED: Rewrote the auto-scheduling logic to correctly prioritize preferred slots and prevent race conditions.
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -1103,246 +1104,41 @@ function populateManualScheduleModal() {
 }
 
 // ===================================================================
-// START: UPDATED SCHEDULING LOGIC
+// START: REVISED AND FIXED AUTO-SCHEDULING LOGIC
 // ===================================================================
 
 /**
- * Schedules sections for priority lecturers based on their preferences.
- * @param {Array} sectionsToSchedule - The sections for priority lecturers.
- * @param {Array} currentSchedules - All existing schedules in the database.
- * @param {Object} lecturerScheduledDays - A map to track days used by lecturers.
- * @returns {Object} An object containing successLog, failureLog, and newSchedules.
+ * A standalone helper function to attempt scheduling a single section in a specific slot.
+ * It checks for all potential conflicts before returning.
+ * @param {object} section - The course section to schedule.
+ * @param {number} day - The day of the week (2-7).
+ * @param {number} startPeriod - The starting period.
+ * @param {number} numPeriods - The number of periods for the class.
+ * @param {Array} tempSchedules - The current list of temporary schedules to check against.
+ * @returns {object|null} A schedule data object if successful, otherwise null.
  */
-function schedulePrioritySections(sectionsToSchedule, currentSchedules, lecturerScheduledDays) {
-    let tempSchedules = [...currentSchedules];
-    const successLog = [];
-    const failureLog = [];
-    const newSchedules = [];
-
-    const tryToSchedule = (section, day, startPeriod) => {
-        const subject = subjects.find(s => s.id === section.monHocId);
-        const numPeriods = subject ? (subject.soTinChi || 3) : 3;
-        const endPeriod = startPeriod + numPeriods - 1;
-
-        if (endPeriod > 15 || (startPeriod <= 5 && endPeriod > 5) || (startPeriod <= 10 && endPeriod > 10)) {
-            return false;
-        }
-
-        for (const room of rooms) {
-            if (room.sucChua < section.siSo) continue;
-
-            const lecturerConflict = checkLecturerConflict(section.giangVienId, day, startPeriod, numPeriods, null, tempSchedules);
-            const roomConflict = checkRoomConflict(room.id, day, startPeriod, numPeriods, null, tempSchedules);
-            const classConflict = checkClassConflict(section.lopChinhQuyId, day, startPeriod, numPeriods, null, tempSchedules);
-
-            if (!lecturerConflict && !roomConflict && !classConflict) {
-                const scheduleData = { lopHocPhanId: section.id, phongHocId: room.id, thu: day, tietBatDau: startPeriod, soTiet: numPeriods };
-                newSchedules.push(scheduleData);
-                tempSchedules.push({ id: `temp-${Math.random()}`, ...scheduleData });
-                successLog.push(`- <strong>${section.maLopHP}</strong> (Ưu tiên): Xếp thành công vào Thứ ${day}, Tiết ${startPeriod}-${endPeriod}, Phòng ${room.tenPhong}`);
-                lecturerScheduledDays[section.giangVienId].add(day);
-                section.scheduled = true;
-                return true;
-            }
-        }
-        return false;
-    };
-
-    for (const section of sectionsToSchedule) {
-        const subject = subjects.find(s => s.id === section.monHocId);
-        if (!subject) {
-            failureLog.push(`- <strong>${section.maLopHP}</strong>: Lỗi - Không tìm thấy thông tin môn học.`);
-            continue;
-        }
-        const numPeriods = subject.soTinChi || 3;
-        const lecturerId = section.giangVienId;
-        if (!lecturerScheduledDays[lecturerId]) {
-            lecturerScheduledDays[lecturerId] = new Set();
-        }
-
-        // Tier 1: Use explicit preferences if they exist
-        const hasPreferences = priorityLecturerPreferences && priorityLecturerPreferences.length > 0;
-        if (hasPreferences) {
-            for (const pref of priorityLecturerPreferences) {
-                let shiftStart, shiftEnd;
-                if (pref.shift === 'Sáng') { shiftStart = 1; shiftEnd = 5; }
-                else if (pref.shift === 'Chiều') { shiftStart = 6; shiftEnd = 10; }
-                else { shiftStart = 11; shiftEnd = 15; }
-
-                for (let p = shiftStart; p <= shiftEnd - numPeriods + 1; p++) {
-                    if (tryToSchedule(section, pref.day, p)) break;
-                }
-                if (section.scheduled) break;
-            }
-        }
-        
-        // Tier 2 & 3 & 4: If no preferences or preferences failed, use tiered day/time logic
-        if (!section.scheduled) {
-            const lecturerExistingDays = lecturerScheduledDays[lecturerId];
-            const sortedExistingDays = Array.from(lecturerExistingDays).sort((a, b) => a - b);
-            const weekdays = [2, 3, 4, 5, 6];
-            let isScheduled = false;
-
-            // Tier 2.1: Try existing weekdays, morning/afternoon
-            for (const day of sortedExistingDays) {
-                if (day > 6) continue;
-                for (let p = 1; p <= 10 - numPeriods + 1; p++) {
-                    if (tryToSchedule(section, day, p)) { isScheduled = true; break; }
-                }
-                if (isScheduled) break;
-            }
-
-            // Tier 2.2: Try new weekdays, morning/afternoon
-            if (!isScheduled) {
-                for (const day of weekdays) {
-                    if (lecturerExistingDays.has(day)) continue;
-                    for (let p = 1; p <= 10 - numPeriods + 1; p++) {
-                        if (tryToSchedule(section, day, p)) { isScheduled = true; break; }
-                    }
-                    if (isScheduled) break;
-                }
-            }
-            
-            // Tier 3: Try weekdays, evening
-            if (!isScheduled) {
-                const allWeekdaysInOrder = [...sortedExistingDays.filter(d => d <= 6), ...weekdays.filter(d => !lecturerExistingDays.has(d))];
-                for (const day of allWeekdaysInOrder) {
-                    for (let p = 11; p <= 15 - numPeriods + 1; p++) {
-                        if (tryToSchedule(section, day, p)) { isScheduled = true; break; }
-                    }
-                    if (isScheduled) break;
-                }
-            }
-
-            // Tier 4: Try Saturday
-            if (!isScheduled) {
-                for (let p = 1; p <= 15 - numPeriods + 1; p++) {
-                    if (tryToSchedule(section, 7, p)) { isScheduled = true; break; }
-                }
-            }
-        }
-
-        if (!section.scheduled) {
-            failureLog.push(`- <strong>${section.maLopHP}</strong> (Ưu tiên): Không tìm được lịch trống phù hợp.`);
-        }
+function trySlot(section, day, startPeriod, numPeriods, tempSchedules) {
+    const endPeriod = startPeriod + numPeriods - 1;
+    if (endPeriod > 15 || (startPeriod <= 5 && endPeriod > 5) || (startPeriod <= 10 && endPeriod > 10)) {
+        return null; // Invalid slot that crosses shifts
     }
 
-    return { successLog, failureLog, newSchedules, tempSchedules };
-}
+    for (const room of rooms) {
+        if (room.sucChua < section.siSo) continue;
 
-/**
- * Schedules sections for normal lecturers, grouping them by day.
- * @param {Array} sectionsToSchedule - The sections for normal lecturers.
- * @param {Array} currentSchedules - All existing schedules (including priority ones).
- * @param {Object} lecturerScheduledDays - A map to track days used by lecturers.
- * @returns {Object} An object containing successLog, failureLog, and newSchedules.
- */
-function scheduleNormalSections(sectionsToSchedule, currentSchedules, lecturerScheduledDays) {
-    let tempSchedules = [...currentSchedules];
-    const successLog = [];
-    const failureLog = [];
-    const newSchedules = [];
+        const lecturerConflict = checkLecturerConflict(section.giangVienId, day, startPeriod, numPeriods, null, tempSchedules);
+        const roomConflict = checkRoomConflict(room.id, day, startPeriod, numPeriods, null, tempSchedules);
+        const classConflict = checkClassConflict(section.lopChinhQuyId, day, startPeriod, numPeriods, null, tempSchedules);
 
-    const trySchedule = (section, day, startPeriod, numPeriods) => {
-        const endPeriod = startPeriod + numPeriods - 1;
-        if (endPeriod > 15 || (startPeriod <= 5 && endPeriod > 5) || (startPeriod <= 10 && endPeriod > 10)) {
-            return false;
-        }
-
-        for (const room of rooms) {
-            if (room.sucChua < section.siSo) continue;
-
-            const lecturerConflict = checkLecturerConflict(section.giangVienId, day, startPeriod, numPeriods, null, tempSchedules);
-            const roomConflict = checkRoomConflict(room.id, day, startPeriod, numPeriods, null, tempSchedules);
-            const classConflict = checkClassConflict(section.lopChinhQuyId, day, startPeriod, numPeriods, null, tempSchedules);
-
-            if (!lecturerConflict && !roomConflict && !classConflict) {
-                const scheduleData = { lopHocPhanId: section.id, phongHocId: room.id, thu: day, tietBatDau: startPeriod, soTiet: numPeriods };
-                newSchedules.push(scheduleData);
-                tempSchedules.push({ id: `temp-${Math.random()}`, ...scheduleData });
-                successLog.push(`- <strong>${section.maLopHP}</strong>: Xếp thành công vào Thứ ${day}, Tiết ${startPeriod}-${endPeriod}, Phòng ${room.tenPhong}`);
-                section.scheduled = true;
-                return true;
-            }
-        }
-        return false;
-    };
-
-    const sectionsByLecturer = sectionsToSchedule.reduce((acc, section) => {
-        const lecturerId = section.giangVienId;
-        if (!acc[lecturerId]) {
-            acc[lecturerId] = [];
-        }
-        acc[lecturerId].push(section);
-        return acc;
-    }, {});
-
-    for (const lecturerId in sectionsByLecturer) {
-        if (!lecturerScheduledDays[lecturerId]) {
-            lecturerScheduledDays[lecturerId] = new Set();
-        }
-        const lecturerSections = sectionsByLecturer[lecturerId];
-        const weekdays = [2, 3, 4, 5, 6];
-
-        for (const section of lecturerSections) {
-            const subject = subjects.find(s => s.id === section.monHocId);
-            if (!subject) {
-                failureLog.push(`- <strong>${section.maLopHP}</strong>: Lỗi - Không tìm thấy thông tin môn học.`);
-                continue;
-            }
-            const numPeriods = subject.soTinChi || 3;
-            let isScheduled = false;
-            
-            const lecturerExistingDays = lecturerScheduledDays[lecturerId];
-            const sortedExistingDays = Array.from(lecturerExistingDays).sort((a,b) => a-b);
-
-            // Strategy 1: Try to fit into existing days (Mon-Fri, Morning/Afternoon)
-            for (const day of sortedExistingDays) {
-                if (day > 6) continue; // Only weekdays
-                for (let p = 1; p <= 10 - numPeriods + 1; p++) {
-                    if (trySchedule(section, day, p, numPeriods)) { isScheduled = true; break; }
-                }
-                if (isScheduled) break;
-            }
-            if (isScheduled) continue;
-
-            // Strategy 2: Try to fit into a NEW day (Mon-Fri, Morning/Afternoon)
-            for (const day of weekdays) {
-                if (lecturerExistingDays.has(day)) continue;
-                for (let p = 1; p <= 10 - numPeriods + 1; p++) {
-                    if (trySchedule(section, day, p, numPeriods)) {
-                        lecturerExistingDays.add(day);
-                        isScheduled = true;
-                        break;
-                    }
-                }
-                if (isScheduled) break;
-            }
-            if (isScheduled) continue;
-
-            // Strategy 3: Last resort - Evenings on Weekdays
-            const allWeekdaysInOrder = [...sortedExistingDays.filter(d => d <= 6), ...weekdays.filter(d => !lecturerExistingDays.has(d))];
-            for (const day of allWeekdaysInOrder) {
-                for (let p = 11; p <= 15 - numPeriods + 1; p++) {
-                    if (trySchedule(section, day, p, numPeriods)) { isScheduled = true; break; }
-                }
-                if (isScheduled) break;
-            }
-            if (isScheduled) continue;
-
-            // Strategy 4: Last resort - Saturday (all shifts)
-            for (let p = 1; p <= 15 - numPeriods + 1; p++) {
-                if (trySchedule(section, 7, p, numPeriods)) { isScheduled = true; break; }
-            }
-            if (isScheduled) continue;
-
-            if (!isScheduled) {
-                failureLog.push(`- <strong>${section.maLopHP}</strong>: Không tìm được lịch trống phù hợp.`);
-            }
+        if (!lecturerConflict && !roomConflict && !classConflict) {
+            // Found a valid room and time
+            return {
+                scheduleData: { lopHocPhanId: section.id, phongHocId: room.id, thu: day, tietBatDau: startPeriod, soTiet: numPeriods },
+                log: `- <strong>${section.maLopHP}</strong>${section.isPriority ? ' (Ưu tiên)' : ''}: Xếp thành công vào Thứ ${day}, Tiết ${startPeriod}-${endPeriod}, Phòng ${room.tenPhong}`
+            };
         }
     }
-
-    return { successLog, failureLog, newSchedules, tempSchedules };
+    return null; // No suitable room found in this slot
 }
 
 /**
@@ -1365,20 +1161,30 @@ async function runAutoScheduler(btn) {
         return;
     }
 
+    // Identify priority lecturer and mark their sections
     const priorityLecturer = lecturers.find(l => l.linkedUid === prioritySchedulerUID);
     const priorityLecturerId = priorityLecturer ? priorityLecturer.id : null;
-
-    const prioritySections = priorityLecturerId ? unscheduledSections.filter(cs => cs.giangVienId === priorityLecturerId) : [];
-    const otherSections = priorityLecturerId ? unscheduledSections.filter(cs => cs.giangVienId !== priorityLecturerId) : unscheduledSections;
+    if (priorityLecturerId) {
+        unscheduledSections.forEach(s => {
+            if (s.giangVienId === priorityLecturerId) {
+                s.isPriority = true;
+            }
+        });
+    }
     
-    prioritySections.sort((a, b) => b.siSo - a.siSo);
-    otherSections.sort((a, b) => b.siSo - a.siSo);
+    // Sort sections: priority first, then by size (descending)
+    unscheduledSections.sort((a, b) => {
+        if (a.isPriority && !b.isPriority) return -1;
+        if (!a.isPriority && b.isPriority) return 1;
+        return (b.siSo || 0) - (a.siSo || 0);
+    });
 
-    let allSuccessLogs = [];
-    let allFailureLogs = [];
-    let allNewSchedules = [];
-    
-    // Build a map of days already scheduled for each lecturer from existing TKB
+    let tempSchedules = [...schedules];
+    const allSuccessLogs = [];
+    const allFailureLogs = [];
+    const allNewSchedules = [];
+
+    // Build a map of days already scheduled for each lecturer
     const lecturerScheduledDays = {};
     schedules.forEach(s => {
         const section = courseSections.find(cs => cs.id === s.lopHocPhanId);
@@ -1390,22 +1196,103 @@ async function runAutoScheduler(btn) {
         }
     });
 
-    // Schedule priority sections first
-    const priorityResult = schedulePrioritySections(prioritySections, [...schedules], lecturerScheduledDays);
-    allSuccessLogs = allSuccessLogs.concat(priorityResult.successLog);
-    allFailureLogs = allFailureLogs.concat(priorityResult.failureLog);
-    allNewSchedules = allNewSchedules.concat(priorityResult.newSchedules);
-    let tempSchedules = priorityResult.tempSchedules;
+    // --- Main Scheduling Loop ---
+    for (const section of unscheduledSections) {
+        const subject = subjects.find(s => s.id === section.monHocId);
+        if (!subject) {
+            allFailureLogs.push(`- <strong>${section.maLopHP}</strong>: Lỗi - Không tìm thấy thông tin môn học.`);
+            continue;
+        }
+        const numPeriods = subject.soTinChi || 3;
+        const lecturerId = section.giangVienId;
+        if (!lecturerScheduledDays[lecturerId]) {
+            lecturerScheduledDays[lecturerId] = new Set();
+        }
 
-    // Filter out sections that were scheduled in the priority run
-    const remainingOtherSections = otherSections.filter(section => !section.scheduled);
+        let isScheduled = false;
+        
+        // Create a scheduling function to avoid repetition
+        const scheduleSection = (day, period) => {
+            if (isScheduled) return;
+            const result = trySlot(section, day, period, numPeriods, tempSchedules);
+            if (result) {
+                allNewSchedules.push(result.scheduleData);
+                tempSchedules.push({ id: `temp-${Math.random()}`, ...result.scheduleData });
+                allSuccessLogs.push(result.log);
+                lecturerScheduledDays[lecturerId].add(day);
+                isScheduled = true;
+            }
+        };
 
-    // Schedule the rest of the sections
-    const otherResult = scheduleNormalSections(remainingOtherSections, tempSchedules, lecturerScheduledDays);
-    allSuccessLogs = allSuccessLogs.concat(otherResult.successLog);
-    allFailureLogs = allFailureLogs.concat(otherResult.failureLog);
-    allNewSchedules = allNewSchedules.concat(otherResult.newSchedules);
+        // Tier 1: Attempt to schedule in preferred slots
+        if (section.isPriority && priorityLecturerPreferences.length > 0) {
+            for (const pref of priorityLecturerPreferences) {
+                if (isScheduled) break;
+                let shiftStart, shiftEnd;
+                if (pref.shift === 'Sáng') { shiftStart = 1; shiftEnd = 5; }
+                else if (pref.shift === 'Chiều') { shiftStart = 6; shiftEnd = 10; }
+                else { shiftStart = 11; shiftEnd = 15; }
+                
+                for (let p = shiftStart; p <= shiftEnd - numPeriods + 1; p++) {
+                    scheduleSection(pref.day, p);
+                    if (isScheduled) break;
+                }
+            }
+        }
+
+        // Tier 2: Attempt to schedule on existing work days (Mon-Fri, Morning/Afternoon)
+        if (!isScheduled) {
+            const existingDays = Array.from(lecturerScheduledDays[lecturerId]).sort();
+            for (const day of existingDays) {
+                if (isScheduled) break;
+                if (day > 6) continue;
+                for (let p = 1; p <= 10 - numPeriods + 1; p++) {
+                    scheduleSection(day, p);
+                    if (isScheduled) break;
+                }
+            }
+        }
+        
+        // Tier 3: Attempt to schedule on new weekdays (Mon-Fri, Morning/Afternoon)
+        if (!isScheduled) {
+            const weekdays = [2, 3, 4, 5, 6];
+            for (const day of weekdays) {
+                if (isScheduled) break;
+                if (!lecturerScheduledDays[lecturerId].has(day)) {
+                    for (let p = 1; p <= 10 - numPeriods + 1; p++) {
+                        scheduleSection(day, p);
+                        if (isScheduled) break;
+                    }
+                }
+            }
+        }
+
+        // Tier 4: Attempt evenings on any weekday
+        if (!isScheduled) {
+            const weekdays = [2, 3, 4, 5, 6];
+            for (const day of weekdays) {
+                 if (isScheduled) break;
+                 for (let p = 11; p <= 15 - numPeriods + 1; p++) {
+                    scheduleSection(day, p);
+                    if (isScheduled) break;
+                }
+            }
+        }
+
+        // Tier 5: Attempt Saturday
+        if (!isScheduled) {
+            for (let p = 1; p <= 15 - numPeriods + 1; p++) {
+                scheduleSection(7, p);
+                if (isScheduled) break;
+            }
+        }
+        
+        if (!isScheduled) {
+            allFailureLogs.push(`- <strong>${section.maLopHP}</strong>: Không tìm được lịch trống phù hợp.`);
+        }
+    }
     
+    // Commit all new schedules to Firestore
     const batch = writeBatch(db);
     allNewSchedules.forEach(scheduleData => {
         const newScheduleRef = doc(thoiKhoaBieuCol);
@@ -1428,7 +1315,7 @@ async function runAutoScheduler(btn) {
 }
 
 // ===================================================================
-// END: UPDATED SCHEDULING LOGIC
+// END: REVISED AND FIXED AUTO-SCHEDULING LOGIC
 // ===================================================================
 
 
@@ -2125,6 +2012,10 @@ async function saveLecturerPreferences() {
     try {
         const settingsDocRef = doc(settingsCol, 'appSettings');
         await setDoc(settingsDocRef, { priorityLecturerPreferences: preferences }, { merge: true });
+        
+        // FIX: Manually update local state to prevent race conditions.
+        priorityLecturerPreferences = preferences;
+
         showAlert("Đã lưu các buổi học ưu tiên thành công!", true);
         closeModal('lecturer-preference-modal');
     } catch (error) {
