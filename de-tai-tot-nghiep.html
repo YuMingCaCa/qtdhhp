@@ -26,36 +26,41 @@
         @keyframes fadeIn { from {opacity: 0} to {opacity: 1} }
         .close-button { color: #aaa; float: right; font-size: 28px; font-weight: bold; }
         .close-button:hover, .close-button:focus { color: black; text-decoration: none; cursor: pointer; }
+        .no-print { display: block; }
+        @media print { .no-print { display: none; } }
     </style>
 </head>
 <body class="p-4 md:p-8">
     <!-- Main content is hidden by default, shown by JS after auth check -->
     <div id="thesis-module-content" class="max-w-7xl mx-auto hidden">
         <!-- Nút Quay lại -->
-        <a href="index.html" class="mb-6 bg-white hover:bg-gray-100 border border-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg inline-flex items-center transition-colors no-underline">
+        <a href="index.html" class="mb-6 bg-white hover:bg-gray-100 border border-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg inline-flex items-center transition-colors no-underline no-print">
             <i class="fas fa-arrow-left mr-2"></i>
             <span>Quay lại trang chọn hệ thống</span>
         </a>
 
         <!-- Nội dung chính của trang -->
         <div class="bg-white p-6 md:p-8 rounded-2xl shadow-lg mt-4">
-            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 no-print">
                 <div>
                     <h1 class="text-3xl font-bold text-gray-800">Quản lý Đề tài Tốt nghiệp</h1>
                     <p class="text-gray-600 mt-2">Nơi quản lý, đề xuất và theo dõi các đề tài tốt nghiệp.</p>
                 </div>
-                <div class="flex gap-2 mt-4 md:mt-0">
+                <div class="flex gap-2 mt-4 md:mt-0 flex-wrap">
+                    <button id="print-list-btn" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center transition-all">
+                        <i class="fas fa-print mr-2"></i> In Danh sách
+                    </button>
                     <button id="import-topics-btn" class="admin-only bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center transition-all">
-                        <i class="fas fa-file-import mr-2"></i> Import Excel
+                        <i class="fas fa-file-import mr-2"></i> Import Đề tài
                     </button>
                     <button id="add-topic-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center transition-all">
-                        <i class="fas fa-plus-circle mr-2"></i> Đề xuất Đề tài mới
+                        <i class="fas fa-plus-circle mr-2"></i> Đề xuất Đề tài
                     </button>
                 </div>
             </div>
 
             <!-- Filters -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 no-print">
                 <div>
                     <label for="filter-department" class="block text-sm font-medium text-gray-700">Lọc theo Khoa</label>
                     <select id="filter-department" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"></select>
@@ -84,7 +89,7 @@
                             <th class="px-6 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Tên Đề tài & Sinh viên</th>
                             <th class="px-6 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Giảng viên HD</th>
                             <th class="px-6 py-3 text-center text-xs font-bold text-gray-600 uppercase tracking-wider">Trạng thái</th>
-                            <th class="px-6 py-3 text-center text-xs font-bold text-gray-600 uppercase tracking-wider">Hành động</th>
+                            <th class="px-6 py-3 text-center text-xs font-bold text-gray-600 uppercase tracking-wider no-print">Hành động</th>
                         </tr>
                     </thead>
                     <tbody id="topics-list-body" class="divide-y divide-gray-200">
@@ -126,7 +131,7 @@
                 </div>
 
                 <!-- Admin-only section -->
-                <div id="admin-topic-section" class="space-y-4 hidden">
+                <fieldset id="admin-topic-section" class="space-y-4 hidden admin-only">
                      <div>
                         <label for="topic-lecturer-select" class="block text-sm font-medium text-gray-700">Giảng viên hướng dẫn</label>
                         <select id="topic-lecturer-select" class="mt-1 block w-full p-2 border border-gray-300 rounded-md"></select>
@@ -140,7 +145,7 @@
                             <option value="taken">Đã có SV</option>
                         </select>
                     </div>
-                </div>
+                </fieldset>
 
                 <div class="flex justify-end pt-4">
                     <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">
@@ -176,6 +181,11 @@
                     <label for="student-class-input" class="block text-sm font-medium text-gray-700">Lớp</label>
                     <input type="text" id="student-class-input" required placeholder="CNTT1-K14" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm">
                 </div>
+                <!-- NEW: Internship Location Field -->
+                <div>
+                    <label for="student-internship-location" class="block text-sm font-medium text-gray-700">Nơi thực tập tốt nghiệp</label>
+                    <input type="text" id="student-internship-location" required placeholder="VD: Công ty TNHH ABC" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm">
+                </div>
 
                 <div class="flex justify-end pt-4">
                     <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg">
@@ -186,7 +196,7 @@
         </div>
     </div>
 
-    <!-- NEW: Import Data Modal -->
+    <!-- Import Topics Modal -->
     <div id="import-data-modal" class="modal">
         <div class="modal-content max-w-2xl">
             <span class="close-button no-print" onclick="closeModal('import-data-modal')">&times;</span>
@@ -207,6 +217,29 @@
                 <h4 class="font-semibold text-gray-800 mb-2">Kết quả Import:</h4>
                 <div id="import-log" class="max-h-60 overflow-y-auto border rounded-md p-3 bg-gray-50 text-sm"></div>
             </div>
+        </div>
+    </div>
+
+    <!-- NEW: Print Modal -->
+    <div id="print-modal" class="modal">
+        <div class="modal-content max-w-lg">
+            <span class="close-button no-print" onclick="closeModal('print-modal')">&times;</span>
+            <h3 class="text-xl font-bold mb-4">In Danh sách Đề tài</h3>
+            <form id="print-form" class="space-y-4">
+                <div>
+                    <label for="print-year-select" class="block text-sm font-medium text-gray-700">Năm học</label>
+                    <select id="print-year-select" class="mt-1 block w-full p-2 border border-gray-300 rounded-md"></select>
+                </div>
+                <div>
+                    <label for="print-department-select" class="block text-sm font-medium text-gray-700">Khoa</label>
+                    <select id="print-department-select" class="mt-1 block w-full p-2 border border-gray-300 rounded-md"></select>
+                </div>
+                <div class="flex justify-end pt-4">
+                    <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg">
+                        <i class="fas fa-print mr-2"></i>Tạo bản in
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 

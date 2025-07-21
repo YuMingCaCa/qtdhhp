@@ -1,6 +1,6 @@
 // File: js/de-tai-tot-nghiep.js
 // Logic for the "Graduation Thesis Management" module.
-// UPDATED: Added functionality for students to register for approved topics and import topics from Excel.
+// UPDATED: Added internship location, supervision quota checks, and printing functionality.
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -57,6 +57,7 @@ let topicsCol, lecturersCol, departmentsCol, usersCol, settingsCol;
 let currentUserInfo = null;
 
 async function initializeFirebase() {
+    // NOTE: Replace with your actual Firebase config.
     const firebaseConfig = {
       apiKey: "AIzaSyCJcTMUwO-w7V0YsGUKWeaW-zl42Ww7fxo",
       authDomain: "qlylaodongbdhhp.firebaseapp.com",
@@ -69,21 +70,24 @@ async function initializeFirebase() {
         const app = initializeApp(firebaseConfig);
         db = getFirestore(app);
         auth = getAuth(app);
+        // Using a consistent path structure for data
         const appId = firebaseConfig.projectId || 'hpu-workload-tracker-app';
         const basePath = `artifacts/${appId}/public/data`; 
         
         topicsCol = collection(db, `${basePath}/thesis_topics`);
-        lecturersCol = collection(db, `${basePath}/lecturers`);
+        lecturersCol = collection(db, `${basePath}/lecturers`); // Assumes lecturers are managed in main.js
         departmentsCol = collection(db, `${basePath}/departments`);
         usersCol = collection(db, `${basePath}/users`);
         settingsCol = collection(db, `${basePath}/settings`);
         
         onAuthStateChanged(auth, async (user) => {
             if (user) {
+                // Fetch user role from your 'users' collection
                 const userDoc = await getDocs(query(usersCol, where("email", "==", user.email)));
                 if (!userDoc.empty) {
                     currentUserInfo = { uid: user.uid, ...userDoc.docs[0].data() };
                 } else {
+                    // Default role for users not in the collection
                     currentUserInfo = { uid: user.uid, email: user.email, role: 'viewer' };
                 }
                 
@@ -92,6 +96,7 @@ async function initializeFirebase() {
                 addEventListeners();
                 updateUIForRole();
             } else {
+                // If not logged in, redirect to the login page
                 window.location.href = 'index.html';
             }
         });
@@ -117,7 +122,11 @@ function updateUIForRole() {
     document.querySelectorAll('.admin-only').forEach(el => {
         el.style.display = isAdmin ? 'flex' : 'none';
     });
-    document.getElementById('admin-topic-section').style.display = isAdmin ? 'block' : 'none';
+
+    // Also disable/enable fieldsets for better form control
+    document.querySelectorAll('fieldset.admin-only').forEach(fs => {
+        fs.disabled = !isAdmin;
+    });
 }
 
 function getStatusBadge(status) {
@@ -158,10 +167,10 @@ function renderTopicsList() {
         let studentInfoHtml = '';
         if (topic.status === 'taken' && topic.studentName) {
             studentInfoHtml = `
-                <div class="mt-2 text-xs text-gray-500">
-                    <span class="font-semibold text-blue-600">SV:</span> ${topic.studentName} - 
-                    <span class="font-semibold text-blue-600">MSV:</span> ${topic.studentId || 'N/A'} - 
-                    <span class="font-semibold text-blue-600">Lớp:</span> ${topic.studentClass || 'N/A'}
+                <div class="mt-2 text-xs text-gray-500 space-y-1">
+                    <div><span class="font-semibold text-blue-600">SV:</span> ${topic.studentName}</div>
+                    <div><span class="font-semibold text-blue-600">MSV:</span> ${topic.studentId || 'N/A'} - <span class="font-semibold text-blue-600">Lớp:</span> ${topic.studentClass || 'N/A'}</div>
+                    <div><span class="font-semibold text-purple-600">Nơi TT:</span> ${topic.internshipLocation || 'Chưa cập nhật'}</div>
                 </div>`;
         }
         
@@ -193,7 +202,7 @@ function renderTopicsList() {
             </td>
             <td class="px-6 py-4 whitespace-nowrap">${lecturer ? lecturer.name : 'N/A'}</td>
             <td class="px-6 py-4 whitespace-nowrap text-center">${getStatusBadge(topic.status)}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-center">
+            <td class="px-6 py-4 whitespace-nowrap text-center no-print">
                 ${actionButtonHtml}
             </td>
         `;
@@ -209,11 +218,9 @@ function populateFilterDropdowns() {
         depSelect.innerHTML += `<option value="${dep.id}">${dep.name}</option>`;
     });
 
-    // Initially populate lecturers for "All Departments"
     updateLecturerFilterDropdown('all');
 }
 
-// Function to update lecturer filter based on department
 function updateLecturerFilterDropdown(departmentId) {
     const lecSelect = document.getElementById('filter-lecturer');
     lecSelect.innerHTML = '<option value="all">Tất cả Giảng viên</option>';
@@ -303,7 +310,7 @@ window.openRegisterModal = (id) => {
     }
 };
 
-// --- Import/Export Functions ---
+// --- Import/Export & Print Functions ---
 function downloadTemplateForTopics() {
     const headers = ["tenDeTai", "moTa", "tenKhoa", "maGiangVien"];
     const filename = "Mau_Import_DeTai.xlsx";
@@ -417,6 +424,80 @@ async function handleTopicImport() {
     reader.readAsArrayBuffer(file);
 }
 
+function generatePrintableList() {
+    const yearFilter = document.getElementById('print-year-select').value;
+    const depFilter = document.getElementById('print-department-select').value;
+
+    const filteredTopics = allTopics.filter(topic => {
+        if (yearFilter && topic.academicYear !== yearFilter) return false;
+        if (depFilter !== 'all' && topic.departmentId !== depFilter) return false;
+        return topic.status === 'taken'; // Only print topics with registered students
+    });
+
+    if (filteredTopics.length === 0) {
+        showAlert("Không có dữ liệu phù hợp để in.");
+        return;
+    }
+
+    const departmentName = depFilter === 'all' ? 'Toàn trường' : allDepartments.find(d => d.id === depFilter)?.name || 'Không rõ';
+    const title = `Danh sách Đề tài Tốt nghiệp và Nơi thực tập - Năm học ${yearFilter} - Khoa ${departmentName}`;
+
+    let tableBodyHtml = '';
+    filteredTopics.forEach((topic, index) => {
+        const lecturer = allLecturers.find(l => l.id === topic.lecturerId);
+        tableBodyHtml += `
+            <tr>
+                <td style="text-align: center;">${index + 1}</td>
+                <td>${topic.name}</td>
+                <td>${lecturer ? lecturer.name : 'N/A'}</td>
+                <td>${topic.studentName || 'N/A'}</td>
+                <td style="text-align: center;">${topic.studentId || 'N/A'}</td>
+                <td style="text-align: center;">${topic.studentClass || 'N/A'}</td>
+                <td>${topic.internshipLocation || 'N/A'}</td>
+            </tr>
+        `;
+    });
+
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+        <html>
+            <head>
+                <title>${title}</title>
+                <style>
+                    body { font-family: 'Times New Roman', Times, serif; margin: 20px; font-size: 12pt; }
+                    table { width: 100%; border-collapse: collapse; }
+                    th, td { border: 1px solid black; padding: 8px; text-align: left; }
+                    th { font-weight: bold; text-align: center; }
+                    .print-header { text-align: center; margin-bottom: 20px; }
+                    @media print { .no-print { display: none; } }
+                </style>
+            </head>
+            <body>
+                <div class="print-header">
+                    <h2>TRƯỜNG ĐẠI HỌC HẢI PHÒNG</h2>
+                    <h3>${title.toUpperCase()}</h3>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>STT</th>
+                            <th>Tên Đề tài</th>
+                            <th>GVHD</th>
+                            <th>Sinh viên</th>
+                            <th>MSV</th>
+                            <th>Lớp</th>
+                            <th>Nơi thực tập</th>
+                        </tr>
+                    </thead>
+                    <tbody>${tableBodyHtml}</tbody>
+                </table>
+                 <button onclick="window.print()" class="no-print" style="margin-top: 20px; padding: 10px 20px;">In Danh sách</button>
+            </body>
+        </html>
+    `);
+    printWindow.document.close();
+}
+
 // --- Event Listeners ---
 function addEventListeners() {
     document.getElementById('add-topic-btn').addEventListener('click', () => {
@@ -434,6 +515,8 @@ function addEventListeners() {
         const id = document.getElementById('topic-id').value;
         const isAdmin = currentUserInfo.role === 'admin';
         const departmentId = document.getElementById('topic-department-select').value;
+        
+        // Find lecturer based on email if not admin
         const selfLecturer = allLecturers.find(l => l.code && currentUserInfo.email && l.code.toLowerCase() === currentUserInfo.email.split('@')[0].toLowerCase());
 
         const data = {
@@ -481,17 +564,34 @@ function addEventListeners() {
         const studentName = document.getElementById('student-name').value.trim();
         const studentId = document.getElementById('student-id-input').value.trim();
         const studentClass = document.getElementById('student-class-input').value.trim();
+        const internshipLocation = document.getElementById('student-internship-location').value.trim();
 
-        if (!studentName || !studentId || !studentClass) {
-            showAlert("Vui lòng điền đầy đủ thông tin của bạn.");
+        if (!studentName || !studentId || !studentClass || !internshipLocation) {
+            showAlert("Vui lòng điền đầy đủ thông tin của bạn, bao gồm cả nơi thực tập.");
             return;
         }
+
+        // --- SUPERVISION QUOTA CHECK ---
+        const topic = allTopics.find(t => t.id === topicId);
+        const lecturer = allLecturers.find(l => l.id === topic.lecturerId);
+        if (lecturer) {
+            // Use a default quota if not set. This should be managed in the main lecturers module.
+            const quota = lecturer.supervisionQuota || 5; 
+            const currentTakenTopics = allTopics.filter(t => t.lecturerId === lecturer.id && t.status === 'taken').length;
+
+            if (currentTakenTopics >= quota) {
+                showAlert(`Giảng viên ${lecturer.name} đã đạt chỉ tiêu hướng dẫn tối đa (${quota} sinh viên). Vui lòng chọn đề tài khác.`);
+                return;
+            }
+        }
+        // --- END QUOTA CHECK ---
 
         const updateData = {
             status: 'taken',
             studentName,
             studentId,
             studentClass,
+            internshipLocation, // Save new field
             registeredByUid: currentUserInfo.uid,
             registeredAt: new Date().toISOString()
         };
@@ -523,6 +623,32 @@ function addEventListeners() {
     });
     document.getElementById('filter-lecturer').addEventListener('change', renderTopicsList);
     document.getElementById('filter-status').addEventListener('change', renderTopicsList);
+
+    // Print listeners
+    document.getElementById('print-list-btn').addEventListener('click', () => {
+        // Populate dropdowns in the print modal
+        const yearSelect = document.getElementById('print-year-select');
+        const depSelect = document.getElementById('print-department-select');
+        
+        yearSelect.innerHTML = '';
+        academicYears.forEach(year => {
+            yearSelect.innerHTML += `<option value="${year}">Năm học ${year}</option>`;
+        });
+        yearSelect.value = getCurrentAcademicYear();
+
+        depSelect.innerHTML = '<option value="all">Tất cả Khoa</option>';
+        allDepartments.forEach(dep => {
+            depSelect.innerHTML += `<option value="${dep.id}">${dep.name}</option>`;
+        });
+
+        openModal('print-modal');
+    });
+
+    document.getElementById('print-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        generatePrintableList();
+        closeModal('print-modal');
+    });
 }
 
 // --- Data Snapshot Listeners ---
@@ -543,7 +669,7 @@ function setupOnSnapshotListeners() {
     onSnapshot(query(lecturersCol), (snapshot) => {
         allLecturers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         allLecturers.sort((a, b) => a.name.localeCompare(b.name));
-        populateFilterDropdowns();
+        populateFilterDropdowns(); // Repopulate filters in case lecturer list changes
         renderTopicsList();
     }, (error) => console.error("Error listening to lecturers:", error));
 
