@@ -181,11 +181,6 @@ const loginFormContainer = document.getElementById('login-form').parentElement;
 const registerFormContainer = document.getElementById('register-form-container');
 
 // --- Page Navigation Logic ---
-/**
- * Reliably shows a single main page container and hides all others.
- * This prevents race conditions where multiple pages might be visible.
- * @param {string} pageIdToShow The ID of the page element to display ('login-page', 'module-selection-page', 'app-content').
- */
 function showPage(pageIdToShow) {
     const pages = [loginPage, moduleSelectionPage, appContent];
     pages.forEach(page => {
@@ -255,24 +250,13 @@ function setButtonLoading(button, isLoading) {
 
 
 // --- Date & Year Logic ---
-/**
- * Formats a date string (e.g., 'YYYY-MM-DD') into 'dd/mm/yyyy' format.
- * Handles potential timezone issues by creating a UTC date object.
- * @param {string} dateString The date string from Firestore or input.
- * @returns {string} The formatted date string 'dd/mm/yyyy'.
- */
 function formatDate(dateString) {
     if (!dateString || typeof dateString !== 'string') return '';
-
-    // Create a date object assuming UTC to avoid timezone shifts from local time.
     const date = new Date(dateString + 'T00:00:00Z');
-
     const day = String(date.getUTCDate()).padStart(2, '0');
-    const month = String(date.getUTCMonth() + 1).padStart(2, '0'); // Months are 0-indexed
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
     const year = date.getUTCFullYear();
-
-    if (isNaN(year)) return ''; // Return empty for invalid dates
-
+    if (isNaN(year)) return '';
     return `${day}/${month}/${year}`;
 }
 
@@ -280,8 +264,8 @@ function getAcademicYear(date) {
     if (!date) return null;
     const d = new Date(date);
     const year = d.getFullYear();
-    const month = d.getMonth(); // 0-11
-    if (month >= 7) { // Academic year starts in August (month 7)
+    const month = d.getMonth();
+    if (month >= 7) {
         return `${year}-${year + 1}`;
     } else {
         return `${year - 1}-${year}`;
@@ -316,7 +300,6 @@ function updateUIForRole() {
         el.style.display = isAdmin ? 'block' : 'none';
     });
 
-    // Hide/show priority-only buttons
     const isPriorityUser = state.currentUser.uid === state.prioritySchedulerUID;
     document.querySelectorAll('.priority-only').forEach(el => {
         el.style.display = isPriorityUser ? 'block' : 'none';
@@ -367,7 +350,6 @@ function renderLecturerTable() {
     const departmentTitle = document.getElementById('department-title');
     tableBody.innerHTML = '';
 
-    // Filter lecturers based on the selected department
     let filteredLecturers = state.lecturers;
     if (state.selectedDepartmentId && state.selectedDepartmentId !== 'all') {
         filteredLecturers = state.lecturers.filter(l => l.departmentId === state.selectedDepartmentId);
@@ -382,7 +364,6 @@ function renderLecturerTable() {
         return;
     }
 
-    // Create an array with lecturers and their total hours
     const lecturersWithHours = filteredLecturers.map(lecturer => {
         const totalHours = state.entries
             .filter(e => e.lecturerId === lecturer.id && (e.academicYear ? e.academicYear === state.selectedYear : getAcademicYear(e.date) === state.selectedYear))
@@ -390,10 +371,8 @@ function renderLecturerTable() {
         return { lecturer, totalHours };
     });
 
-    // Sort the array by totalHours in descending order
     lecturersWithHours.sort((a, b) => b.totalHours - a.totalHours);
 
-    // Render the sorted list
     lecturersWithHours.forEach((item, index) => {
         const { lecturer, totalHours } = item;
         const row = document.createElement('tr');
@@ -432,7 +411,6 @@ function renderLecturersList() {
     const formDepSelect = document.getElementById('lecturer-department');
     const filterDepSelect = document.getElementById('filter-lecturer-by-department');
 
-    // Populate the department dropdown inside the form for adding/editing a lecturer
     const currentFormDepVal = formDepSelect.value;
     formDepSelect.innerHTML = '<option value="">-- Chọn Khoa --</option>';
     state.departments.forEach(dep => {
@@ -443,17 +421,15 @@ function renderLecturersList() {
     });
     formDepSelect.value = currentFormDepVal;
 
-    // Filter the list of lecturers based on the filter dropdown
     const selectedFilterDepId = filterDepSelect.value;
     let filteredLecturers = state.lecturers;
     if (selectedFilterDepId && selectedFilterDepId !== 'all') {
         filteredLecturers = state.lecturers.filter(l => l.departmentId === selectedFilterDepId);
     }
 
-    // Render the filtered list into the table
     listBody.innerHTML = '';
     if (filteredLecturers.length === 0) {
-        listBody.innerHTML = `<tr><td colspan="5" class="text-center p-6 text-gray-500">Không có giảng viên nào trong khoa được chọn.</td></tr>`;
+        listBody.innerHTML = `<tr><td colspan="6" class="text-center p-6 text-gray-500">Không có giảng viên nào trong khoa được chọn.</td></tr>`;
         return;
     }
     
@@ -473,11 +449,15 @@ function renderLecturersList() {
         } else {
             linkButtonHtml = `<button class="text-blue-500 hover:text-blue-700" title="Gắn giảng viên này vào tài khoản của bạn" onclick="window.linkLecturerToCurrentUser('${lecturer.id}')"><i class="fas fa-link fa-lg"></i></button>`;
         }
+        
+        // UPDATED: Display supervisionQuota, default to 0 if not set
+        const quota = lecturer.supervisionQuota || 0;
 
         row.innerHTML = `
             <td class="px-4 py-2">${lecturer.name}</td>
             <td class="px-4 py-2">${lecturer.code}</td>
             <td class="px-4 py-2">${department?.name || 'Chưa phân khoa'}</td>
+            <td class="px-4 py-2 text-center font-bold">${quota}</td>
             <td class="px-4 py-2 text-center">
                 <button class="text-blue-500 mr-2" onclick="editLecturer('${lecturer.id}')"><i class="fas fa-edit"></i></button>
                 <button class="text-red-500" onclick="deleteLecturer('${lecturer.id}')"><i class="fas fa-trash"></i></button>
@@ -609,8 +589,8 @@ async function renderUsersList() {
         usersSnapshot.forEach(userDoc => {
             const userData = userDoc.data();
             const isCurrentUser = state.currentUser.uid === userDoc.id;
-            const isPriorityUser = userDoc.id === state.prioritySchedulerUID; // Check if this is the priority user
-            const isDisabled = isCurrentUser || isPriorityUser; // Disable if it's the current user OR the priority user
+            const isPriorityUser = userDoc.id === state.prioritySchedulerUID;
+            const isDisabled = isCurrentUser || isPriorityUser;
 
             const row = document.createElement('tr');
             row.className = "border-b";
@@ -790,7 +770,6 @@ function generateDepartmentReportHtml() {
         return { lecturer, totalHours };
     });
     
-    // Sắp xếp danh sách giảng viên theo tổng số giờ giảm dần
     lecturersWithHours.sort((a, b) => b.totalHours - a.totalHours);
 
     const grandTotalHours = lecturersWithHours.reduce((sum, item) => sum + item.totalHours, 0);
@@ -1059,6 +1038,8 @@ window.editLecturer = (id) => {
     document.getElementById('lecturer-code').value = lecturer.code;
     document.getElementById('lecturer-department').value = lecturer.departmentId;
     document.getElementById('lecturer-phone').value = lecturer.soDienThoai || '';
+    // UPDATED: Populate quota field
+    document.getElementById('lecturer-quota').value = lecturer.supervisionQuota || '';
 };
 
 window.deleteLecturer = (id) => {
@@ -1087,7 +1068,6 @@ window.deleteTask = (id) => {
     });
 };
 
-// NEW: Function to link a lecturer record to the current user's account
 window.linkLecturerToCurrentUser = async (lecturerId) => {
     const lecturerToLink = state.lecturers.find(l => l.id === lecturerId);
     if (!lecturerToLink) {
@@ -1114,7 +1094,6 @@ window.linkLecturerToCurrentUser = async (lecturerId) => {
     });
 };
 
-// NEW: Function to unlink a lecturer
 window.unlinkLecturer = async (lecturerId) => {
     const lecturerToUnlink = state.lecturers.find(l => l.id === lecturerId);
     if (!lecturerToUnlink) {
@@ -1164,7 +1143,7 @@ function clearInactivityListeners() {
     clearTimeout(inactivityTimer);
 }
 
-// --- NEW: DUPLICATE CLEANUP LOGIC ---
+// --- DUPLICATE CLEANUP LOGIC ---
 async function cleanupDuplicateLecturers(btn) {
     setButtonLoading(btn, true);
     try {
@@ -1173,7 +1152,7 @@ async function cleanupDuplicateLecturers(btn) {
 
         const lecturerGroups = new Map();
         allLecturers.forEach(lecturer => {
-            if (!lecturer.code) return; // Skip lecturers without a code
+            if (!lecturer.code) return;
             const code = lecturer.code.trim().toLowerCase();
             if (!lecturerGroups.has(code)) {
                 lecturerGroups.set(code, []);
@@ -1184,7 +1163,6 @@ async function cleanupDuplicateLecturers(btn) {
         const duplicatesToProcess = [];
         for (const [code, group] of lecturerGroups.entries()) {
             if (group.length > 1) {
-                // Sort by name to have a consistent master, or just pick the first one
                 group.sort((a, b) => a.name.localeCompare(b.name));
                 const master = group[0];
                 const duplicates = group.slice(1);
@@ -1206,7 +1184,6 @@ async function cleanupDuplicateLecturers(btn) {
             const masterId = group.master.id;
             const duplicateIds = group.duplicates.map(d => d.id);
             
-            // Find all entries associated with duplicate lecturer IDs
             const entriesQuery = query(entriesCol, where('lecturerId', 'in', duplicateIds));
             const entriesSnapshot = await getDocs(entriesQuery);
             
@@ -1215,7 +1192,6 @@ async function cleanupDuplicateLecturers(btn) {
                 entriesToUpdateCount++;
             });
 
-            // Schedule duplicates for deletion
             duplicateIds.forEach(id => {
                 batch.delete(doc(lecturersCol, id));
                 lecturersToDeleteCount++;
@@ -1286,7 +1262,7 @@ function setupOnSnapshotListeners() {
             setDoc(doc(settingsCol, SETTINGS_DOC_ID), { customYears: [], prioritySchedulerUID: null });
         }
         renderYearSelect();
-        updateUIForRole(); // Update UI after getting priority user info
+        updateUIForRole();
     }, snapshotErrorHandler('Cài đặt'));
 }
 
@@ -1335,7 +1311,6 @@ async function initializeFirebase() {
 
                 state.currentUser = { uid: user.uid, ...userDoc.data() };
                 
-                // Set priority user if not set
                 const settingsDocRef = doc(settingsCol, SETTINGS_DOC_ID);
                 const settingsDoc = await getDoc(settingsDocRef);
                 if (!settingsDoc.exists() || !settingsDoc.data().prioritySchedulerUID) {
@@ -1493,7 +1468,7 @@ function addEventListeners() {
             if (uid === state.prioritySchedulerUID) {
                 showAlert('Không thể thay đổi vai trò của người dùng ưu tiên.');
                 const selectEl = document.querySelector(`.role-select[data-uid="${uid}"]`);
-                selectEl.value = 'admin'; // Revert change
+                selectEl.value = 'admin';
                 return;
             }
             const selectEl = document.querySelector(`.role-select[data-uid="${uid}"]`);
@@ -1752,7 +1727,6 @@ function addEventListeners() {
         }
     });
 
-    // Common search logic for bulk tools
     function findEntriesForBulkAction(depId, year, descriptionText, date) {
          if (!depId && !year && !descriptionText && !date) {
             showAlert('Vui lòng nhập ít nhất một tiêu chí tìm kiếm.');
@@ -1939,7 +1913,6 @@ function addEventListeners() {
         });
     });
 
-    // NEW: Cleanup Duplicates Button
     document.getElementById('cleanup-duplicates-btn').addEventListener('click', (e) => {
         showConfirm(
             'Bạn có chắc muốn chạy công cụ dọn dẹp dữ liệu giảng viên trùng lặp? Hành động này sẽ hợp nhất các giảng viên có cùng MÃ GIẢNG VIÊN và không thể hoàn tác.',
@@ -1947,11 +1920,7 @@ function addEventListeners() {
         );
     });
 
-    // ===================================================================
-    // START: STATISTICS & REPORTING LOGIC (FIX)
-    // ===================================================================
-
-    // Function to populate lecturer dropdown in stats modal
+    // STATISTICS & REPORTING LOGIC
     function populateStatsLecturerSelect(departmentId) {
         const lecturerSelect = document.getElementById('stats-lecturer-select');
         lecturerSelect.innerHTML = '<option value="all">-- Tất cả giảng viên --</option>';
@@ -1969,27 +1938,22 @@ function addEventListeners() {
         });
     }
 
-    // Open the statistics modal
     document.getElementById('statistics-tool-btn').addEventListener('click', () => {
         const depSelect = document.getElementById('stats-department-select');
         const yearSelect = document.getElementById('stats-year-select');
         
-        // Populate departments
         depSelect.innerHTML = '<option value="all">-- Toàn trường --</option>';
         state.departments.forEach(dep => {
             depSelect.innerHTML += `<option value="${dep.id}">${dep.name}</option>`;
         });
         
-        // Populate years
         yearSelect.innerHTML = '';
         getYearsForSelect().forEach(year => {
             yearSelect.innerHTML += `<option value="${year}" ${year === state.selectedYear ? 'selected' : ''}>Năm học ${year}</option>`;
         });
 
-        // Populate lecturers based on initial department selection
         populateStatsLecturerSelect(depSelect.value);
 
-        // Reset results area
         document.getElementById('statistics-results-container').classList.add('hidden');
         document.getElementById('export-report-btn').classList.add('hidden');
         document.getElementById('statistics-results-table').innerHTML = '';
@@ -1997,12 +1961,10 @@ function addEventListeners() {
         openModal('statistics-modal');
     });
 
-    // Update lecturer list when department changes in stats modal
     document.getElementById('stats-department-select').addEventListener('change', (e) => {
         populateStatsLecturerSelect(e.target.value);
     });
 
-    // "View Statistics" button click
     document.getElementById('view-statistics-btn').addEventListener('click', (e) => {
         const btn = e.currentTarget;
         setButtonLoading(btn, true);
@@ -2017,7 +1979,6 @@ function addEventListeners() {
             return;
         }
 
-        // Filter entries
         const filteredEntries = state.entries.filter(entry => {
             const entryYear = entry.academicYear || getAcademicYear(entry.date);
             if (entryYear !== year) return false;
@@ -2031,12 +1992,10 @@ function addEventListeners() {
             return true;
         });
 
-        // Store results in state for report generation
         state.statsEntries = filteredEntries;
         state.statsSelectedYear = year;
         state.statsSelectedLecturer = lecturerId !== 'all' ? state.lecturers.find(l => l.id === lecturerId) : null;
 
-        // Render results table
         const tableContainer = document.getElementById('statistics-results-table');
         const resultsTitle = document.getElementById('statistics-results-title');
         const exportBtn = document.getElementById('export-report-btn');
@@ -2082,7 +2041,6 @@ function addEventListeners() {
             resultsTitle.textContent = `Kết quả thống kê (${filteredEntries.length} mục):`;
             tableContainer.innerHTML = tableHtml;
             
-            // Show export button only if a single lecturer was selected
             if (lecturerId !== 'all') {
                 exportBtn.classList.remove('hidden');
             } else {
@@ -2094,7 +2052,6 @@ function addEventListeners() {
         setButtonLoading(btn, false);
     });
 
-    // "Export Lecturer Report" button click
     document.getElementById('export-report-btn').addEventListener('click', () => {
         try {
             const reportHtml = generateLecturerReportHtml();
@@ -2107,7 +2064,6 @@ function addEventListeners() {
         }
     });
     
-    // "Export Department Report" button click
     document.getElementById('export-department-report-btn').addEventListener('click', () => {
         try {
             const reportHtml = generateDepartmentReportHtml();
@@ -2119,11 +2075,6 @@ function addEventListeners() {
             console.error(error);
         }
     });
-
-    // ===================================================================
-    // END: STATISTICS & REPORTING LOGIC (FIX)
-    // ===================================================================
-
 
     // Other forms
     document.getElementById('department-form').addEventListener('submit', async (e) => {
@@ -2157,8 +2108,17 @@ function addEventListeners() {
         const code = document.getElementById('lecturer-code').value.trim();
         const departmentId = document.getElementById('lecturer-department').value;
         const soDienThoai = document.getElementById('lecturer-phone').value.trim();
-        if (!name || !code || !departmentId) { showAlert("Vui lòng điền đầy đủ thông tin bắt buộc."); setButtonLoading(btn, false); return; }
-        const data = { name, code, departmentId, soDienThoai };
+        // UPDATED: Get supervision quota value
+        const supervisionQuota = parseInt(document.getElementById('lecturer-quota').value, 10) || 0;
+        
+        if (!name || !code || !departmentId) { 
+            showAlert("Vui lòng điền đầy đủ thông tin bắt buộc (Tên, Mã GV, Khoa)."); 
+            setButtonLoading(btn, false); 
+            return; 
+        }
+        
+        const data = { name, code, departmentId, soDienThoai, supervisionQuota };
+        
         try {
             if (id) {
                 await updateDoc(doc(lecturersCol, id), data);
@@ -2209,7 +2169,7 @@ function addEventListeners() {
 
 // --- Initial Load ---
 document.addEventListener('DOMContentLoaded', () => {
-    injectStyles(); // Inject styles on load
+    injectStyles();
     state.selectedYear = getCurrentAcademicYear();
     addEventListeners();
     initializeFirebase();

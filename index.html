@@ -466,13 +466,12 @@
         </div>
     </div>
 
-    <!-- Manage Lecturers Modal (UPDATED with filter and link button) -->
+    <!-- Manage Lecturers Modal (UPDATED with quota) -->
     <div id="manage-lecturers-modal" class="modal">
         <div class="modal-content">
             <span class="close-button no-print" onclick="closeModal('manage-lecturers-modal')">&times;</span>
             <h3 class="text-xl font-bold mb-4">Quản lý Giảng viên</h3>
             
-            <!-- NEW FILTER SECTION -->
             <div class="mb-4 p-4 border rounded-lg bg-gray-50">
                 <label for="filter-lecturer-by-department" class="block text-sm font-medium text-gray-700">Lọc theo Khoa:</label>
                 <select id="filter-lecturer-by-department" class="mt-1 p-2 border rounded-md w-full"></select>
@@ -480,7 +479,7 @@
 
             <form id="lecturer-form" class="mb-4 p-4 border rounded-lg bg-gray-50">
                 <input type="hidden" id="lecturer-id">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
                     <div>
                         <label for="lecturer-name" class="block text-sm font-medium text-gray-700">Họ và tên</label>
                         <input type="text" id="lecturer-name" placeholder="VD: Nguyễn Văn A" required class="mt-1 p-2 border rounded-md w-full">
@@ -489,17 +488,22 @@
                         <label for="lecturer-code" class="block text-sm font-medium text-gray-700">Mã giảng viên</label>
                         <input type="text" id="lecturer-code" placeholder="VD: GV001" required class="mt-1 p-2 border rounded-md w-full">
                     </div>
-                    <div>
-                        <label for="lecturer-phone" class="block text-sm font-medium text-gray-700">Số điện thoại</label>
-                        <input type="tel" id="lecturer-phone" placeholder="VD: 0912345678" class="mt-1 p-2 border rounded-md w-full">
-                    </div>
-                    <div>
+                     <div>
                         <label for="lecturer-department" class="block text-sm font-medium text-gray-700">Khoa</label>
                         <select id="lecturer-department" required class="mt-1 p-2 border rounded-md w-full">
                             <option value="">-- Chọn Khoa --</option>
                         </select>
                     </div>
-                    <div class="md:col-span-2">
+                    <div>
+                        <label for="lecturer-phone" class="block text-sm font-medium text-gray-700">Số điện thoại</label>
+                        <input type="tel" id="lecturer-phone" placeholder="VD: 0912345678" class="mt-1 p-2 border rounded-md w-full">
+                    </div>
+                    <!-- NEW: Supervision Quota Input -->
+                    <div>
+                        <label for="lecturer-quota" class="block text-sm font-medium text-gray-700">Chỉ tiêu HD Tối đa</label>
+                        <input type="number" id="lecturer-quota" placeholder="VD: 5" min="0" class="mt-1 p-2 border rounded-md w-full">
+                    </div>
+                    <div class="md:col-start-3">
                         <button type="submit" class="bg-green-600 hover:bg-green-700 text-white p-2 rounded-md w-full">Lưu Giảng viên</button>
                     </div>
                 </div>
@@ -511,6 +515,7 @@
                             <th class="px-4 py-2 text-left">Họ và Tên</th>
                             <th class="px-4 py-2 text-left">Mã GV</th>
                             <th class="px-4 py-2 text-left">Khoa</th>
+                            <th class="px-4 py-2 text-center">Chỉ tiêu HD</th>
                             <th class="px-4 py-2 text-center">Hành động</th>
                             <th class="px-4 py-2 text-center">Liên kết</th>
                         </tr>

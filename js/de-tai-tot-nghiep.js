@@ -1,6 +1,6 @@
 // File: js/de-tai-tot-nghiep.js
 // Logic for the "Graduation Thesis Management" module.
-// UPDATED: Added internship location, supervision quota checks, and printing functionality.
+// UPDATED: Added student import functionality.
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -53,11 +53,10 @@ function getCurrentAcademicYear() {
 
 // --- Firebase Initialization ---
 let db, auth;
-let topicsCol, lecturersCol, departmentsCol, usersCol, settingsCol;
+let topicsCol, lecturersCol, departmentsCol, usersCol, settingsCol, studentsCol; // Added studentsCol
 let currentUserInfo = null;
 
 async function initializeFirebase() {
-    // NOTE: Replace with your actual Firebase config.
     const firebaseConfig = {
       apiKey: "AIzaSyCJcTMUwO-w7V0YsGUKWeaW-zl42Ww7fxo",
       authDomain: "qlylaodongbdhhp.firebaseapp.com",
@@ -70,24 +69,22 @@ async function initializeFirebase() {
         const app = initializeApp(firebaseConfig);
         db = getFirestore(app);
         auth = getAuth(app);
-        // Using a consistent path structure for data
         const appId = firebaseConfig.projectId || 'hpu-workload-tracker-app';
         const basePath = `artifacts/${appId}/public/data`; 
         
         topicsCol = collection(db, `${basePath}/thesis_topics`);
-        lecturersCol = collection(db, `${basePath}/lecturers`); // Assumes lecturers are managed in main.js
+        lecturersCol = collection(db, `${basePath}/lecturers`);
         departmentsCol = collection(db, `${basePath}/departments`);
         usersCol = collection(db, `${basePath}/users`);
         settingsCol = collection(db, `${basePath}/settings`);
+        studentsCol = collection(db, `${basePath}/students`); // Initialize students collection
         
         onAuthStateChanged(auth, async (user) => {
             if (user) {
-                // Fetch user role from your 'users' collection
                 const userDoc = await getDocs(query(usersCol, where("email", "==", user.email)));
                 if (!userDoc.empty) {
                     currentUserInfo = { uid: user.uid, ...userDoc.docs[0].data() };
                 } else {
-                    // Default role for users not in the collection
                     currentUserInfo = { uid: user.uid, email: user.email, role: 'viewer' };
                 }
                 
@@ -96,7 +93,6 @@ async function initializeFirebase() {
                 addEventListeners();
                 updateUIForRole();
             } else {
-                // If not logged in, redirect to the login page
                 window.location.href = 'index.html';
             }
         });
@@ -111,6 +107,7 @@ async function initializeFirebase() {
 let allTopics = [];
 let allLecturers = [];
 let allDepartments = [];
+let allStudents = []; // Added students state
 let academicYears = [];
 
 // --- UI Rendering & Logic ---
@@ -123,7 +120,6 @@ function updateUIForRole() {
         el.style.display = isAdmin ? 'flex' : 'none';
     });
 
-    // Also disable/enable fieldsets for better form control
     document.querySelectorAll('fieldset.admin-only').forEach(fs => {
         fs.disabled = !isAdmin;
     });
@@ -320,6 +316,16 @@ function downloadTemplateForTopics() {
     XLSX.writeFile(wb, filename);
 }
 
+// NEW: Download template for students
+function downloadTemplateForStudents() {
+    const headers = ["maSV", "hoTen", "lop", "tenKhoa", "khoaHoc"];
+    const filename = "Mau_Import_SinhVien.xlsx";
+    const ws = XLSX.utils.json_to_sheet([{}], { header: headers });
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Data");
+    XLSX.writeFile(wb, filename);
+}
+
 async function handleTopicImport() {
     const btn = document.getElementById('start-import-btn');
     setButtonLoading(btn, true);
@@ -388,7 +394,7 @@ async function handleTopicImport() {
                         academicYear: currentYear,
                         departmentId: department.id,
                         lecturerId: lecturer.id,
-                        status: 'pending', // Imported topics are pending by default
+                        status: 'pending',
                         proposerUid: currentUserInfo.uid,
                         createdAt: new Date().toISOString(),
                         lastUpdated: new Date().toISOString(),
@@ -424,6 +430,113 @@ async function handleTopicImport() {
     reader.readAsArrayBuffer(file);
 }
 
+// NEW: Handle student import
+async function handleStudentImport() {
+    const btn = document.getElementById('start-student-import-btn');
+    setButtonLoading(btn, true);
+
+    const fileInput = document.getElementById('import-student-file-input');
+    const logContainer = document.getElementById('import-student-log');
+    const resultsContainer = document.getElementById('import-student-results-container');
+    
+    resultsContainer.classList.remove('hidden');
+    logContainer.innerHTML = 'Bắt đầu quá trình import...<br>';
+
+    if (!fileInput.files || fileInput.files.length === 0) {
+        showAlert("Vui lòng chọn một file Excel.");
+        setButtonLoading(btn, false);
+        return;
+    }
+
+    const file = fileInput.files[0];
+    const reader = new FileReader();
+
+    reader.onload = async (e) => {
+        try {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+            const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+            if (jsonData.length === 0) {
+                logContainer.innerHTML += '<span class="text-red-500">Lỗi: File không có dữ liệu.</span><br>';
+                setButtonLoading(btn, false);
+                return;
+            }
+
+            logContainer.innerHTML += `Đã đọc ${jsonData.length} dòng từ file. Đang kiểm tra và lưu...<br>`;
+
+            const batch = writeBatch(db);
+            let successCount = 0;
+            let updateCount = 0;
+            let errorCount = 0;
+
+            for (const [index, row] of jsonData.entries()) {
+                try {
+                    const studentId = String(row.maSV || '').trim();
+                    const studentName = String(row.hoTen || '').trim();
+                    const studentClass = String(row.lop || '').trim();
+                    const departmentName = String(row.tenKhoa || '').trim().toLowerCase();
+                    const course = String(row.khoaHoc || '').trim();
+
+                    if (!studentId || !studentName || !departmentName) {
+                        throw new Error("Thiếu thông tin bắt buộc (Mã SV, Họ tên, Tên Khoa).");
+                    }
+
+                    const department = allDepartments.find(d => d.name.toLowerCase() === departmentName);
+                    if (!department) throw new Error(`Không tìm thấy khoa "${row.tenKhoa}"`);
+
+                    const studentData = {
+                        studentId,
+                        name: studentName,
+                        class: studentClass,
+                        departmentId: department.id,
+                        course,
+                        lastUpdated: new Date().toISOString(),
+                    };
+                    
+                    // Check for existing student to update instead of creating duplicates
+                    const existingStudentQuery = query(studentsCol, where("studentId", "==", studentId));
+                    const existingDocs = await getDocs(existingStudentQuery);
+
+                    if (!existingDocs.empty) {
+                        const docRef = existingDocs.docs[0].ref;
+                        batch.update(docRef, studentData);
+                        updateCount++;
+                    } else {
+                        const newDocRef = doc(studentsCol);
+                        batch.set(newDocRef, studentData);
+                        successCount++;
+                    }
+
+                } catch (rowError) {
+                    errorCount++;
+                    logContainer.innerHTML += `<span class="text-orange-500">- Dòng ${index + 2}: Lỗi - ${rowError.message}</span><br>`;
+                }
+            }
+
+            if (successCount > 0 || updateCount > 0) {
+                await batch.commit();
+            }
+            
+            logContainer.innerHTML += `<hr class="my-2">`;
+            logContainer.innerHTML += `<strong class="text-green-600">Hoàn thành!</strong><br>`;
+            logContainer.innerHTML += `<span>- Thêm mới thành công: ${successCount} sinh viên.</span><br>`;
+            logContainer.innerHTML += `<span class="text-blue-600">- Cập nhật sinh viên đã có: ${updateCount} sinh viên.</span><br>`;
+            logContainer.innerHTML += `<span>- Bị lỗi: ${errorCount} dòng.</span><br>`;
+
+        } catch (error) {
+            console.error("Student import error:", error);
+            logContainer.innerHTML += `<span class="text-red-500">Đã xảy ra lỗi nghiêm trọng: ${error.message}</span><br>`;
+        } finally {
+            setButtonLoading(btn, false);
+            fileInput.value = '';
+        }
+    };
+    reader.readAsArrayBuffer(file);
+}
+
 function generatePrintableList() {
     const yearFilter = document.getElementById('print-year-select').value;
     const depFilter = document.getElementById('print-department-select').value;
@@ -431,7 +544,7 @@ function generatePrintableList() {
     const filteredTopics = allTopics.filter(topic => {
         if (yearFilter && topic.academicYear !== yearFilter) return false;
         if (depFilter !== 'all' && topic.departmentId !== depFilter) return false;
-        return topic.status === 'taken'; // Only print topics with registered students
+        return topic.status === 'taken';
     });
 
     if (filteredTopics.length === 0) {
@@ -515,8 +628,6 @@ function addEventListeners() {
         const id = document.getElementById('topic-id').value;
         const isAdmin = currentUserInfo.role === 'admin';
         const departmentId = document.getElementById('topic-department-select').value;
-        
-        // Find lecturer based on email if not admin
         const selfLecturer = allLecturers.find(l => l.code && currentUserInfo.email && l.code.toLowerCase() === currentUserInfo.email.split('@')[0].toLowerCase());
 
         const data = {
@@ -571,11 +682,9 @@ function addEventListeners() {
             return;
         }
 
-        // --- SUPERVISION QUOTA CHECK ---
         const topic = allTopics.find(t => t.id === topicId);
         const lecturer = allLecturers.find(l => l.id === topic.lecturerId);
         if (lecturer) {
-            // Use a default quota if not set. This should be managed in the main lecturers module.
             const quota = lecturer.supervisionQuota || 5; 
             const currentTakenTopics = allTopics.filter(t => t.lecturerId === lecturer.id && t.status === 'taken').length;
 
@@ -584,14 +693,13 @@ function addEventListeners() {
                 return;
             }
         }
-        // --- END QUOTA CHECK ---
 
         const updateData = {
             status: 'taken',
             studentName,
             studentId,
             studentClass,
-            internshipLocation, // Save new field
+            internshipLocation,
             registeredByUid: currentUserInfo.uid,
             registeredAt: new Date().toISOString()
         };
@@ -615,6 +723,16 @@ function addEventListeners() {
     document.getElementById('download-template-btn').addEventListener('click', downloadTemplateForTopics);
     document.getElementById('start-import-btn').addEventListener('click', handleTopicImport);
 
+    // NEW: Student Import Listeners
+    document.getElementById('import-students-btn').addEventListener('click', () => {
+        document.getElementById('import-student-file-input').value = '';
+        document.getElementById('import-student-log').innerHTML = '';
+        document.getElementById('import-student-results-container').classList.add('hidden');
+        openModal('import-students-modal');
+    });
+    document.getElementById('download-student-template-btn').addEventListener('click', downloadTemplateForStudents);
+    document.getElementById('start-student-import-btn').addEventListener('click', handleStudentImport);
+
     // Filter listeners
     document.getElementById('filter-department').addEventListener('change', () => {
         const selectedDepId = document.getElementById('filter-department').value;
@@ -626,7 +744,6 @@ function addEventListeners() {
 
     // Print listeners
     document.getElementById('print-list-btn').addEventListener('click', () => {
-        // Populate dropdowns in the print modal
         const yearSelect = document.getElementById('print-year-select');
         const depSelect = document.getElementById('print-department-select');
         
@@ -669,7 +786,7 @@ function setupOnSnapshotListeners() {
     onSnapshot(query(lecturersCol), (snapshot) => {
         allLecturers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         allLecturers.sort((a, b) => a.name.localeCompare(b.name));
-        populateFilterDropdowns(); // Repopulate filters in case lecturer list changes
+        populateFilterDropdowns();
         renderTopicsList();
     }, (error) => console.error("Error listening to lecturers:", error));
 
@@ -678,8 +795,13 @@ function setupOnSnapshotListeners() {
         allTopics.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
         renderTopicsList();
     }, (error) => console.error("Error listening to topics:", error));
-}
 
+    // NEW: Student data listener
+    onSnapshot(query(studentsCol), (snapshot) => {
+        allStudents = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        console.log(`Loaded ${allStudents.length} students.`);
+    }, (error) => console.error("Error listening to students:", error));
+}
 
 // --- Global Functions for Modals ---
 window.openModal = (modalId) => document.getElementById(modalId).style.display = 'block';
