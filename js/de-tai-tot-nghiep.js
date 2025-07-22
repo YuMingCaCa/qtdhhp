@@ -1,6 +1,6 @@
 // File: js/de-tai-tot-nghiep.js
 // Logic for the "Graduation Thesis Management" module.
-// UPDATED: Added "dateOfBirth" to student import. Added modals and logic for direct management of students and internship locations.
+// UPDATED: Added class and location filters to the internship print modal.
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -589,15 +589,27 @@ function generatePrintableList() {
     printWindow.document.close();
 }
 
+// UPDATED: This function now handles advanced filtering
 function generateInternshipPrintableList() {
     const yearFilter = document.getElementById('print-year-select').value;
     const depFilter = document.getElementById('print-department-select').value;
+    const classFilter = document.getElementById('print-class-select').value;
+    const locationFilter = document.getElementById('print-location-select').value;
 
-    const filteredTopics = allTopics.filter(topic =>
-        (yearFilter && topic.academicYear === yearFilter) &&
-        (depFilter === 'all' || topic.departmentId === depFilter) &&
-        topic.status === 'taken'
+    let filteredTopics = allTopics.filter(topic =>
+        topic.status === 'taken' &&
+        (yearFilter && topic.academicYear === yearFilter)
     );
+
+    if (depFilter !== 'all') {
+        filteredTopics = filteredTopics.filter(topic => topic.departmentId === depFilter);
+    }
+    if (classFilter !== 'all') {
+        filteredTopics = filteredTopics.filter(topic => topic.studentClass === classFilter);
+    }
+    if (locationFilter !== 'all') {
+        filteredTopics = filteredTopics.filter(topic => topic.internshipLocation === locationFilter);
+    }
 
     if (filteredTopics.length === 0) {
         showAlert("Không có dữ liệu phù hợp để in.");
@@ -614,14 +626,24 @@ function generateInternshipPrintableList() {
     });
 
     const departmentName = depFilter === 'all' ? 'Toàn trường' : allDepartments.find(d => d.id === depFilter)?.name || 'Không rõ';
-    const title = `Danh sách Sinh viên Thực tập Tốt nghiệp - Năm học ${yearFilter} - Khoa ${departmentName}`;
+    const className = classFilter === 'all' ? '' : ` - Lớp ${classFilter}`;
+    const locationNameTitle = locationFilter === 'all' ? '' : ` - ${locationFilter}`;
+    const title = `Danh sách Sinh viên Thực tập Tốt nghiệp - Năm học ${yearFilter} - Khoa ${departmentName}${className}${locationNameTitle}`;
 
     let tableBodyHtml = '';
     let stt = 1;
-    for (const locationName in groupedByLocation) {
+    const sortedLocations = Object.keys(groupedByLocation).sort();
+
+    for (const locationName of sortedLocations) {
         const topicsInLocation = groupedByLocation[locationName];
         const locationDetails = allInternshipLocations.find(loc => loc.name === locationName) || {};
         
+        topicsInLocation.sort((a, b) => {
+            if (a.studentClass < b.studentClass) return -1;
+            if (a.studentClass > b.studentClass) return 1;
+            return (a.studentName || '').localeCompare(b.studentName || '');
+        });
+
         topicsInLocation.forEach((topic, index) => {
             const student = allStudents.find(s => s.studentId === topic.studentId) || {};
             const dob = student.dateOfBirth ? new Date(student.dateOfBirth).toLocaleDateString('vi-VN') : '';
@@ -664,6 +686,22 @@ function generateDetailedInternshipPrintableList() {
     const printWindow = window.open('', '_blank');
     printWindow.document.write(`<html><head><title>${title}</title><style>body{font-family:'Times New Roman',serif;font-size:12pt}table{width:100%;border-collapse:collapse}th,td{border:1px solid black;padding:8px;vertical-align:middle}th{font-weight:bold;text-align:center}.print-header{text-align:center;margin-bottom:20px}@media print{.no-print{display:none}}</style></head><body><div class="print-header"><h2>TRƯỜNG ĐẠI HỌC HẢI PHÒNG</h2><h3>${title.toUpperCase()}</h3></div><table><thead><tr><th>STT</th><th>Tên cơ sở thực tập</th><th>Địa chỉ</th><th>Điện thoại liên hệ</th><th>Ghi chú</th><th>Số sinh viên</th></tr></thead><tbody>${tableBodyHtml}</tbody></table><button onclick="window.print()" class="no-print" style="margin-top:20px;padding:10px 20px;">In</button></body></html>`);
     printWindow.document.close();
+}
+
+// --- NEW: Function to populate class filter in print modal ---
+function populatePrintClassFilter(departmentId) {
+    const classSelect = document.getElementById('print-class-select');
+    classSelect.innerHTML = '<option value="all">Tất cả Lớp</option>';
+
+    if (allStudents.length === 0) return;
+
+    let relevantStudents = allStudents;
+    if (departmentId !== 'all') {
+        relevantStudents = allStudents.filter(s => s.departmentId === departmentId);
+    }
+
+    const classes = [...new Set(relevantStudents.map(s => s.class))].sort();
+    classSelect.innerHTML += classes.map(c => `<option value="${c}">${c}</option>`).join('');
 }
 
 
@@ -924,18 +962,39 @@ function addEventListeners() {
     document.getElementById('filter-lecturer').addEventListener('change', renderTopicsList);
     document.getElementById('filter-status').addEventListener('change', renderTopicsList);
 
-    // Print listeners
-    const setupPrintModal = () => {
+    // --- UPDATED: Print listeners ---
+    const setupPrintModal = (isAdvanced = false) => {
         const yearSelect = document.getElementById('print-year-select');
         const depSelect = document.getElementById('print-department-select');
+        const classContainer = document.getElementById('print-class-filter-container');
+        const locationContainer = document.getElementById('print-location-filter-container');
+        const locationSelect = document.getElementById('print-location-select');
+
+        // Populate Year and Department always
         yearSelect.innerHTML = academicYears.map(y => `<option value="${y}" ${y === getCurrentAcademicYear() ? 'selected' : ''}>Năm học ${y}</option>`).join('');
         depSelect.innerHTML = '<option value="all">Tất cả Khoa</option>' + allDepartments.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
+
+        if (isAdvanced) {
+            // Show and populate advanced filters
+            classContainer.classList.remove('hidden');
+            locationContainer.classList.remove('hidden');
+            locationSelect.innerHTML = '<option value="all">Tất cả Cơ sở TT</option>' + allInternshipLocations.map(l => `<option value="${l.name}">${l.name}</option>`).join('');
+            
+            // Populate class filter based on department and set up listener
+            populatePrintClassFilter(depSelect.value);
+            depSelect.onchange = () => populatePrintClassFilter(depSelect.value);
+        } else {
+            // Hide advanced filters for basic print
+            classContainer.classList.add('hidden');
+            locationContainer.classList.add('hidden');
+            depSelect.onchange = null; // Remove listener
+        }
         openModal('print-modal');
     };
     
     document.getElementById('print-list-btn').addEventListener('click', (e) => {
         e.preventDefault();
-        setupPrintModal();
+        setupPrintModal(false); // Basic modal
         printMenuDropdown.classList.add('hidden');
         document.getElementById('print-form').onsubmit = (ev) => {
             ev.preventDefault();
@@ -946,11 +1005,11 @@ function addEventListeners() {
     
     document.getElementById('print-location-list-btn').addEventListener('click', (e) => {
         e.preventDefault();
-        setupPrintModal();
+        setupPrintModal(true); // Advanced modal with class/location
         printMenuDropdown.classList.add('hidden');
         document.getElementById('print-form').onsubmit = (ev) => {
             ev.preventDefault();
-            generateInternshipPrintableList();
+            generateInternshipPrintableList(); // This function is now updated to handle more filters
             closeModal('print-modal');
         };
     });
@@ -960,6 +1019,8 @@ function addEventListeners() {
         printMenuDropdown.classList.add('hidden');
         generateDetailedInternshipPrintableList();
     });
+    // --- END UPDATED Print listeners ---
+
 
     // Bulk Approval Listeners
     document.getElementById('topics-list-body').addEventListener('change', (e) => {
