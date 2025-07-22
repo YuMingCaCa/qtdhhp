@@ -19,7 +19,7 @@
             background-color: #f0f4f8;
         }
         .modal { display: none; position: fixed; z-index: 50; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5); -webkit-animation-name: fadeIn; -webkit-animation-duration: 0.4s; animation-name: fadeIn; animation-duration: 0.4s; }
-        .modal-content { background-color: #fefefe; margin: 5% auto; padding: 24px; border: 1px solid #888; width: 90%; max-width: 600px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1); -webkit-animation-name: slideIn; -webkit-animation-duration: 0.4s; animation-name: slideIn; animation-duration: 0.4s; }
+        .modal-content { background-color: #fefefe; margin: 5% auto; padding: 24px; border: 1px solid #888; width: 90%; max-width: 800px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1); -webkit-animation-name: slideIn; -webkit-animation-duration: 0.4s; animation-name: slideIn; animation-duration: 0.4s; }
         @-webkit-keyframes slideIn { from {top: -300px; opacity: 0} to {top: 0; opacity: 1} }
         @keyframes slideIn { from {margin-top: -5%; opacity: 0} to {margin-top: 5%; opacity: 1} }
         @-webkit-keyframes fadeIn { from {opacity: 0} to {opacity: 1} }
@@ -73,6 +73,13 @@
                             </div>
                         </div>
                     </div>
+                    <!-- Assignment Buttons -->
+                    <button id="assignment-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center transition-all admin-only">
+                        <i class="fas fa-user-check mr-2"></i> Phân công SV
+                    </button>
+                    <button id="bulk-assignment-btn" class="bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center transition-all admin-only">
+                        <i class="fas fa-users-cog mr-2"></i> Phân công Hàng loạt
+                    </button>
                     <button id="add-topic-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center transition-all">
                         <i class="fas fa-plus-circle mr-2"></i> Đề xuất Đề tài
                     </button>
@@ -101,11 +108,19 @@
                 </div>
             </div>
 
+            <!-- Bulk Approval Button -->
+            <div id="bulk-approve-container" class="mb-4 no-print hidden">
+                <button id="bulk-approve-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center transition-all admin-only">
+                    <i class="fas fa-check-double mr-2"></i> Duyệt các đề tài đã chọn
+                </button>
+            </div>
+
             <!-- Bảng danh sách đề tài -->
             <div class="overflow-x-auto">
                 <table class="min-w-full bg-white border border-gray-200 rounded-lg">
                     <thead class="bg-gray-100">
                         <tr>
+                            <th class="px-2 py-3 text-center w-12 no-print"><input type="checkbox" id="select-all-topics-checkbox"></th>
                             <th class="px-6 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Tên Đề tài & Sinh viên</th>
                             <th class="px-6 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Giảng viên HD</th>
                             <th class="px-6 py-3 text-center text-xs font-bold text-gray-600 uppercase tracking-wider">Trạng thái</th>
@@ -121,6 +136,91 @@
     </div>
 
     <!-- MODALS -->
+    
+    <!-- Single Assignment Modal -->
+    <div id="assignment-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button no-print" onclick="closeModal('assignment-modal')">&times;</span>
+            <h3 class="text-xl font-bold mb-4">Phân công Sinh viên Thực hiện Đề tài</h3>
+            <form id="assignment-form" class="space-y-4">
+                <div>
+                    <label for="assignment-student-select" class="block text-sm font-medium text-gray-700">1. Chọn Sinh viên (chưa được phân công)</label>
+                    <select id="assignment-student-select" required class="mt-1 block w-full p-2 border border-gray-300 rounded-md"></select>
+                </div>
+                <div>
+                    <label for="assignment-topic-select" class="block text-sm font-medium text-gray-700">2. Chọn Đề tài (đã được duyệt)</label>
+                    <select id="assignment-topic-select" required class="mt-1 block w-full p-2 border border-gray-300 rounded-md"></select>
+                </div>
+                <div>
+                    <label for="assignment-location-select" class="block text-sm font-medium text-gray-700">3. Chọn Cơ sở Thực tập</label>
+                    <select id="assignment-location-select" required class="mt-1 block w-full p-2 border border-gray-300 rounded-md"></select>
+                </div>
+                <div class="flex justify-end pt-4">
+                    <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg">
+                        <i class="fas fa-check-circle mr-2"></i>Xác nhận Phân công
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Bulk Assignment Modal -->
+    <div id="bulk-assignment-modal" class="modal">
+        <div class="modal-content max-w-4xl">
+            <span class="close-button no-print" onclick="closeModal('bulk-assignment-modal')">&times;</span>
+            <h3 class="text-xl font-bold mb-4">Phân công Sinh viên Hàng loạt</h3>
+            <form id="bulk-assignment-form" class="space-y-4">
+                <!-- Filters -->
+                <div class="p-4 border rounded-lg bg-gray-50 grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label for="bulk-assign-filter-department" class="block text-sm font-medium text-gray-700">Khoa</label>
+                        <select id="bulk-assign-filter-department" class="mt-1 block w-full p-2 border border-gray-300 rounded-md"></select>
+                    </div>
+                    <div>
+                        <label for="bulk-assign-filter-course" class="block text-sm font-medium text-gray-700">Khóa học</label>
+                        <select id="bulk-assign-filter-course" class="mt-1 block w-full p-2 border border-gray-300 rounded-md"></select>
+                    </div>
+                    <div>
+                        <label for="bulk-assign-filter-class" class="block text-sm font-medium text-gray-700">Lớp</label>
+                        <select id="bulk-assign-filter-class" class="mt-1 block w-full p-2 border border-gray-300 rounded-md"></select>
+                    </div>
+                </div>
+
+                <!-- Checklists -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <h4 class="font-semibold text-gray-800 mb-2">1. Chọn Sinh viên (<span id="selected-students-count">0</span>)</h4>
+                        <div class="border rounded-md p-2 h-64 overflow-y-auto">
+                            <div class="flex items-center mb-2"><input type="checkbox" id="select-all-students-bulk"><label for="select-all-students-bulk" class="ml-2">Chọn tất cả</label></div>
+                            <div id="bulk-assignment-student-list" class="space-y-1"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <h4 class="font-semibold text-gray-800 mb-2">2. Chọn Đề tài (<span id="selected-topics-count">0</span>)</h4>
+                        <div class="border rounded-md p-2 h-64 overflow-y-auto">
+                            <div class="flex items-center mb-2"><input type="checkbox" id="select-all-topics-bulk"><label for="select-all-topics-bulk" class="ml-2">Chọn tất cả</label></div>
+                            <div id="bulk-assignment-topic-list" class="space-y-1"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div>
+                    <label for="bulk-assignment-location-select" class="block text-sm font-medium text-gray-700">3. Chọn Cơ sở Thực tập (áp dụng cho tất cả)</label>
+                    <select id="bulk-assignment-location-select" required class="mt-1 block w-full p-2 border border-gray-300 rounded-md"></select>
+                </div>
+
+                <div class="p-3 bg-yellow-100 text-yellow-800 rounded-md text-sm">
+                    <strong>Lưu ý:</strong> Hệ thống sẽ phân công lần lượt sinh viên đầu tiên trong danh sách đã chọn với đề tài đầu tiên. Vui lòng đảm bảo số lượng sinh viên và đề tài bằng nhau.
+                </div>
+
+                <div class="flex justify-end pt-4">
+                    <button type="submit" class="bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-lg">
+                        <i class="fas fa-check-double mr-2"></i>Xác nhận Phân công Hàng loạt
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
 
     <!-- Add/Edit Topic Modal -->
     <div id="topic-modal" class="modal">
@@ -292,7 +392,7 @@
     <div id="print-modal" class="modal">
         <div class="modal-content max-w-lg">
             <span class="close-button no-print" onclick="closeModal('print-modal')">&times;</span>
-            <h3 class="text-xl font-bold mb-4">In Danh sách Đề tài</h3>
+            <h3 class="text-xl font-bold mb-4">Tùy chọn In</h3>
             <form id="print-form" class="space-y-4">
                 <div>
                     <label for="print-year-select" class="block text-sm font-medium text-gray-700">Năm học</label>

@@ -1,6 +1,6 @@
 // File: js/de-tai-tot-nghiep.js
 // Logic for the "Graduation Thesis Management" module.
-// UPDATED: Added 'notes' and 'studentCount' to internship locations and created a new detailed print format.
+// UPDATED: Added bulk assignment with filters and bulk approval features.
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -170,7 +170,7 @@ function renderTopicsList() {
     });
 
     if (filteredTopics.length === 0) {
-        listBody.innerHTML = `<tr><td colspan="4" class="text-center p-6 text-gray-500">Không có đề tài nào phù hợp với bộ lọc.</td></tr>`;
+        listBody.innerHTML = `<tr><td colspan="5" class="text-center p-6 text-gray-500">Không có đề tài nào phù hợp với bộ lọc.</td></tr>`;
         return;
     }
 
@@ -207,8 +207,13 @@ function renderTopicsList() {
                 actionButtonHtml = `<span class="text-gray-400 cursor-not-allowed" title="Không thể đăng ký đề tài này"><i class="fas fa-ban"></i></span>`;
             }
         }
+        
+        const checkboxHtml = isAdmin && topic.status === 'pending'
+            ? `<input type="checkbox" class="topic-checkbox" data-topic-id="${topic.id}">`
+            : '';
 
         row.innerHTML = `
+            <td class="px-2 py-4 text-center no-print">${checkboxHtml}</td>
             <td class="px-6 py-4">
                 <div class="font-bold text-gray-900">${topic.name}</div>
                 <div class="text-sm text-gray-500 truncate">${topic.description}</div>
@@ -351,7 +356,6 @@ function downloadTemplateForStudents() {
 }
 
 function downloadTemplateForInternshipLocations() {
-    // UPDATED: Added new fields to the template
     const headers = ["tenCoSo", "diaChi", "soDienThoai", "ghiChu", "soSinhVien"];
     const filename = "Mau_Import_CoSoThucTap.xlsx";
     const ws = XLSX.utils.json_to_sheet([{}], { header: headers });
@@ -519,7 +523,6 @@ async function handleInternshipLocationImport() {
                     const name = String(row.tenCoSo || '').trim();
                     const address = String(row.diaChi || '').trim();
                     const phone = String(row.soDienThoai || '').trim();
-                    // UPDATED: Read new fields
                     const notes = String(row.ghiChu || '').trim();
                     const studentCount = parseInt(row.soSinhVien || 0, 10);
 
@@ -624,7 +627,6 @@ function generateInternshipPrintableList() {
     printWindow.document.close();
 }
 
-// NEW: Generate detailed print list for internship locations
 function generateDetailedInternshipPrintableList() {
     if (allInternshipLocations.length === 0) {
         showAlert("Không có dữ liệu cơ sở thực tập để in.");
@@ -655,6 +657,161 @@ function addEventListeners() {
         populateModalDropdowns();
         openModal('topic-modal');
     });
+
+    document.getElementById('assignment-btn').addEventListener('click', () => {
+        const studentSelect = document.getElementById('assignment-student-select');
+        const topicSelect = document.getElementById('assignment-topic-select');
+        const locationSelect = document.getElementById('assignment-location-select');
+
+        const assignedStudentIds = new Set(allTopics.filter(t => t.status === 'taken').map(t => t.studentId));
+        const unassignedStudents = allStudents.filter(s => !assignedStudentIds.has(s.studentId));
+        const approvedTopics = allTopics.filter(t => t.status === 'approved');
+
+        if (unassignedStudents.length === 0) {
+            showAlert("Không có sinh viên nào để phân công. Vui lòng import danh sách sinh viên hoặc kiểm tra lại vì tất cả sinh viên có thể đã được phân công.");
+            return;
+        }
+        if (approvedTopics.length === 0) {
+            showAlert("Không có đề tài nào đã được duyệt và sẵn sàng để phân công. Vui lòng duyệt một số đề tài trước.");
+            return;
+        }
+        if (allInternshipLocations.length === 0) {
+            showAlert("Chưa có cơ sở thực tập nào trong hệ thống. Vui lòng import danh sách cơ sở thực tập trước.");
+            return;
+        }
+
+        studentSelect.innerHTML = '<option value="">-- Chọn Sinh viên --</option>' + 
+            unassignedStudents.map(s => `<option value="${s.id}">${s.name} (${s.studentId})</option>`).join('');
+
+        topicSelect.innerHTML = '<option value="">-- Chọn Đề tài --</option>' +
+            approvedTopics.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+
+        locationSelect.innerHTML = '<option value="">-- Chọn Cơ sở TT --</option>' +
+            allInternshipLocations.map(l => `<option value="${l.name}">${l.name}</option>`).join('');
+        
+        openModal('assignment-modal');
+    });
+
+    document.getElementById('assignment-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const studentId = document.getElementById('assignment-student-select').value;
+        const topicId = document.getElementById('assignment-topic-select').value;
+        const location = document.getElementById('assignment-location-select').value;
+
+        if (!studentId || !topicId || !location) {
+            showAlert("Vui lòng chọn đầy đủ thông tin.");
+            return;
+        }
+
+        const student = allStudents.find(s => s.id === studentId);
+        const topic = allTopics.find(t => t.id === topicId);
+        const lecturer = allLecturers.find(l => l.id === topic.lecturerId);
+
+        if (lecturer) {
+            const quota = lecturer.supervisionQuota || 5;
+            const currentTakenTopics = allTopics.filter(t => t.lecturerId === lecturer.id && t.status === 'taken').length;
+            if (currentTakenTopics >= quota) {
+                showAlert(`Giảng viên ${lecturer.name} đã đạt chỉ tiêu (${quota} SV). Không thể phân công.`);
+                return;
+            }
+        }
+
+        const updateData = {
+            status: 'taken',
+            studentName: student.name,
+            studentId: student.studentId,
+            studentClass: student.class,
+            internshipLocation: location,
+            registeredByUid: currentUserInfo.uid,
+            registeredAt: new Date().toISOString()
+        };
+
+        try {
+            await updateDoc(doc(topicsCol, topicId), updateData);
+            showAlert('Phân công sinh viên thành công!', true);
+            closeModal('assignment-modal');
+        } catch (error) {
+            showAlert(`Lỗi khi phân công: ${error.message}`);
+        }
+    });
+
+    document.getElementById('bulk-assignment-btn').addEventListener('click', () => {
+        const locationSelect = document.getElementById('bulk-assignment-location-select');
+        const deptFilter = document.getElementById('bulk-assign-filter-department');
+
+        if (allInternshipLocations.length === 0) {
+            showAlert("Chưa có cơ sở thực tập nào trong hệ thống. Vui lòng import danh sách cơ sở thực tập trước.");
+            return;
+        }
+        
+        deptFilter.innerHTML = '<option value="all">Tất cả Khoa</option>' + 
+            allDepartments.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
+        
+        locationSelect.innerHTML = '<option value="">-- Chọn Cơ sở TT --</option>' +
+            allInternshipLocations.map(l => `<option value="${l.name}">${l.name}</option>`).join('');
+        
+        populateBulkAssignFilters();
+        
+        openModal('bulk-assignment-modal');
+    });
+
+    document.getElementById('bulk-assignment-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const selectedStudentIds = Array.from(document.querySelectorAll('#bulk-assignment-student-list input:checked')).map(cb => cb.value);
+        const selectedTopicIds = Array.from(document.querySelectorAll('#bulk-assignment-topic-list input:checked')).map(cb => cb.value);
+        const location = document.getElementById('bulk-assignment-location-select').value;
+
+        if (selectedStudentIds.length === 0 || selectedTopicIds.length === 0 || !location) {
+            showAlert("Vui lòng chọn sinh viên, đề tài và cơ sở thực tập.");
+            return;
+        }
+        if (selectedStudentIds.length !== selectedTopicIds.length) {
+            showAlert("Số lượng sinh viên và đề tài được chọn phải bằng nhau.");
+            return;
+        }
+        
+        const lecturerAssignmentCounts = {};
+        for(const topicId of selectedTopicIds) {
+            const topic = allTopics.find(t => t.id === topicId);
+            lecturerAssignmentCounts[topic.lecturerId] = (lecturerAssignmentCounts[topic.lecturerId] || 0) + 1;
+        }
+
+        for(const lecturerId in lecturerAssignmentCounts) {
+            const lecturer = allLecturers.find(l => l.id === lecturerId);
+            const quota = lecturer.supervisionQuota || 5;
+            const currentTakenTopics = allTopics.filter(t => t.lecturerId === lecturer.id && t.status === 'taken').length;
+            if(currentTakenTopics + lecturerAssignmentCounts[lecturerId] > quota) {
+                showAlert(`Giảng viên ${lecturer.name} sẽ vượt quá chỉ tiêu (${quota} SV) với phân công này.`);
+                return;
+            }
+        }
+
+        showConfirm(`Bạn có chắc muốn phân công ${selectedStudentIds.length} sinh viên vào ${selectedTopicIds.length} đề tài?`, async () => {
+            const batch = writeBatch(db);
+            for(let i = 0; i < selectedStudentIds.length; i++) {
+                const student = allStudents.find(s => s.id === selectedStudentIds[i]);
+                const topicId = selectedTopicIds[i];
+                const updateData = {
+                    status: 'taken',
+                    studentName: student.name,
+                    studentId: student.studentId,
+                    studentClass: student.class,
+                    internshipLocation: location,
+                    registeredByUid: currentUserInfo.uid,
+                    registeredAt: new Date().toISOString()
+                };
+                batch.update(doc(topicsCol, topicId), updateData);
+            }
+            try {
+                await batch.commit();
+                showAlert('Phân công hàng loạt thành công!', true);
+                closeModal('bulk-assignment-modal');
+            } catch (error) {
+                showAlert(`Lỗi khi phân công: ${error.message}`);
+            }
+        });
+    });
+
 
     document.getElementById('topic-department-select').addEventListener('change', (e) => {
         updateLecturerDropdownInModal(e.target.value);
@@ -780,6 +937,56 @@ function addEventListeners() {
         printMenuDropdown.classList.add('hidden');
         generateDetailedInternshipPrintableList();
     });
+
+    // Bulk Approval Listeners
+    document.getElementById('topics-list-body').addEventListener('change', (e) => {
+        if (e.target.classList.contains('topic-checkbox')) {
+            const anyChecked = Array.from(document.querySelectorAll('.topic-checkbox:checked')).length > 0;
+            document.getElementById('bulk-approve-container').style.display = anyChecked ? 'block' : 'none';
+        }
+    });
+
+    document.getElementById('select-all-topics-checkbox').addEventListener('change', (e) => {
+        document.querySelectorAll('.topic-checkbox').forEach(cb => cb.checked = e.target.checked);
+        document.getElementById('bulk-approve-container').style.display = e.target.checked ? 'block' : 'none';
+    });
+
+    document.getElementById('bulk-approve-btn').addEventListener('click', async () => {
+        const selectedIds = Array.from(document.querySelectorAll('.topic-checkbox:checked')).map(cb => cb.dataset.topicId);
+        if (selectedIds.length === 0) {
+            showAlert("Vui lòng chọn ít nhất một đề tài để duyệt.");
+            return;
+        }
+        showConfirm(`Bạn có chắc muốn duyệt ${selectedIds.length} đề tài đã chọn?`, async () => {
+            const batch = writeBatch(db);
+            selectedIds.forEach(id => {
+                batch.update(doc(topicsCol, id), { status: 'approved' });
+            });
+            try {
+                await batch.commit();
+                showAlert('Duyệt hàng loạt thành công!', true);
+            } catch (error) {
+                showAlert(`Lỗi khi duyệt: ${error.message}`);
+            }
+        });
+    });
+
+    // Bulk Assignment Filter Listeners
+    ['bulk-assign-filter-department', 'bulk-assign-filter-course', 'bulk-assign-filter-class'].forEach(id => {
+        document.getElementById(id).addEventListener('change', populateBulkAssignFilters);
+    });
+
+    // Bulk Assignment Select All Listeners
+    document.getElementById('select-all-students-bulk').addEventListener('change', (e) => {
+        document.querySelectorAll('#bulk-assignment-student-list input').forEach(cb => cb.checked = e.target.checked);
+        updateSelectedCounts();
+    });
+    document.getElementById('select-all-topics-bulk').addEventListener('change', (e) => {
+        document.querySelectorAll('#bulk-assignment-topic-list input').forEach(cb => cb.checked = e.target.checked);
+        updateSelectedCounts();
+    });
+    document.getElementById('bulk-assignment-student-list').addEventListener('change', updateSelectedCounts);
+    document.getElementById('bulk-assignment-topic-list').addEventListener('change', updateSelectedCounts);
 }
 
 // --- Data Snapshot Listeners ---
@@ -813,6 +1020,67 @@ function setupOnSnapshotListeners() {
     onSnapshot(query(internshipLocationsCol), (snapshot) => {
         allInternshipLocations = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a, b) => a.name.localeCompare(b.name));
     }, (error) => console.error("Error listening to internship locations:", error));
+}
+
+// --- NEW Bulk Assignment Helper Functions ---
+function populateBulkAssignFilters() {
+    const deptFilter = document.getElementById('bulk-assign-filter-department').value;
+    const courseFilter = document.getElementById('bulk-assign-filter-course');
+    const classFilter = document.getElementById('bulk-assign-filter-class');
+    
+    const assignedStudentIds = new Set(allTopics.filter(t => t.status === 'taken').map(t => t.studentId));
+    let availableStudents = allStudents.filter(s => !assignedStudentIds.has(s.studentId));
+    
+    if (deptFilter !== 'all') {
+        availableStudents = availableStudents.filter(s => s.departmentId === deptFilter);
+    }
+
+    // Populate Course filter
+    const courses = [...new Set(availableStudents.map(s => s.course).filter(Boolean))].sort();
+    const currentCourse = courseFilter.value;
+    courseFilter.innerHTML = '<option value="all">Tất cả Khóa học</option>' + courses.map(c => `<option value="${c}">${c}</option>`).join('');
+    courseFilter.value = currentCourse;
+    
+    if (courseFilter.value !== 'all') {
+        availableStudents = availableStudents.filter(s => s.course === courseFilter.value);
+    }
+
+    // Populate Class filter
+    const classes = [...new Set(availableStudents.map(s => s.class).filter(Boolean))].sort();
+    const currentClass = classFilter.value;
+    classFilter.innerHTML = '<option value="all">Tất cả Lớp</option>' + classes.map(c => `<option value="${c}">${c}</option>`).join('');
+    classFilter.value = currentClass;
+
+    populateBulkAssignLists();
+}
+
+function populateBulkAssignLists() {
+    const deptFilter = document.getElementById('bulk-assign-filter-department').value;
+    const courseFilter = document.getElementById('bulk-assign-filter-course').value;
+    const classFilter = document.getElementById('bulk-assign-filter-class').value;
+    const studentListDiv = document.getElementById('bulk-assignment-student-list');
+    const topicListDiv = document.getElementById('bulk-assignment-topic-list');
+
+    const assignedStudentIds = new Set(allTopics.filter(t => t.status === 'taken').map(t => t.studentId));
+    let filteredStudents = allStudents.filter(s => !assignedStudentIds.has(s.studentId));
+    
+    if (deptFilter !== 'all') filteredStudents = filteredStudents.filter(s => s.departmentId === deptFilter);
+    if (courseFilter !== 'all') filteredStudents = filteredStudents.filter(s => s.course === courseFilter);
+    if (classFilter !== 'all') filteredStudents = filteredStudents.filter(s => s.class === classFilter);
+
+    studentListDiv.innerHTML = filteredStudents.map(s => `<div><input type="checkbox" id="student-${s.id}" value="${s.id}"><label for="student-${s.id}" class="ml-2">${s.name} (${s.studentId})</label></div>`).join('');
+
+    const approvedTopics = allTopics.filter(t => t.status === 'approved');
+    topicListDiv.innerHTML = approvedTopics.map(t => `<div><input type="checkbox" id="topic-${t.id}" value="${t.id}"><label for="topic-${t.id}" class="ml-2">${t.name}</label></div>`).join('');
+
+    updateSelectedCounts();
+}
+
+function updateSelectedCounts() {
+    const studentCount = document.querySelectorAll('#bulk-assignment-student-list input:checked').length;
+    const topicCount = document.querySelectorAll('#bulk-assignment-topic-list input:checked').length;
+    document.getElementById('selected-students-count').textContent = studentCount;
+    document.getElementById('selected-topics-count').textContent = topicCount;
 }
 
 // --- Global Functions for Modals ---
