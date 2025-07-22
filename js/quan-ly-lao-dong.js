@@ -1,10 +1,12 @@
+// File: js/quan-ly-lao-dong.js
+// Logic for the Workload Management module.
+// This file was created from the original main.js.
+
 // Import Firebase modules
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import {
     getAuth,
     onAuthStateChanged,
-    createUserWithEmailAndPassword,
-    signInWithEmailAndPassword,
     sendPasswordResetEmail,
     updatePassword,
     reauthenticateWithCredential,
@@ -27,6 +29,7 @@ import {
     where,
     deleteField
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
 
 /**
  * Injects all necessary CSS styles into the document's head.
@@ -174,23 +177,7 @@ let usersCol, departmentsCol, lecturersCol, tasksCol, entriesCol, settingsCol;
 const SETTINGS_DOC_ID = 'appSettings';
 
 // UI Elements
-const loginPage = document.getElementById('login-page');
-const moduleSelectionPage = document.getElementById('module-selection-page');
 const appContent = document.getElementById('app-content');
-const loginFormContainer = document.getElementById('login-form').parentElement;
-const registerFormContainer = document.getElementById('register-form-container');
-
-// --- Page Navigation Logic ---
-function showPage(pageIdToShow) {
-    const pages = [loginPage, moduleSelectionPage, appContent];
-    pages.forEach(page => {
-        if (page.id === pageIdToShow) {
-            page.classList.remove('hidden');
-        } else {
-            page.classList.add('hidden');
-        }
-    });
-}
 
 // --- Custom Alert/Confirm Modal Logic ---
 function showAlert(message, isSuccess = false) {
@@ -450,7 +437,6 @@ function renderLecturersList() {
             linkButtonHtml = `<button class="text-blue-500 hover:text-blue-700" title="Gắn giảng viên này vào tài khoản của bạn" onclick="window.linkLecturerToCurrentUser('${lecturer.id}')"><i class="fas fa-link fa-lg"></i></button>`;
         }
         
-        // UPDATED: Display supervisionQuota, default to 0 if not set
         const quota = lecturer.supervisionQuota || 0;
 
         row.innerHTML = `
@@ -1038,7 +1024,6 @@ window.editLecturer = (id) => {
     document.getElementById('lecturer-code').value = lecturer.code;
     document.getElementById('lecturer-department').value = lecturer.departmentId;
     document.getElementById('lecturer-phone').value = lecturer.soDienThoai || '';
-    // UPDATED: Populate quota field
     document.getElementById('lecturer-quota').value = lecturer.supervisionQuota || '';
 };
 
@@ -1297,13 +1282,11 @@ async function initializeFirebase() {
                 let userDoc = await getDoc(userDocRef);
 
                 if (!userDoc.exists()) {
-                    const allUsersSnapshot = await getDocs(usersCol);
-                    const isFirstUser = allUsersSnapshot.empty;
-                    const newUserRole = isFirstUser ? 'admin' : 'viewer';
-
+                    // This case should ideally be handled by the registration logic on the index page,
+                    // but as a fallback, we create a viewer user.
                     await setDoc(userDocRef, {
                         email: user.email,
-                        role: newUserRole,
+                        role: 'viewer',
                         createdAt: new Date()
                     });
                     userDoc = await getDoc(userDocRef);
@@ -1313,34 +1296,24 @@ async function initializeFirebase() {
                 
                 const settingsDocRef = doc(settingsCol, SETTINGS_DOC_ID);
                 const settingsDoc = await getDoc(settingsDocRef);
-                if (!settingsDoc.exists() || !settingsDoc.data().prioritySchedulerUID) {
-                    if (state.currentUser.role === 'admin') {
-                        await setDoc(settingsDocRef, { prioritySchedulerUID: user.uid }, { merge: true });
-                        state.prioritySchedulerUID = user.uid;
-                    }
-                } else {
+                if (settingsDoc.exists()) {
                     state.prioritySchedulerUID = settingsDoc.data().prioritySchedulerUID;
                 }
 
                 document.getElementById('user-email').textContent = state.currentUser.email;
-                document.getElementById('user-email-module-page').textContent = state.currentUser.email;
-
-                showPage('module-selection-page');
+                appContent.classList.remove('hidden');
 
                 updateUIForRole();
                 setupOnSnapshotListeners();
                 resetInactivityTimer();
                 setupInactivityListeners();
             } else {
-                state.currentUser = null;
-                showPage('login-page');
-                dataListenersAttached = false;
-                clearInactivityListeners();
+                // If user is not logged in, redirect to the main login page.
+                window.location.href = 'index.html';
             }
         });
 
-    } catch (error)
-    {
+    } catch (error) {
         console.error("Firebase initialization error:", error);
         showAlert(`Lỗi khởi tạo Firebase: ${error.message}`);
     }
@@ -1348,58 +1321,9 @@ async function initializeFirebase() {
 
 // --- Event Handlers ---
 function addEventListeners() {
-    // Auth form switching
-    document.getElementById('show-register-link').addEventListener('click', (e) => {
-        e.preventDefault();
-        loginFormContainer.classList.add('hidden');
-        registerFormContainer.classList.remove('hidden');
-    });
-    document.getElementById('show-login-link').addEventListener('click', (e) => {
-        e.preventDefault();
-        registerFormContainer.classList.add('hidden');
-        loginFormContainer.classList.remove('hidden');
-    });
-
     // Auth actions
-    document.getElementById('login-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const btn = e.target.querySelector('button[type="submit"]');
-        setButtonLoading(btn, true);
-        const email = document.getElementById('login-email').value;
-        const password = document.getElementById('login-password').value;
-        try {
-            await signInWithEmailAndPassword(auth, email, password);
-        } catch (error) {
-            showAlert(error.message);
-        } finally {
-            setButtonLoading(btn, false);
-        }
-    });
-    document.getElementById('register-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const btn = e.target.querySelector('button[type="submit"]');
-        setButtonLoading(btn, true);
-        const email = document.getElementById('register-email').value;
-        const password = document.getElementById('register-password').value;
-        try {
-            await createUserWithEmailAndPassword(auth, email, password);
-        } catch (error) {
-            showAlert(error.message);
-        } finally {
-            setButtonLoading(btn, false);
-        }
-    });
     document.getElementById('logout-btn').addEventListener('click', () => signOut(auth));
-    document.getElementById('logout-btn-module-page').addEventListener('click', () => signOut(auth));
     
-    // Module Navigation
-    document.getElementById('module-workload').addEventListener('click', () => {
-        showPage('app-content');
-    });
-    document.getElementById('back-to-modules-btn').addEventListener('click', () => {
-        showPage('module-selection-page');
-    });
-
     // Change Password
     document.getElementById('change-password-btn').addEventListener('click', () => {
         openModal('change-password-modal');
@@ -2108,7 +2032,6 @@ function addEventListeners() {
         const code = document.getElementById('lecturer-code').value.trim();
         const departmentId = document.getElementById('lecturer-department').value;
         const soDienThoai = document.getElementById('lecturer-phone').value.trim();
-        // UPDATED: Get supervision quota value
         const supervisionQuota = parseInt(document.getElementById('lecturer-quota').value, 10) || 0;
         
         if (!name || !code || !departmentId) { 
