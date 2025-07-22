@@ -573,17 +573,39 @@ async function handleInternshipLocationImport() {
 function generatePrintableList() {
     const yearFilter = document.getElementById('print-year-select').value;
     const depFilter = document.getElementById('print-department-select').value;
-    const filteredTopics = allTopics.filter(t => (yearFilter && t.academicYear === yearFilter) && (depFilter === 'all' || t.departmentId === depFilter) && t.status === 'taken');
+    const classFilter = document.getElementById('print-class-select').value;
+    const locationFilter = document.getElementById('print-location-select').value;
+
+    let filteredTopics = allTopics.filter(t => 
+        t.status === 'taken' &&
+        (yearFilter && t.academicYear === yearFilter)
+    );
+
+    if (depFilter !== 'all') {
+        filteredTopics = filteredTopics.filter(topic => topic.departmentId === depFilter);
+    }
+    if (classFilter !== 'all') {
+        filteredTopics = filteredTopics.filter(topic => topic.studentClass === classFilter);
+    }
+    if (locationFilter !== 'all') {
+        filteredTopics = filteredTopics.filter(topic => topic.internshipLocation === locationFilter);
+    }
+
     if (filteredTopics.length === 0) {
         showAlert("Không có dữ liệu phù hợp để in.");
         return;
     }
+
     const departmentName = depFilter === 'all' ? 'Toàn trường' : allDepartments.find(d => d.id === depFilter)?.name || 'Không rõ';
-    const title = `Danh sách Đề tài Tốt nghiệp và Nơi thực tập - Năm học ${yearFilter} - Khoa ${departmentName}`;
+    const className = classFilter === 'all' ? '' : ` - Lớp ${classFilter}`;
+    const locationNameTitle = locationFilter === 'all' ? '' : ` - ${locationFilter}`;
+    const title = `Danh sách Đề tài Tốt nghiệp - Năm học ${yearFilter} - Khoa ${departmentName}${className}${locationNameTitle}`;
+    
     let tableBodyHtml = filteredTopics.map((topic, index) => {
         const lecturer = allLecturers.find(l => l.id === topic.lecturerId);
         return `<tr><td style="text-align: center;">${index + 1}</td><td>${topic.name}</td><td>${lecturer ? lecturer.name : 'N/A'}</td><td>${topic.studentName || 'N/A'}</td><td style="text-align: center;">${topic.studentId || 'N/A'}</td><td style="text-align: center;">${topic.studentClass || 'N/A'}</td><td>${topic.internshipLocation || 'N/A'}</td></tr>`;
     }).join('');
+    
     const printWindow = window.open('', '_blank');
     printWindow.document.write(`<html><head><title>${title}</title><style>body{font-family:'Times New Roman',serif;font-size:12pt}table{width:100%;border-collapse:collapse}th,td{border:1px solid black;padding:8px}th{font-weight:bold;text-align:center}.print-header{text-align:center;margin-bottom:20px}@media print{.no-print{display:none}}</style></head><body><div class="print-header"><h2>TRƯỜNG ĐẠI HỌC HẢI PHÒNG</h2><h3>${title.toUpperCase()}</h3></div><table><thead><tr><th>STT</th><th>Tên Đề tài</th><th>GVHD</th><th>Sinh viên</th><th>MSV</th><th>Lớp</th><th>Nơi thực tập</th></tr></thead><tbody>${tableBodyHtml}</tbody></table><button onclick="window.print()" class="no-print" style="margin-top:20px;padding:10px 20px;">In</button></body></html>`);
     printWindow.document.close();
@@ -994,11 +1016,11 @@ function addEventListeners() {
     
     document.getElementById('print-list-btn').addEventListener('click', (e) => {
         e.preventDefault();
-        setupPrintModal(false); // Basic modal
+        setupPrintModal(true); // UPDATED: Always show advanced modal
         printMenuDropdown.classList.add('hidden');
         document.getElementById('print-form').onsubmit = (ev) => {
             ev.preventDefault();
-            generatePrintableList();
+            generatePrintableList(); // This function is now updated
             closeModal('print-modal');
         };
     });
