@@ -1,6 +1,6 @@
 // File: js/de-tai-tot-nghiep.js
 // Logic for the "Graduation Thesis Management" module.
-// UPDATED: Added bulk assignment with filters and bulk approval features.
+// UPDATED: Added "dateOfBirth" to student import. Added modals and logic for direct management of students and internship locations.
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -119,7 +119,7 @@ function updateUIForRole() {
     const isAdmin = currentUserInfo.role === 'admin';
 
     document.querySelectorAll('.admin-only').forEach(el => {
-        if (el.id === 'import-menu-dropdown' || el.id === 'print-menu-dropdown') {
+        if (el.id === 'import-menu-dropdown' || el.id === 'print-menu-dropdown' || el.id === 'manage-menu-dropdown') {
             if (!isAdmin) {
                 el.style.display = 'none';
             }
@@ -443,7 +443,7 @@ async function handleStudentImport() {
     reader.onload = async (e) => {
         try {
             const data = new Uint8Array(e.target.result);
-            const workbook = XLSX.read(data, { type: 'array' });
+            const workbook = XLSX.read(data, { type: 'array', cellDates: true });
             const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
             if (jsonData.length === 0) {
                 logContainer.innerHTML += '<span class="text-red-500">Lỗi: File trống.</span><br>';
@@ -457,14 +457,30 @@ async function handleStudentImport() {
                 try {
                     const studentId = String(row.maSV || '').trim();
                     const studentName = String(row.hoTen || '').trim();
-                    const dateOfBirth = String(row.ngaySinh || '').trim();
+                    let dateOfBirth = row.ngaySinh;
+                    if (dateOfBirth instanceof Date) {
+                        // Keep it as a Date object, Firestore will convert to Timestamp
+                    } else if (typeof dateOfBirth === 'string') {
+                        dateOfBirth = new Date(dateOfBirth);
+                    } else {
+                        dateOfBirth = null;
+                    }
+
                     const studentClass = String(row.lop || '').trim();
                     const departmentName = String(row.tenKhoa || '').trim().toLowerCase();
                     const course = String(row.khoaHoc || '').trim();
                     if (!studentId || !studentName || !departmentName) throw new Error("Thiếu Mã SV, Họ tên, hoặc Tên Khoa.");
                     const department = allDepartments.find(d => d.name.toLowerCase() === departmentName);
                     if (!department) throw new Error(`Không tìm thấy khoa "${row.tenKhoa}"`);
-                    const studentData = { studentId, name: studentName, dateOfBirth, class: studentClass, departmentId: department.id, course, lastUpdated: new Date().toISOString() };
+                    const studentData = { 
+                        studentId, 
+                        name: studentName, 
+                        dateOfBirth: dateOfBirth ? dateOfBirth.toISOString().split('T')[0] : null, // Store as YYYY-MM-DD string
+                        class: studentClass, 
+                        departmentId: department.id, 
+                        course, 
+                        lastUpdated: new Date().toISOString() 
+                    };
                     const existingDocs = await getDocs(query(studentsCol, where("studentId", "==", studentId)));
                     if (!existingDocs.empty) {
                         batch.update(existingDocs.docs[0].ref, studentData);
@@ -608,11 +624,12 @@ function generateInternshipPrintableList() {
         
         topicsInLocation.forEach((topic, index) => {
             const student = allStudents.find(s => s.studentId === topic.studentId) || {};
+            const dob = student.dateOfBirth ? new Date(student.dateOfBirth).toLocaleDateString('vi-VN') : '';
             tableBodyHtml += `
                 <tr>
                     <td style="text-align: center;">${stt++}</td>
                     <td>${topic.studentName || ''}</td>
-                    <td style="text-align: center;">${student.dateOfBirth || ''}</td>
+                    <td style="text-align: center;">${dob}</td>
                     <td style="text-align: center;">${topic.studentClass || ''}</td>
                     ${index === 0 ? `<td rowspan="${topicsInLocation.length}">${locationName}</td>` : ''}
                     ${index === 0 ? `<td rowspan="${topicsInLocation.length}">${locationDetails.address || ''}</td>` : ''}
@@ -870,8 +887,11 @@ function addEventListeners() {
     const printMenuDropdown = document.getElementById('print-menu-dropdown');
     const importMenuBtn = document.getElementById('import-menu-btn');
     const importMenuDropdown = document.getElementById('import-menu-dropdown');
+    const manageMenuBtn = document.getElementById('manage-menu-btn');
+    const manageMenuDropdown = document.getElementById('manage-menu-dropdown');
 
     const setupDropdown = (btn, dropdown) => {
+        if(!btn || !dropdown) return;
         btn.addEventListener('click', () => dropdown.classList.toggle('hidden'));
         window.addEventListener('click', (e) => {
             if (!btn.contains(e.target) && !dropdown.contains(e.target)) {
@@ -881,6 +901,7 @@ function addEventListeners() {
     };
     setupDropdown(printMenuBtn, printMenuDropdown);
     setupDropdown(importMenuBtn, importMenuDropdown);
+    setupDropdown(manageMenuBtn, manageMenuDropdown);
 
     // Import Listeners
     document.getElementById('import-topics-btn').addEventListener('click', (e) => { e.preventDefault(); openModal('import-data-modal'); importMenuDropdown.classList.add('hidden'); });
@@ -989,7 +1010,224 @@ function addEventListeners() {
     });
     document.getElementById('bulk-assignment-student-list').addEventListener('change', updateSelectedCounts);
     document.getElementById('bulk-assignment-topic-list').addEventListener('change', updateSelectedCounts);
+    
+    // --- NEW: Management Modal Listeners ---
+    document.getElementById('manage-students-btn').addEventListener('click', (e) => {
+        e.preventDefault();
+        openManageStudentsModal();
+        manageMenuDropdown.classList.add('hidden');
+    });
+
+    document.getElementById('manage-locations-btn').addEventListener('click', (e) => {
+        e.preventDefault();
+        openManageLocationsModal();
+        manageMenuDropdown.classList.add('hidden');
+    });
+
+    document.getElementById('student-management-form').addEventListener('submit', handleStudentFormSubmit);
+    document.getElementById('clear-student-management-form-btn').addEventListener('click', clearStudentManagementForm);
+    document.getElementById('location-management-form').addEventListener('submit', handleLocationFormSubmit);
+    document.getElementById('clear-location-management-form-btn').addEventListener('click', clearLocationManagementForm);
 }
+
+// --- NEW: Data Management Functions ---
+
+// Student Management
+function openManageStudentsModal() {
+    const depSelect = document.getElementById('student-management-department');
+    depSelect.innerHTML = '<option value="">-- Chọn Khoa --</option>' + allDepartments.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
+    clearStudentManagementForm();
+    renderStudentsForManagement();
+    openModal('manage-students-modal');
+}
+
+function renderStudentsForManagement() {
+    const listBody = document.getElementById('students-management-list-body');
+    listBody.innerHTML = '';
+    allStudents.sort((a,b) => a.name.localeCompare(b.name)).forEach(student => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td class="px-4 py-2">${student.name}</td>
+            <td class="px-4 py-2">${student.studentId}</td>
+            <td class="px-4 py-2">${student.class}</td>
+            <td class="px-4 py-2 text-center">
+                <button class="text-blue-600 hover:text-blue-900 mr-3" onclick="window.editStudentForManagement('${student.id}')" title="Sửa"><i class="fas fa-edit"></i></button>
+                <button class="text-red-600 hover:text-red-900" onclick="window.deleteStudentForManagement('${student.id}')" title="Xóa"><i class="fas fa-trash"></i></button>
+            </td>
+        `;
+        listBody.appendChild(row);
+    });
+}
+
+function clearStudentManagementForm() {
+    document.getElementById('student-management-form').reset();
+    document.getElementById('student-management-id').value = '';
+}
+
+async function handleStudentFormSubmit(e) {
+    e.preventDefault();
+    const btn = e.target.querySelector('button[type="submit"]');
+    setButtonLoading(btn, true);
+
+    const id = document.getElementById('student-management-id').value;
+    const data = {
+        name: document.getElementById('student-management-name').value.trim(),
+        studentId: document.getElementById('student-management-code').value.trim(),
+        dateOfBirth: document.getElementById('student-management-dob').value,
+        class: document.getElementById('student-management-class').value.trim(),
+        course: document.getElementById('student-management-course').value.trim(),
+        departmentId: document.getElementById('student-management-department').value,
+        lastUpdated: new Date().toISOString()
+    };
+
+    if (!data.name || !data.studentId || !data.class || !data.departmentId) {
+        showAlert("Vui lòng điền đầy đủ các trường bắt buộc.");
+        setButtonLoading(btn, false);
+        return;
+    }
+
+    try {
+        if (id) {
+            await updateDoc(doc(studentsCol, id), data);
+            showAlert('Cập nhật sinh viên thành công!', true);
+        } else {
+            const q = query(studentsCol, where("studentId", "==", data.studentId));
+            const existing = await getDocs(q);
+            if (!existing.empty) {
+                showAlert(`Lỗi: Mã sinh viên ${data.studentId} đã tồn tại.`);
+            } else {
+                await addDoc(studentsCol, data);
+                showAlert('Thêm sinh viên thành công!', true);
+            }
+        }
+        clearStudentManagementForm();
+    } catch (error) {
+        showAlert(`Lỗi khi lưu sinh viên: ${error.message}`);
+    } finally {
+        setButtonLoading(btn, false);
+    }
+}
+
+window.editStudentForManagement = (id) => {
+    const student = allStudents.find(s => s.id === id);
+    if (student) {
+        document.getElementById('student-management-id').value = student.id;
+        document.getElementById('student-management-name').value = student.name;
+        document.getElementById('student-management-code').value = student.studentId;
+        document.getElementById('student-management-dob').value = student.dateOfBirth || '';
+        document.getElementById('student-management-class').value = student.class;
+        document.getElementById('student-management-course').value = student.course;
+        document.getElementById('student-management-department').value = student.departmentId;
+    }
+}
+
+window.deleteStudentForManagement = (id) => {
+    const student = allStudents.find(s => s.id === id);
+    const isAssigned = allTopics.some(t => t.studentId === student.studentId);
+    if (isAssigned) {
+        showAlert("Không thể xóa sinh viên đã được phân công đề tài. Vui lòng hủy phân công trước.");
+        return;
+    }
+    showConfirm(`Bạn có chắc muốn xóa sinh viên ${student.name}?`, async () => {
+        try {
+            await deleteDoc(doc(studentsCol, id));
+            showAlert('Xóa sinh viên thành công!', true);
+        } catch (error) {
+            showAlert(`Lỗi khi xóa: ${error.message}`);
+        }
+    });
+}
+
+// Location Management
+function openManageLocationsModal() {
+    clearLocationManagementForm();
+    renderLocationsForManagement();
+    openModal('manage-locations-modal');
+}
+
+function renderLocationsForManagement() {
+    const listBody = document.getElementById('locations-management-list-body');
+    listBody.innerHTML = '';
+    allInternshipLocations.forEach(loc => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td class="px-4 py-2">${loc.name}</td>
+            <td class="px-4 py-2">${loc.address}</td>
+            <td class="px-4 py-2 text-center">${loc.studentCount}</td>
+            <td class="px-4 py-2 text-center">
+                <button class="text-blue-600 hover:text-blue-900 mr-3" onclick="window.editLocationForManagement('${loc.id}')" title="Sửa"><i class="fas fa-edit"></i></button>
+                <button class="text-red-600 hover:text-red-900" onclick="window.deleteLocationForManagement('${loc.id}')" title="Xóa"><i class="fas fa-trash"></i></button>
+            </td>
+        `;
+        listBody.appendChild(row);
+    });
+}
+
+function clearLocationManagementForm() {
+    document.getElementById('location-management-form').reset();
+    document.getElementById('location-management-id').value = '';
+}
+
+async function handleLocationFormSubmit(e) {
+    e.preventDefault();
+    const btn = e.target.querySelector('button[type="submit"]');
+    setButtonLoading(btn, true);
+
+    const id = document.getElementById('location-management-id').value;
+    const data = {
+        name: document.getElementById('location-management-name').value.trim(),
+        address: document.getElementById('location-management-address').value.trim(),
+        phone: document.getElementById('location-management-phone').value.trim(),
+        notes: document.getElementById('location-management-notes').value.trim(),
+        studentCount: parseInt(document.getElementById('location-management-count').value, 10) || 0,
+    };
+
+    if (!data.name) {
+        showAlert("Vui lòng nhập Tên cơ sở.");
+        setButtonLoading(btn, false);
+        return;
+    }
+
+    try {
+        if (id) {
+            await updateDoc(doc(internshipLocationsCol, id), data);
+            showAlert('Cập nhật cơ sở thành công!', true);
+        } else {
+            await addDoc(internshipLocationsCol, data);
+            showAlert('Thêm cơ sở thành công!', true);
+        }
+        clearLocationManagementForm();
+    } catch (error) {
+        showAlert(`Lỗi khi lưu cơ sở: ${error.message}`);
+    } finally {
+        setButtonLoading(btn, false);
+    }
+}
+
+window.editLocationForManagement = (id) => {
+    const loc = allInternshipLocations.find(l => l.id === id);
+    if (loc) {
+        document.getElementById('location-management-id').value = loc.id;
+        document.getElementById('location-management-name').value = loc.name;
+        document.getElementById('location-management-address').value = loc.address || '';
+        document.getElementById('location-management-phone').value = loc.phone || '';
+        document.getElementById('location-management-notes').value = loc.notes || '';
+        document.getElementById('location-management-count').value = loc.studentCount || 0;
+    }
+}
+
+window.deleteLocationForManagement = (id) => {
+    const loc = allInternshipLocations.find(l => l.id === id);
+    showConfirm(`Bạn có chắc muốn xóa cơ sở ${loc.name}?`, async () => {
+        try {
+            await deleteDoc(doc(internshipLocationsCol, id));
+            showAlert('Xóa cơ sở thành công!', true);
+        } catch (error) {
+            showAlert(`Lỗi khi xóa: ${error.message}`);
+        }
+    });
+}
+
 
 // --- Data Snapshot Listeners ---
 function setupOnSnapshotListeners() {
@@ -1017,10 +1255,12 @@ function setupOnSnapshotListeners() {
 
     onSnapshot(query(studentsCol), (snapshot) => {
         allStudents = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        renderStudentsForManagement(); // Re-render management list on change
     }, (error) => console.error("Error listening to students:", error));
 
     onSnapshot(query(internshipLocationsCol), (snapshot) => {
         allInternshipLocations = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a, b) => a.name.localeCompare(b.name));
+        renderLocationsForManagement(); // Re-render management list on change
     }, (error) => console.error("Error listening to internship locations:", error));
 }
 

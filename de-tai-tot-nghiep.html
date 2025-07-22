@@ -47,6 +47,18 @@
                     <p class="text-gray-600 mt-2">Nơi quản lý, đề xuất và theo dõi các đề tài tốt nghiệp.</p>
                 </div>
                 <div class="flex gap-2 mt-4 md:mt-0 flex-wrap">
+                    <!-- Management Dropdown -->
+                    <div class="relative inline-block admin-only">
+                        <button id="manage-menu-btn" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center transition-all">
+                            <i class="fas fa-cogs mr-2"></i> Quản lý Dữ liệu <i class="fas fa-caret-down ml-2"></i>
+                        </button>
+                        <div id="manage-menu-dropdown" class="absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 hidden z-10">
+                             <div class="py-1">
+                                <a href="#" id="manage-students-btn" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Quản lý Sinh viên</a>
+                                <a href="#" id="manage-locations-btn" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Quản lý Cơ sở TT</a>
+                            </div>
+                        </div>
+                    </div>
                     <!-- Print Buttons -->
                     <div class="relative inline-block">
                         <button id="print-menu-btn" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center transition-all">
@@ -137,6 +149,115 @@
 
     <!-- MODALS -->
     
+    <!-- Manage Students Modal -->
+    <div id="manage-students-modal" class="modal">
+        <div class="modal-content max-w-4xl">
+            <span class="close-button no-print" onclick="closeModal('manage-students-modal')">&times;</span>
+            <h3 class="text-xl font-bold mb-4">Quản lý Sinh viên</h3>
+            
+            <form id="student-management-form" class="mb-4 p-4 border rounded-lg bg-gray-50">
+                <input type="hidden" id="student-management-id">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                    <div>
+                        <label for="student-management-name" class="block text-sm font-medium text-gray-700">Họ và tên</label>
+                        <input type="text" id="student-management-name" placeholder="Nguyễn Văn A" required class="mt-1 p-2 border rounded-md w-full">
+                    </div>
+                    <div>
+                        <label for="student-management-code" class="block text-sm font-medium text-gray-700">Mã sinh viên</label>
+                        <input type="text" id="student-management-code" placeholder="78910" required class="mt-1 p-2 border rounded-md w-full">
+                    </div>
+                    <div>
+                        <label for="student-management-dob" class="block text-sm font-medium text-gray-700">Ngày sinh</label>
+                        <input type="date" id="student-management-dob" required class="mt-1 p-2 border rounded-md w-full">
+                    </div>
+                    <div>
+                        <label for="student-management-class" class="block text-sm font-medium text-gray-700">Lớp</label>
+                        <input type="text" id="student-management-class" placeholder="CNTT1-K14" required class="mt-1 p-2 border rounded-md w-full">
+                    </div>
+                    <div>
+                        <label for="student-management-course" class="block text-sm font-medium text-gray-700">Khóa học</label>
+                        <input type="text" id="student-management-course" placeholder="K14" required class="mt-1 p-2 border rounded-md w-full">
+                    </div>
+                    <div>
+                        <label for="student-management-department" class="block text-sm font-medium text-gray-700">Khoa</label>
+                        <select id="student-management-department" required class="mt-1 p-2 border rounded-md w-full"></select>
+                    </div>
+                    <div class="md:col-span-3 flex gap-2">
+                        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-md w-full">Lưu Sinh viên</button>
+                        <button type="button" id="clear-student-management-form-btn" class="bg-gray-200 hover:bg-gray-300 text-black p-2 rounded-md w-full">Làm mới</button>
+                    </div>
+                </div>
+            </form>
+
+            <div class="overflow-x-auto max-h-80">
+                <table class="min-w-full bg-white">
+                    <thead class="bg-gray-100 sticky top-0">
+                        <tr>
+                            <th class="px-4 py-2 text-left">Họ Tên</th>
+                            <th class="px-4 py-2 text-left">MSV</th>
+                            <th class="px-4 py-2 text-left">Lớp</th>
+                            <th class="px-4 py-2 text-center">Hành động</th>
+                        </tr>
+                    </thead>
+                    <tbody id="students-management-list-body"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Manage Internship Locations Modal -->
+    <div id="manage-locations-modal" class="modal">
+        <div class="modal-content max-w-4xl">
+            <span class="close-button no-print" onclick="closeModal('manage-locations-modal')">&times;</span>
+            <h3 class="text-xl font-bold mb-4">Quản lý Cơ sở Thực tập</h3>
+            
+            <form id="location-management-form" class="mb-4 p-4 border rounded-lg bg-gray-50">
+                <input type="hidden" id="location-management-id">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+                    <div>
+                        <label for="location-management-name" class="block text-sm font-medium text-gray-700">Tên cơ sở</label>
+                        <input type="text" id="location-management-name" placeholder="Công ty TNHH ABC" required class="mt-1 p-2 border rounded-md w-full">
+                    </div>
+                     <div>
+                        <label for="location-management-address" class="block text-sm font-medium text-gray-700">Địa chỉ</label>
+                        <input type="text" id="location-management-address" placeholder="Số 1, đường X, quận Y, TP Z" class="mt-1 p-2 border rounded-md w-full">
+                    </div>
+                    <div>
+                        <label for="location-management-phone" class="block text-sm font-medium text-gray-700">Số điện thoại</label>
+                        <input type="tel" id="location-management-phone" placeholder="0123456789" class="mt-1 p-2 border rounded-md w-full">
+                    </div>
+                    <div>
+                        <label for="location-management-count" class="block text-sm font-medium text-gray-700">Số SV tối đa</label>
+                        <input type="number" id="location-management-count" value="0" min="0" class="mt-1 p-2 border rounded-md w-full">
+                    </div>
+                    <div class="md:col-span-2">
+                        <label for="location-management-notes" class="block text-sm font-medium text-gray-700">Ghi chú</label>
+                        <textarea id="location-management-notes" rows="2" class="mt-1 p-2 border rounded-md w-full"></textarea>
+                    </div>
+                    <div class="md:col-span-2 flex gap-2">
+                        <button type="submit" class="bg-green-600 hover:bg-green-700 text-white p-2 rounded-md w-full">Lưu Cơ sở</button>
+                        <button type="button" id="clear-location-management-form-btn" class="bg-gray-200 hover:bg-gray-300 text-black p-2 rounded-md w-full">Làm mới</button>
+                    </div>
+                </div>
+            </form>
+
+            <div class="overflow-x-auto max-h-80">
+                <table class="min-w-full bg-white">
+                    <thead class="bg-gray-100 sticky top-0">
+                        <tr>
+                            <th class="px-4 py-2 text-left">Tên Cơ sở</th>
+                            <th class="px-4 py-2 text-left">Địa chỉ</th>
+                            <th class="px-4 py-2 text-center">Số SV</th>
+                            <th class="px-4 py-2 text-center">Hành động</th>
+                        </tr>
+                    </thead>
+                    <tbody id="locations-management-list-body"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+
     <!-- Single Assignment Modal -->
     <div id="assignment-modal" class="modal">
         <div class="modal-content">
