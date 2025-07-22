@@ -652,6 +652,8 @@ function generateDetailedInternshipPrintableList() {
 
 // --- Event Listeners ---
 function addEventListeners() {
+    console.log("Adding event listeners for thesis module..."); // Debugging line
+
     document.getElementById('add-topic-btn').addEventListener('click', () => {
         clearTopicForm();
         populateModalDropdowns();
