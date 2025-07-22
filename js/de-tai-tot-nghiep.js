@@ -1,6 +1,6 @@
 // File: js/de-tai-tot-nghiep.js
 // Logic for the "Graduation Thesis Management" module.
-// UPDATED: Added student import functionality.
+// UPDATED: Added 'notes' and 'studentCount' to internship locations and created a new detailed print format.
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -53,7 +53,7 @@ function getCurrentAcademicYear() {
 
 // --- Firebase Initialization ---
 let db, auth;
-let topicsCol, lecturersCol, departmentsCol, usersCol, settingsCol, studentsCol; // Added studentsCol
+let topicsCol, lecturersCol, departmentsCol, usersCol, settingsCol, studentsCol, internshipLocationsCol;
 let currentUserInfo = null;
 
 async function initializeFirebase() {
@@ -77,7 +77,8 @@ async function initializeFirebase() {
         departmentsCol = collection(db, `${basePath}/departments`);
         usersCol = collection(db, `${basePath}/users`);
         settingsCol = collection(db, `${basePath}/settings`);
-        studentsCol = collection(db, `${basePath}/students`); // Initialize students collection
+        studentsCol = collection(db, `${basePath}/students`);
+        internshipLocationsCol = collection(db, `${basePath}/internship_locations`);
         
         onAuthStateChanged(auth, async (user) => {
             if (user) {
@@ -107,7 +108,8 @@ async function initializeFirebase() {
 let allTopics = [];
 let allLecturers = [];
 let allDepartments = [];
-let allStudents = []; // Added students state
+let allStudents = [];
+let allInternshipLocations = [];
 let academicYears = [];
 
 // --- UI Rendering & Logic ---
@@ -115,15 +117,31 @@ let academicYears = [];
 function updateUIForRole() {
     if (!currentUserInfo) return;
     const isAdmin = currentUserInfo.role === 'admin';
-    
-    document.querySelectorAll('.admin-only').forEach(el => {
-        el.style.display = isAdmin ? 'flex' : 'none';
-    });
 
-    document.querySelectorAll('fieldset.admin-only').forEach(fs => {
-        fs.disabled = !isAdmin;
+    document.querySelectorAll('.admin-only').forEach(el => {
+        if (el.id === 'import-menu-dropdown' || el.id === 'print-menu-dropdown') {
+            if (!isAdmin) {
+                el.style.display = 'none';
+            }
+            return; 
+        }
+
+        if (el.classList.contains('relative')) {
+             el.style.display = isAdmin ? 'inline-block' : 'none';
+        } 
+        else if (el.tagName === 'BUTTON') {
+             el.style.display = isAdmin ? 'flex' : 'none';
+        }
+        else if (el.tagName === 'FIELDSET') {
+            el.style.display = isAdmin ? 'block' : 'none';
+            el.disabled = !isAdmin;
+        }
+        else {
+            el.style.display = isAdmin ? 'block' : 'none';
+        }
     });
 }
+
 
 function getStatusBadge(status) {
     switch (status) {
@@ -301,6 +319,13 @@ window.openRegisterModal = (id) => {
     if (topic) {
         document.getElementById('register-topic-id').value = id;
         document.getElementById('register-topic-name').textContent = topic.name;
+        
+        const locationSelect = document.getElementById('student-internship-location');
+        locationSelect.innerHTML = '<option value="">-- Chọn cơ sở thực tập --</option>';
+        allInternshipLocations.forEach(loc => {
+            locationSelect.innerHTML += `<option value="${loc.name}">${loc.name}</option>`;
+        });
+
         document.getElementById('student-register-form').reset();
         openModal('student-register-modal');
     }
@@ -316,10 +341,19 @@ function downloadTemplateForTopics() {
     XLSX.writeFile(wb, filename);
 }
 
-// NEW: Download template for students
 function downloadTemplateForStudents() {
-    const headers = ["maSV", "hoTen", "lop", "tenKhoa", "khoaHoc"];
+    const headers = ["maSV", "hoTen", "ngaySinh", "lop", "tenKhoa", "khoaHoc"];
     const filename = "Mau_Import_SinhVien.xlsx";
+    const ws = XLSX.utils.json_to_sheet([{}], { header: headers });
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Data");
+    XLSX.writeFile(wb, filename);
+}
+
+function downloadTemplateForInternshipLocations() {
+    // UPDATED: Added new fields to the template
+    const headers = ["tenCoSo", "diaChi", "soDienThoai", "ghiChu", "soSinhVien"];
+    const filename = "Mau_Import_CoSoThucTap.xlsx";
     const ws = XLSX.utils.json_to_sheet([{}], { header: headers });
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Data");
@@ -329,99 +363,56 @@ function downloadTemplateForStudents() {
 async function handleTopicImport() {
     const btn = document.getElementById('start-import-btn');
     setButtonLoading(btn, true);
-
     const fileInput = document.getElementById('import-file-input');
     const logContainer = document.getElementById('import-log');
     const resultsContainer = document.getElementById('import-results-container');
-    
     resultsContainer.classList.remove('hidden');
-    logContainer.innerHTML = 'Bắt đầu quá trình import...<br>';
-
+    logContainer.innerHTML = 'Bắt đầu...<br>';
     if (!fileInput.files || fileInput.files.length === 0) {
-        showAlert("Vui lòng chọn một file Excel.");
+        showAlert("Vui lòng chọn file.");
         setButtonLoading(btn, false);
         return;
     }
-
     const file = fileInput.files[0];
     const reader = new FileReader();
-
     reader.onload = async (e) => {
         try {
             const data = new Uint8Array(e.target.result);
             const workbook = XLSX.read(data, { type: 'array' });
-            const sheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[sheetName];
-            const jsonData = XLSX.utils.sheet_to_json(worksheet);
-
+            const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
             if (jsonData.length === 0) {
-                logContainer.innerHTML += '<span class="text-red-500">Lỗi: File không có dữ liệu.</span><br>';
+                logContainer.innerHTML += '<span class="text-red-500">Lỗi: File trống.</span><br>';
                 setButtonLoading(btn, false);
                 return;
             }
-
-            logContainer.innerHTML += `Đã đọc ${jsonData.length} dòng từ file. Đang xử lý...<br>`;
-
+            logContainer.innerHTML += `Đã đọc ${jsonData.length} dòng. Đang xử lý...<br>`;
             const batch = writeBatch(db);
-            let successCount = 0;
-            let errorCount = 0;
+            let successCount = 0, errorCount = 0;
             const currentYear = getCurrentAcademicYear();
-
             for (const [index, row] of jsonData.entries()) {
                 try {
                     const tenDeTai = String(row.tenDeTai || '').trim();
                     const moTa = String(row.moTa || '').trim();
                     const tenKhoa = String(row.tenKhoa || '').trim().toLowerCase();
                     const maGiangVien = String(row.maGiangVien || '').trim().toLowerCase();
-
-                    if (!tenDeTai || !moTa || !tenKhoa || !maGiangVien) {
-                        throw new Error("Thiếu thông tin bắt buộc (Tên đề tài, Mô tả, Tên khoa, Mã GV).");
-                    }
-
+                    if (!tenDeTai || !tenKhoa || !maGiangVien) throw new Error("Thiếu Tên đề tài, Tên khoa, hoặc Mã GV.");
                     const department = allDepartments.find(d => d.name.toLowerCase() === tenKhoa);
                     if (!department) throw new Error(`Không tìm thấy khoa "${row.tenKhoa}"`);
-
                     const lecturer = allLecturers.find(l => l.code.toLowerCase() === maGiangVien);
-                    if (!lecturer) throw new Error(`Không tìm thấy giảng viên có mã "${row.maGiangVien}"`);
-                    
-                    if (lecturer.departmentId !== department.id) {
-                         throw new Error(`Giảng viên "${lecturer.name}" không thuộc khoa "${department.name}"`);
-                    }
-
-                    const newTopicData = {
-                        name: tenDeTai,
-                        description: moTa,
-                        academicYear: currentYear,
-                        departmentId: department.id,
-                        lecturerId: lecturer.id,
-                        status: 'pending',
-                        proposerUid: currentUserInfo.uid,
-                        createdAt: new Date().toISOString(),
-                        lastUpdated: new Date().toISOString(),
-                    };
-
-                    const newDocRef = doc(topicsCol);
-                    batch.set(newDocRef, newTopicData);
+                    if (!lecturer) throw new Error(`Không tìm thấy GV có mã "${row.maGiangVien}"`);
+                    if (lecturer.departmentId !== department.id) throw new Error(`GV "${lecturer.name}" không thuộc khoa "${department.name}"`);
+                    const newTopicData = { name: tenDeTai, description: moTa, academicYear: currentYear, departmentId: department.id, lecturerId: lecturer.id, status: 'pending', proposerUid: currentUserInfo.uid, createdAt: new Date().toISOString(), lastUpdated: new Date().toISOString() };
+                    batch.set(doc(topicsCol), newTopicData);
                     successCount++;
-
                 } catch (rowError) {
                     errorCount++;
                     logContainer.innerHTML += `<span class="text-orange-500">- Dòng ${index + 2}: Lỗi - ${rowError.message}</span><br>`;
                 }
             }
-
-            if (successCount > 0) {
-                await batch.commit();
-            }
-            
-            logContainer.innerHTML += `<hr class="my-2">`;
-            logContainer.innerHTML += `<strong class="text-green-600">Hoàn thành!</strong><br>`;
-            logContainer.innerHTML += `<span>- Thêm mới thành công: ${successCount} đề tài.</span><br>`;
-            logContainer.innerHTML += `<span>- Bị lỗi: ${errorCount} dòng.</span><br>`;
-
+            if (successCount > 0) await batch.commit();
+            logContainer.innerHTML += `<hr class="my-2"><strong class="text-green-600">Hoàn thành!</strong><br><span>- Thành công: ${successCount}.</span><br><span>- Lỗi: ${errorCount}.</span><br>`;
         } catch (error) {
-            console.error("Import error:", error);
-            logContainer.innerHTML += `<span class="text-red-500">Đã xảy ra lỗi nghiêm trọng: ${error.message}</span><br>`;
+            logContainer.innerHTML += `<span class="text-red-500">Lỗi nghiêm trọng: ${error.message}</span><br>`;
         } finally {
             setButtonLoading(btn, false);
             fileInput.value = '';
@@ -430,105 +421,128 @@ async function handleTopicImport() {
     reader.readAsArrayBuffer(file);
 }
 
-// NEW: Handle student import
 async function handleStudentImport() {
     const btn = document.getElementById('start-student-import-btn');
     setButtonLoading(btn, true);
-
     const fileInput = document.getElementById('import-student-file-input');
     const logContainer = document.getElementById('import-student-log');
     const resultsContainer = document.getElementById('import-student-results-container');
-    
     resultsContainer.classList.remove('hidden');
-    logContainer.innerHTML = 'Bắt đầu quá trình import...<br>';
-
+    logContainer.innerHTML = 'Bắt đầu...<br>';
     if (!fileInput.files || fileInput.files.length === 0) {
-        showAlert("Vui lòng chọn một file Excel.");
+        showAlert("Vui lòng chọn file.");
         setButtonLoading(btn, false);
         return;
     }
-
     const file = fileInput.files[0];
     const reader = new FileReader();
-
     reader.onload = async (e) => {
         try {
             const data = new Uint8Array(e.target.result);
             const workbook = XLSX.read(data, { type: 'array' });
-            const sheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[sheetName];
-            const jsonData = XLSX.utils.sheet_to_json(worksheet);
-
+            const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
             if (jsonData.length === 0) {
-                logContainer.innerHTML += '<span class="text-red-500">Lỗi: File không có dữ liệu.</span><br>';
+                logContainer.innerHTML += '<span class="text-red-500">Lỗi: File trống.</span><br>';
                 setButtonLoading(btn, false);
                 return;
             }
-
-            logContainer.innerHTML += `Đã đọc ${jsonData.length} dòng từ file. Đang kiểm tra và lưu...<br>`;
-
+            logContainer.innerHTML += `Đã đọc ${jsonData.length} dòng. Đang xử lý...<br>`;
             const batch = writeBatch(db);
-            let successCount = 0;
-            let updateCount = 0;
-            let errorCount = 0;
-
+            let successCount = 0, updateCount = 0, errorCount = 0;
             for (const [index, row] of jsonData.entries()) {
                 try {
                     const studentId = String(row.maSV || '').trim();
                     const studentName = String(row.hoTen || '').trim();
+                    const dateOfBirth = String(row.ngaySinh || '').trim();
                     const studentClass = String(row.lop || '').trim();
                     const departmentName = String(row.tenKhoa || '').trim().toLowerCase();
                     const course = String(row.khoaHoc || '').trim();
-
-                    if (!studentId || !studentName || !departmentName) {
-                        throw new Error("Thiếu thông tin bắt buộc (Mã SV, Họ tên, Tên Khoa).");
-                    }
-
+                    if (!studentId || !studentName || !departmentName) throw new Error("Thiếu Mã SV, Họ tên, hoặc Tên Khoa.");
                     const department = allDepartments.find(d => d.name.toLowerCase() === departmentName);
                     if (!department) throw new Error(`Không tìm thấy khoa "${row.tenKhoa}"`);
-
-                    const studentData = {
-                        studentId,
-                        name: studentName,
-                        class: studentClass,
-                        departmentId: department.id,
-                        course,
-                        lastUpdated: new Date().toISOString(),
-                    };
-                    
-                    // Check for existing student to update instead of creating duplicates
-                    const existingStudentQuery = query(studentsCol, where("studentId", "==", studentId));
-                    const existingDocs = await getDocs(existingStudentQuery);
-
+                    const studentData = { studentId, name: studentName, dateOfBirth, class: studentClass, departmentId: department.id, course, lastUpdated: new Date().toISOString() };
+                    const existingDocs = await getDocs(query(studentsCol, where("studentId", "==", studentId)));
                     if (!existingDocs.empty) {
-                        const docRef = existingDocs.docs[0].ref;
-                        batch.update(docRef, studentData);
+                        batch.update(existingDocs.docs[0].ref, studentData);
                         updateCount++;
                     } else {
-                        const newDocRef = doc(studentsCol);
-                        batch.set(newDocRef, studentData);
+                        batch.set(doc(studentsCol), studentData);
                         successCount++;
                     }
-
                 } catch (rowError) {
                     errorCount++;
                     logContainer.innerHTML += `<span class="text-orange-500">- Dòng ${index + 2}: Lỗi - ${rowError.message}</span><br>`;
                 }
             }
-
-            if (successCount > 0 || updateCount > 0) {
-                await batch.commit();
-            }
-            
-            logContainer.innerHTML += `<hr class="my-2">`;
-            logContainer.innerHTML += `<strong class="text-green-600">Hoàn thành!</strong><br>`;
-            logContainer.innerHTML += `<span>- Thêm mới thành công: ${successCount} sinh viên.</span><br>`;
-            logContainer.innerHTML += `<span class="text-blue-600">- Cập nhật sinh viên đã có: ${updateCount} sinh viên.</span><br>`;
-            logContainer.innerHTML += `<span>- Bị lỗi: ${errorCount} dòng.</span><br>`;
-
+            if (successCount > 0 || updateCount > 0) await batch.commit();
+            logContainer.innerHTML += `<hr class="my-2"><strong class="text-green-600">Hoàn thành!</strong><br><span>- Thêm mới: ${successCount}.</span><br><span class="text-blue-600">- Cập nhật: ${updateCount}.</span><br><span>- Lỗi: ${errorCount}.</span><br>`;
         } catch (error) {
-            console.error("Student import error:", error);
-            logContainer.innerHTML += `<span class="text-red-500">Đã xảy ra lỗi nghiêm trọng: ${error.message}</span><br>`;
+            logContainer.innerHTML += `<span class="text-red-500">Lỗi nghiêm trọng: ${error.message}</span><br>`;
+        } finally {
+            setButtonLoading(btn, false);
+            fileInput.value = '';
+        }
+    };
+    reader.readAsArrayBuffer(file);
+}
+
+async function handleInternshipLocationImport() {
+    const btn = document.getElementById('start-location-import-btn');
+    setButtonLoading(btn, true);
+    const fileInput = document.getElementById('import-location-file-input');
+    const logContainer = document.getElementById('import-location-log');
+    const resultsContainer = document.getElementById('import-location-results-container');
+    resultsContainer.classList.remove('hidden');
+    logContainer.innerHTML = 'Bắt đầu...<br>';
+    if (!fileInput.files || fileInput.files.length === 0) {
+        showAlert("Vui lòng chọn file.");
+        setButtonLoading(btn, false);
+        return;
+    }
+    const file = fileInput.files[0];
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+        try {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+            if (jsonData.length === 0) {
+                logContainer.innerHTML += '<span class="text-red-500">Lỗi: File trống.</span><br>';
+                setButtonLoading(btn, false);
+                return;
+            }
+            logContainer.innerHTML += `Đã đọc ${jsonData.length} dòng. Đang xử lý...<br>`;
+            const batch = writeBatch(db);
+            let successCount = 0, updateCount = 0, errorCount = 0;
+            for (const [index, row] of jsonData.entries()) {
+                try {
+                    const name = String(row.tenCoSo || '').trim();
+                    const address = String(row.diaChi || '').trim();
+                    const phone = String(row.soDienThoai || '').trim();
+                    // UPDATED: Read new fields
+                    const notes = String(row.ghiChu || '').trim();
+                    const studentCount = parseInt(row.soSinhVien || 0, 10);
+
+                    if (!name) throw new Error("Thiếu Tên cơ sở.");
+
+                    const locationData = { name, address, phone, notes, studentCount };
+                    const existingDocs = await getDocs(query(internshipLocationsCol, where("name", "==", name)));
+                    if (!existingDocs.empty) {
+                        batch.update(existingDocs.docs[0].ref, locationData);
+                        updateCount++;
+                    } else {
+                        batch.set(doc(internshipLocationsCol), locationData);
+                        successCount++;
+                    }
+                } catch (rowError) {
+                    errorCount++;
+                    logContainer.innerHTML += `<span class="text-orange-500">- Dòng ${index + 2}: Lỗi - ${rowError.message}</span><br>`;
+                }
+            }
+            if (successCount > 0 || updateCount > 0) await batch.commit();
+            logContainer.innerHTML += `<hr class="my-2"><strong class="text-green-600">Hoàn thành!</strong><br><span>- Thêm mới: ${successCount}.</span><br><span class="text-blue-600">- Cập nhật: ${updateCount}.</span><br><span>- Lỗi: ${errorCount}.</span><br>`;
+        } catch (error) {
+            logContainer.innerHTML += `<span class="text-red-500">Lỗi nghiêm trọng: ${error.message}</span><br>`;
         } finally {
             setButtonLoading(btn, false);
             fileInput.value = '';
@@ -540,76 +554,99 @@ async function handleStudentImport() {
 function generatePrintableList() {
     const yearFilter = document.getElementById('print-year-select').value;
     const depFilter = document.getElementById('print-department-select').value;
+    const filteredTopics = allTopics.filter(t => (yearFilter && t.academicYear === yearFilter) && (depFilter === 'all' || t.departmentId === depFilter) && t.status === 'taken');
+    if (filteredTopics.length === 0) {
+        showAlert("Không có dữ liệu phù hợp để in.");
+        return;
+    }
+    const departmentName = depFilter === 'all' ? 'Toàn trường' : allDepartments.find(d => d.id === depFilter)?.name || 'Không rõ';
+    const title = `Danh sách Đề tài Tốt nghiệp và Nơi thực tập - Năm học ${yearFilter} - Khoa ${departmentName}`;
+    let tableBodyHtml = filteredTopics.map((topic, index) => {
+        const lecturer = allLecturers.find(l => l.id === topic.lecturerId);
+        return `<tr><td style="text-align: center;">${index + 1}</td><td>${topic.name}</td><td>${lecturer ? lecturer.name : 'N/A'}</td><td>${topic.studentName || 'N/A'}</td><td style="text-align: center;">${topic.studentId || 'N/A'}</td><td style="text-align: center;">${topic.studentClass || 'N/A'}</td><td>${topic.internshipLocation || 'N/A'}</td></tr>`;
+    }).join('');
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`<html><head><title>${title}</title><style>body{font-family:'Times New Roman',serif;font-size:12pt}table{width:100%;border-collapse:collapse}th,td{border:1px solid black;padding:8px}th{font-weight:bold;text-align:center}.print-header{text-align:center;margin-bottom:20px}@media print{.no-print{display:none}}</style></head><body><div class="print-header"><h2>TRƯỜNG ĐẠI HỌC HẢI PHÒNG</h2><h3>${title.toUpperCase()}</h3></div><table><thead><tr><th>STT</th><th>Tên Đề tài</th><th>GVHD</th><th>Sinh viên</th><th>MSV</th><th>Lớp</th><th>Nơi thực tập</th></tr></thead><tbody>${tableBodyHtml}</tbody></table><button onclick="window.print()" class="no-print" style="margin-top:20px;padding:10px 20px;">In</button></body></html>`);
+    printWindow.document.close();
+}
 
-    const filteredTopics = allTopics.filter(topic => {
-        if (yearFilter && topic.academicYear !== yearFilter) return false;
-        if (depFilter !== 'all' && topic.departmentId !== depFilter) return false;
-        return topic.status === 'taken';
-    });
+function generateInternshipPrintableList() {
+    const yearFilter = document.getElementById('print-year-select').value;
+    const depFilter = document.getElementById('print-department-select').value;
+
+    const filteredTopics = allTopics.filter(topic =>
+        (yearFilter && topic.academicYear === yearFilter) &&
+        (depFilter === 'all' || topic.departmentId === depFilter) &&
+        topic.status === 'taken'
+    );
 
     if (filteredTopics.length === 0) {
         showAlert("Không có dữ liệu phù hợp để in.");
         return;
     }
 
-    const departmentName = depFilter === 'all' ? 'Toàn trường' : allDepartments.find(d => d.id === depFilter)?.name || 'Không rõ';
-    const title = `Danh sách Đề tài Tốt nghiệp và Nơi thực tập - Năm học ${yearFilter} - Khoa ${departmentName}`;
-
-    let tableBodyHtml = '';
-    filteredTopics.forEach((topic, index) => {
-        const lecturer = allLecturers.find(l => l.id === topic.lecturerId);
-        tableBodyHtml += `
-            <tr>
-                <td style="text-align: center;">${index + 1}</td>
-                <td>${topic.name}</td>
-                <td>${lecturer ? lecturer.name : 'N/A'}</td>
-                <td>${topic.studentName || 'N/A'}</td>
-                <td style="text-align: center;">${topic.studentId || 'N/A'}</td>
-                <td style="text-align: center;">${topic.studentClass || 'N/A'}</td>
-                <td>${topic.internshipLocation || 'N/A'}</td>
-            </tr>
-        `;
+    const groupedByLocation = {};
+    filteredTopics.forEach(topic => {
+        const locationName = topic.internshipLocation || "Chưa xác định";
+        if (!groupedByLocation[locationName]) {
+            groupedByLocation[locationName] = [];
+        }
+        groupedByLocation[locationName].push(topic);
     });
 
+    const departmentName = depFilter === 'all' ? 'Toàn trường' : allDepartments.find(d => d.id === depFilter)?.name || 'Không rõ';
+    const title = `Danh sách Sinh viên Thực tập Tốt nghiệp - Năm học ${yearFilter} - Khoa ${departmentName}`;
+
+    let tableBodyHtml = '';
+    let stt = 1;
+    for (const locationName in groupedByLocation) {
+        const topicsInLocation = groupedByLocation[locationName];
+        const locationDetails = allInternshipLocations.find(loc => loc.name === locationName) || {};
+        
+        topicsInLocation.forEach((topic, index) => {
+            const student = allStudents.find(s => s.studentId === topic.studentId) || {};
+            tableBodyHtml += `
+                <tr>
+                    <td style="text-align: center;">${stt++}</td>
+                    <td>${topic.studentName || ''}</td>
+                    <td style="text-align: center;">${student.dateOfBirth || ''}</td>
+                    <td style="text-align: center;">${topic.studentClass || ''}</td>
+                    ${index === 0 ? `<td rowspan="${topicsInLocation.length}">${locationName}</td>` : ''}
+                    ${index === 0 ? `<td rowspan="${topicsInLocation.length}">${locationDetails.address || ''}</td>` : ''}
+                    ${index === 0 ? `<td rowspan="${topicsInLocation.length}" style="text-align: center;">${locationDetails.phone || ''}</td>` : ''}
+                </tr>
+            `;
+        });
+    }
+
     const printWindow = window.open('', '_blank');
-    printWindow.document.write(`
-        <html>
-            <head>
-                <title>${title}</title>
-                <style>
-                    body { font-family: 'Times New Roman', Times, serif; margin: 20px; font-size: 12pt; }
-                    table { width: 100%; border-collapse: collapse; }
-                    th, td { border: 1px solid black; padding: 8px; text-align: left; }
-                    th { font-weight: bold; text-align: center; }
-                    .print-header { text-align: center; margin-bottom: 20px; }
-                    @media print { .no-print { display: none; } }
-                </style>
-            </head>
-            <body>
-                <div class="print-header">
-                    <h2>TRƯỜNG ĐẠI HỌC HẢI PHÒNG</h2>
-                    <h3>${title.toUpperCase()}</h3>
-                </div>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>STT</th>
-                            <th>Tên Đề tài</th>
-                            <th>GVHD</th>
-                            <th>Sinh viên</th>
-                            <th>MSV</th>
-                            <th>Lớp</th>
-                            <th>Nơi thực tập</th>
-                        </tr>
-                    </thead>
-                    <tbody>${tableBodyHtml}</tbody>
-                </table>
-                 <button onclick="window.print()" class="no-print" style="margin-top: 20px; padding: 10px 20px;">In Danh sách</button>
-            </body>
-        </html>
-    `);
+    printWindow.document.write(`<html><head><title>${title}</title><style>body{font-family:'Times New Roman',serif;font-size:12pt}table{width:100%;border-collapse:collapse}th,td{border:1px solid black;padding:8px;vertical-align:middle}th{font-weight:bold;text-align:center}.print-header{text-align:center;margin-bottom:20px}@media print{.no-print{display:none}}</style></head><body><div class="print-header"><h2>TRƯỜNG ĐẠI HỌC HẢI PHÒNG</h2><h3>${title.toUpperCase()}</h3></div><table><thead><tr><th rowspan="2">STT</th><th rowspan="2">Họ và tên</th><th rowspan="2">Ngày sinh</th><th rowspan="2">Lớp</th><th colspan="3">Cơ sở thực tập</th></tr><tr><th>Tên cơ sở TT</th><th>Địa chỉ cơ sở TT</th><th>Số ĐT</th></tr></thead><tbody>${tableBodyHtml}</tbody></table><button onclick="window.print()" class="no-print" style="margin-top:20px;padding:10px 20px;">In</button></body></html>`);
     printWindow.document.close();
 }
+
+// NEW: Generate detailed print list for internship locations
+function generateDetailedInternshipPrintableList() {
+    if (allInternshipLocations.length === 0) {
+        showAlert("Không có dữ liệu cơ sở thực tập để in.");
+        return;
+    }
+    const title = `Danh sách Cơ sở Thực tập Tốt nghiệp`;
+    let tableBodyHtml = allInternshipLocations.map((loc, index) => `
+        <tr>
+            <td style="text-align: center;">${index + 1}</td>
+            <td>${loc.name || ''}</td>
+            <td>${loc.address || ''}</td>
+            <td style="text-align: center;">${loc.phone || ''}</td>
+            <td>${loc.notes || ''}</td>
+            <td style="text-align: center;">${loc.studentCount || 0}</td>
+        </tr>
+    `).join('');
+
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`<html><head><title>${title}</title><style>body{font-family:'Times New Roman',serif;font-size:12pt}table{width:100%;border-collapse:collapse}th,td{border:1px solid black;padding:8px;vertical-align:middle}th{font-weight:bold;text-align:center}.print-header{text-align:center;margin-bottom:20px}@media print{.no-print{display:none}}</style></head><body><div class="print-header"><h2>TRƯỜNG ĐẠI HỌC HẢI PHÒNG</h2><h3>${title.toUpperCase()}</h3></div><table><thead><tr><th>STT</th><th>Tên cơ sở thực tập</th><th>Địa chỉ</th><th>Điện thoại liên hệ</th><th>Ghi chú</th><th>Số sinh viên</th></tr></thead><tbody>${tableBodyHtml}</tbody></table><button onclick="window.print()" class="no-print" style="margin-top:20px;padding:10px 20px;">In</button></body></html>`);
+    printWindow.document.close();
+}
+
 
 // --- Event Listeners ---
 function addEventListeners() {
@@ -629,44 +666,21 @@ function addEventListeners() {
         const isAdmin = currentUserInfo.role === 'admin';
         const departmentId = document.getElementById('topic-department-select').value;
         const selfLecturer = allLecturers.find(l => l.code && currentUserInfo.email && l.code.toLowerCase() === currentUserInfo.email.split('@')[0].toLowerCase());
-
-        const data = {
-            name: document.getElementById('topic-name').value.trim(),
-            description: document.getElementById('topic-description').value.trim(),
-            academicYear: document.getElementById('topic-year-select').value,
-            departmentId: departmentId,
-            lecturerId: isAdmin ? document.getElementById('topic-lecturer-select').value : (selfLecturer ? selfLecturer.id : null),
-            status: isAdmin ? document.getElementById('topic-status-select').value : 'pending',
-            proposerUid: id ? allTopics.find(t=>t.id === id).proposerUid : currentUserInfo.uid,
-            lastUpdated: new Date().toISOString(),
-        };
-
-        if (!data.name || !data.description || !data.academicYear || !data.departmentId) {
-            showAlert("Vui lòng điền đầy đủ các trường bắt buộc.");
-            return;
-        }
-        if (isAdmin && !data.lecturerId) {
-            showAlert("Admin phải chọn một giảng viên hướng dẫn.");
-            return;
-        }
-        if (!isAdmin && !data.lecturerId) {
-            showAlert("Không thể xác định giảng viên đề xuất. Vui lòng đảm bảo thông tin giảng viên của bạn (mã GV) có trong hệ thống và khớp với email.");
-            return;
-        }
-
+        const data = { name: document.getElementById('topic-name').value.trim(), description: document.getElementById('topic-description').value.trim(), academicYear: document.getElementById('topic-year-select').value, departmentId: departmentId, lecturerId: isAdmin ? document.getElementById('topic-lecturer-select').value : (selfLecturer ? selfLecturer.id : null), status: isAdmin ? document.getElementById('topic-status-select').value : 'pending', proposerUid: id ? allTopics.find(t=>t.id === id).proposerUid : currentUserInfo.uid, lastUpdated: new Date().toISOString() };
+        if (!data.name || !data.academicYear || !data.departmentId) { showAlert("Vui lòng điền các trường bắt buộc."); return; }
+        if (isAdmin && !data.lecturerId) { showAlert("Admin phải chọn giảng viên."); return; }
+        if (!isAdmin && !data.lecturerId) { showAlert("Không thể xác định giảng viên đề xuất."); return; }
         try {
             if (id) {
                 await updateDoc(doc(topicsCol, id), data);
-                showAlert('Cập nhật đề tài thành công!', true);
+                showAlert('Cập nhật thành công!', true);
             } else {
                 data.createdAt = new Date().toISOString();
                 await addDoc(topicsCol, data);
-                showAlert('Đề xuất đề tài mới thành công!', true);
+                showAlert('Đề xuất thành công!', true);
             }
             closeModal('topic-modal');
-        } catch (error) {
-            showAlert(`Lỗi khi lưu đề tài: ${error.message}`);
-        }
+        } catch (error) { showAlert(`Lỗi: ${error.message}`); }
     });
 
     document.getElementById('student-register-form').addEventListener('submit', async (e) => {
@@ -675,96 +689,96 @@ function addEventListeners() {
         const studentName = document.getElementById('student-name').value.trim();
         const studentId = document.getElementById('student-id-input').value.trim();
         const studentClass = document.getElementById('student-class-input').value.trim();
-        const internshipLocation = document.getElementById('student-internship-location').value.trim();
-
-        if (!studentName || !studentId || !studentClass || !internshipLocation) {
-            showAlert("Vui lòng điền đầy đủ thông tin của bạn, bao gồm cả nơi thực tập.");
-            return;
-        }
-
+        const internshipLocation = document.getElementById('student-internship-location').value;
+        if (!studentName || !studentId || !studentClass || !internshipLocation) { showAlert("Vui lòng điền đầy đủ thông tin."); return; }
         const topic = allTopics.find(t => t.id === topicId);
         const lecturer = allLecturers.find(l => l.id === topic.lecturerId);
         if (lecturer) {
             const quota = lecturer.supervisionQuota || 5; 
             const currentTakenTopics = allTopics.filter(t => t.lecturerId === lecturer.id && t.status === 'taken').length;
-
-            if (currentTakenTopics >= quota) {
-                showAlert(`Giảng viên ${lecturer.name} đã đạt chỉ tiêu hướng dẫn tối đa (${quota} sinh viên). Vui lòng chọn đề tài khác.`);
-                return;
-            }
+            if (currentTakenTopics >= quota) { showAlert(`Giảng viên ${lecturer.name} đã đạt chỉ tiêu (${quota} SV).`); return; }
         }
-
-        const updateData = {
-            status: 'taken',
-            studentName,
-            studentId,
-            studentClass,
-            internshipLocation,
-            registeredByUid: currentUserInfo.uid,
-            registeredAt: new Date().toISOString()
-        };
-
+        const updateData = { status: 'taken', studentName, studentId, studentClass, internshipLocation, registeredByUid: currentUserInfo.uid, registeredAt: new Date().toISOString() };
         try {
             await updateDoc(doc(topicsCol, topicId), updateData);
-            showAlert('Đăng ký đề tài thành công!', true);
+            showAlert('Đăng ký thành công!', true);
             closeModal('student-register-modal');
-        } catch (error) {
-            showAlert(`Lỗi khi đăng ký: ${error.message}`);
-        }
+        } catch (error) { showAlert(`Lỗi: ${error.message}`); }
     });
 
-    // Import listeners
-    document.getElementById('import-topics-btn').addEventListener('click', () => {
-        document.getElementById('import-file-input').value = '';
-        document.getElementById('import-log').innerHTML = '';
-        document.getElementById('import-results-container').classList.add('hidden');
-        openModal('import-data-modal');
-    });
+    // Dropdown Menu Logic
+    const printMenuBtn = document.getElementById('print-menu-btn');
+    const printMenuDropdown = document.getElementById('print-menu-dropdown');
+    const importMenuBtn = document.getElementById('import-menu-btn');
+    const importMenuDropdown = document.getElementById('import-menu-dropdown');
+
+    const setupDropdown = (btn, dropdown) => {
+        btn.addEventListener('click', () => dropdown.classList.toggle('hidden'));
+        window.addEventListener('click', (e) => {
+            if (!btn.contains(e.target) && !dropdown.contains(e.target)) {
+                dropdown.classList.add('hidden');
+            }
+        });
+    };
+    setupDropdown(printMenuBtn, printMenuDropdown);
+    setupDropdown(importMenuBtn, importMenuDropdown);
+
+    // Import Listeners
+    document.getElementById('import-topics-btn').addEventListener('click', (e) => { e.preventDefault(); openModal('import-data-modal'); importMenuDropdown.classList.add('hidden'); });
     document.getElementById('download-template-btn').addEventListener('click', downloadTemplateForTopics);
     document.getElementById('start-import-btn').addEventListener('click', handleTopicImport);
-
-    // NEW: Student Import Listeners
-    document.getElementById('import-students-btn').addEventListener('click', () => {
-        document.getElementById('import-student-file-input').value = '';
-        document.getElementById('import-student-log').innerHTML = '';
-        document.getElementById('import-student-results-container').classList.add('hidden');
-        openModal('import-students-modal');
-    });
+    
+    document.getElementById('import-students-btn').addEventListener('click', (e) => { e.preventDefault(); openModal('import-students-modal'); importMenuDropdown.classList.add('hidden'); });
     document.getElementById('download-student-template-btn').addEventListener('click', downloadTemplateForStudents);
     document.getElementById('start-student-import-btn').addEventListener('click', handleStudentImport);
 
+    document.getElementById('import-locations-btn').addEventListener('click', (e) => { e.preventDefault(); openModal('import-locations-modal'); importMenuDropdown.classList.add('hidden'); });
+    document.getElementById('download-location-template-btn').addEventListener('click', downloadTemplateForInternshipLocations);
+    document.getElementById('start-location-import-btn').addEventListener('click', handleInternshipLocationImport);
+
     // Filter listeners
     document.getElementById('filter-department').addEventListener('change', () => {
-        const selectedDepId = document.getElementById('filter-department').value;
-        updateLecturerFilterDropdown(selectedDepId);
+        updateLecturerFilterDropdown(document.getElementById('filter-department').value);
         renderTopicsList();
     });
     document.getElementById('filter-lecturer').addEventListener('change', renderTopicsList);
     document.getElementById('filter-status').addEventListener('change', renderTopicsList);
 
     // Print listeners
-    document.getElementById('print-list-btn').addEventListener('click', () => {
+    const setupPrintModal = () => {
         const yearSelect = document.getElementById('print-year-select');
         const depSelect = document.getElementById('print-department-select');
-        
-        yearSelect.innerHTML = '';
-        academicYears.forEach(year => {
-            yearSelect.innerHTML += `<option value="${year}">Năm học ${year}</option>`;
-        });
-        yearSelect.value = getCurrentAcademicYear();
-
-        depSelect.innerHTML = '<option value="all">Tất cả Khoa</option>';
-        allDepartments.forEach(dep => {
-            depSelect.innerHTML += `<option value="${dep.id}">${dep.name}</option>`;
-        });
-
+        yearSelect.innerHTML = academicYears.map(y => `<option value="${y}" ${y === getCurrentAcademicYear() ? 'selected' : ''}>Năm học ${y}</option>`).join('');
+        depSelect.innerHTML = '<option value="all">Tất cả Khoa</option>' + allDepartments.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
         openModal('print-modal');
+    };
+    
+    document.getElementById('print-list-btn').addEventListener('click', (e) => {
+        e.preventDefault();
+        setupPrintModal();
+        printMenuDropdown.classList.add('hidden');
+        document.getElementById('print-form').onsubmit = (ev) => {
+            ev.preventDefault();
+            generatePrintableList();
+            closeModal('print-modal');
+        };
+    });
+    
+    document.getElementById('print-location-list-btn').addEventListener('click', (e) => {
+        e.preventDefault();
+        setupPrintModal();
+        printMenuDropdown.classList.add('hidden');
+        document.getElementById('print-form').onsubmit = (ev) => {
+            ev.preventDefault();
+            generateInternshipPrintableList();
+            closeModal('print-modal');
+        };
     });
 
-    document.getElementById('print-form').addEventListener('submit', (e) => {
+    document.getElementById('print-detailed-location-list-btn').addEventListener('click', (e) => {
         e.preventDefault();
-        generatePrintableList();
-        closeModal('print-modal');
+        printMenuDropdown.classList.add('hidden');
+        generateDetailedInternshipPrintableList();
     });
 }
 
@@ -772,35 +786,33 @@ function addEventListeners() {
 function setupOnSnapshotListeners() {
     onSnapshot(doc(settingsCol, 'appSettings'), (docSnapshot) => {
         const customYears = docSnapshot.exists() ? (docSnapshot.data().customYears || []) : [];
-        const allYears = new Set([getCurrentAcademicYear(), ...customYears]);
-        academicYears = Array.from(allYears).sort().reverse();
+        academicYears = Array.from(new Set([getCurrentAcademicYear(), ...customYears])).sort().reverse();
     }, (error) => console.error("Error listening to settings:", error));
 
     onSnapshot(query(departmentsCol), (snapshot) => {
-        allDepartments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        allDepartments.sort((a, b) => a.name.localeCompare(b.name));
+        allDepartments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a, b) => a.name.localeCompare(b.name));
         populateFilterDropdowns();
         renderTopicsList();
     }, (error) => console.error("Error listening to departments:", error));
 
     onSnapshot(query(lecturersCol), (snapshot) => {
-        allLecturers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        allLecturers.sort((a, b) => a.name.localeCompare(b.name));
+        allLecturers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a, b) => a.name.localeCompare(b.name));
         populateFilterDropdowns();
         renderTopicsList();
     }, (error) => console.error("Error listening to lecturers:", error));
 
     onSnapshot(query(topicsCol), (snapshot) => {
-        allTopics = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        allTopics.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+        allTopics = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
         renderTopicsList();
     }, (error) => console.error("Error listening to topics:", error));
 
-    // NEW: Student data listener
     onSnapshot(query(studentsCol), (snapshot) => {
         allStudents = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        console.log(`Loaded ${allStudents.length} students.`);
     }, (error) => console.error("Error listening to students:", error));
+
+    onSnapshot(query(internshipLocationsCol), (snapshot) => {
+        allInternshipLocations = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a, b) => a.name.localeCompare(b.name));
+    }, (error) => console.error("Error listening to internship locations:", error));
 }
 
 // --- Global Functions for Modals ---
