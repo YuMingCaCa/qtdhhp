@@ -254,9 +254,14 @@ const renderSchedule = (tasks, weekInfo, weekMetadata) => {
             let timeString = '';
             if (task.startTime) timeString = `<strong>${task.startTime.replace(':', 'h')}${task.endTime ? ` - ${task.endTime.replace(':', 'h')}` : ''}:</strong> `;
 
+            // UPDATED: Replace newlines with <br> tags to preserve formatting
+            const contentHtml = task.content
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\n/g, '<br>');
+
             row.innerHTML = `
                 ${dayCellHtml}
-                <td class="p-4 text-left align-top">${timeString}${task.content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')}</td>
+                <td class="p-4 text-left align-top">${timeString}${contentHtml}</td>
                 <td class="p-4 text-center align-top">${task.location}</td>
                 <td class="p-4 text-center align-top no-print">
                     <button data-id="${task.id}" class="edit-task-btn text-blue-500 hover:text-blue-700"><i class="fas fa-edit"></i></button>
@@ -508,8 +513,10 @@ const generateMonthlyReport = () => {
         <style>
             @page { size: A4; margin: 2cm; }
             body { font-family: 'Times New Roman', Times, serif; font-size: 13pt; line-height: 1.5; }
-            .header-table { width: 100%; border-collapse: collapse; text-align: center; }
-            .header-table td { vertical-align: top; width: 50%; }
+            .header-table { width: 100%; border-collapse: collapse; }
+            .header-left { text-align: center; vertical-align: top; width: 50%; }
+            .header-right { text-align: center; vertical-align: top; width: 50%; }
+            .underline { border-bottom: 1px solid black; display: inline-block; padding-bottom: 1px; width: 60%; }
             p { margin: 0 0 5px 0; }
             strong { font-weight: bold; }
             ul { list-style-type: none; padding-left: 0; margin: 0 0 10px 0; }
@@ -522,8 +529,14 @@ const generateMonthlyReport = () => {
         </head><body>
         <table class="header-table">
             <tr>
-                <td><p>TRƯỜNG ĐẠI HỌC HẢI PHÒNG</p><p><strong>${department.name.toUpperCase()}</strong></p></td>
-                <td><p><strong>CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</strong></p><p><strong>Độc lập – Tự do – Hạnh phúc</strong></p></td>
+                <td class="header-left">
+                    <p>TRƯỜNG ĐẠI HỌC HẢI PHÒNG</p>
+                    <p><strong>${department.name.toUpperCase()}</strong></p>
+                </td>
+                <td class="header-right">
+                    <p><strong>CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</strong></p>
+                    <p><strong class="underline">Độc lập – Tự do – Hạnh phúc</strong></p>
+                </td>
             </tr>
         </table>
         <p style="text-align:right;font-style:italic;margin-top:10px;">Hải Phòng, ngày ${formatDate(new Date())}</p>
