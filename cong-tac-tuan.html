@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quản lý Công tác tuần - ĐHHP</title>
+    <link rel="icon" type="image/png" href="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRjTnSBGofmGpcMY_uEoXhgAB-FeeLjVslu1A&s">
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8;
+        }
+        main {
+            flex-grow: 1;
+        }
+        .modal { display: none; position: fixed; z-index: 50; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5); animation: fadeIn 0.3s; align-items: center; justify-content: center;}
+        .modal-content { background-color: #fefefe; margin: auto; padding: 24px; border-radius: 12px; width: 90%; max-width: 700px; animation: slideIn 0.3s; }
+        .close-button { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
+        @keyframes fadeIn { from {opacity: 0;} to {opacity: 1;} }
+        @keyframes slideIn { from {transform: translateY(-50px); opacity: 0;} to {transform: translateY(0); opacity: 1;} }
+        
+        .printable-content ul {
+            list-style-position: inside;
+            padding-left: 1rem;
+        }
+        .printable-content ul li {
+            margin-bottom: 0.5rem;
+        }
+
+        @media print {
+            body {
+                padding: 0;
+                margin: 0;
+                background-color: #fff;
+            }
+            .no-print {
+                display: none !important;
+            }
+            main {
+                width: 100%;
+                max-width: 100%;
+                margin: 0;
+                padding: 0;
+            }
+            .printable-content {
+                display: none; /* Hide the web view on print */
+            }
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <main id="weekly-task-module-content" class="max-w-7xl mx-auto">
+        <!-- Header -->
+        <div class="bg-white p-6 rounded-2xl shadow-lg mb-8 no-print">
+            <div class="flex items-center justify-between">
+                <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRjTnSBGofmGpcMY_uEoXhgAB-FeeLjVslu1A&s" alt="Logo Trường Đại học Hải Phòng" class="h-16 md:h-20">
+                <div class="text-center">
+                    <h1 class="text-xl md:text-3xl font-bold text-blue-800">Lịch Công tác Tuần</h1>
+                    <p class="text-md md:text-lg text-gray-600">Trường Đại học Hải Phòng</p>
+                </div>
+                <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQpzh7trviplRC5G2r75APp6H3wcTnXVixU-Q&s" alt="Logo Khoa Công nghệ Thông tin" class="h-16 md:h-20">
+            </div>
+        </div>
+
+        <!-- Nút Quay lại -->
+        <a href="index.html" class="mb-6 bg-white hover:bg-gray-100 border border-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg inline-flex items-center transition-colors no-underline no-print">
+            <i class="fas fa-arrow-left mr-2"></i>
+            <span>Quay lại trang chọn hệ thống</span>
+        </a>
+
+        <!-- Nội dung chính -->
+        <div class="bg-white p-6 md:p-8 rounded-2xl shadow-lg mt-4 printable-content">
+            <!-- Bảng điều khiển -->
+            <div class="flex flex-col md:flex-row justify-between items-end mb-6 gap-4 no-print">
+                <div class="flex flex-wrap gap-4 w-full md:w-auto">
+                    <div>
+                        <label for="department-selector" class="block text-sm font-medium text-gray-700">Xem lịch của</label>
+                        <select id="department-selector" class="mt-1 p-2 border border-gray-300 rounded-md shadow-sm w-full md:w-64"></select>
+                    </div>
+                    <div>
+                        <label for="week-selector" class="block text-sm font-medium text-gray-700">Chọn tuần</label>
+                        <input type="week" id="week-selector" class="mt-1 p-2 border border-gray-300 rounded-md shadow-sm">
+                    </div>
+                </div>
+                <div class="flex gap-2 flex-shrink-0 flex-wrap">
+                    <button id="manage-monthly-info-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center transition-all">
+                        <i class="fas fa-calendar-alt mr-2"></i> TT Tháng
+                    </button>
+                    <button id="manage-week-info-btn" class="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center transition-all">
+                        <i class="fas fa-info-circle mr-2"></i> TT Tuần
+                    </button>
+                    <button id="manage-departments-btn" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center transition-all">
+                        <i class="fas fa-building mr-2"></i> QL Khoa
+                    </button>
+                    <button id="add-task-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center transition-all">
+                        <i class="fas fa-plus-circle mr-2"></i> Thêm CV
+                    </button>
+                    <button id="print-schedule-btn" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center transition-all">
+                        <i class="fas fa-print mr-2"></i> In Lịch
+                    </button>
+                </div>
+            </div>
+
+            <!-- Bảng Lịch công tác -->
+            <div class="overflow-x-auto">
+                <h2 id="schedule-title" class="text-xl font-bold text-center mb-4">LỊCH CÔNG TÁC TUẦN ... (Từ ngày ... đến ngày ...)</h2>
+                
+                <!-- Công tác trọng tâm -->
+                <div id="key-tasks-section" class="mb-6"></div>
+
+                <table class="min-w-full bg-white border border-gray-200">
+                    <thead class="bg-gray-100">
+                        <tr>
+                            <th class="px-4 py-3 text-center text-xs font-bold text-gray-600 uppercase tracking-wider w-1/6">Thứ/Ngày</th>
+                            <th class="px-4 py-3 text-center text-xs font-bold text-gray-600 uppercase tracking-wider w-4/6">Thời gian - Nội dung</th>
+                            <th class="px-4 py-3 text-center text-xs font-bold text-gray-600 uppercase tracking-wider w-1/6">Địa điểm</th>
+                            <th class="px-4 py-3 text-center text-xs font-bold text-gray-600 uppercase tracking-wider no-print">Hành động</th>
+                        </tr>
+                    </thead>
+                    <tbody id="schedule-body" class="divide-y divide-gray-200">
+                        <!-- Dữ liệu sẽ được chèn vào đây bằng JS -->
+                    </tbody>
+                </table>
+                 <div id="notes-section" class="mt-6">
+                    <!-- Ghi chú sẽ được chèn vào đây -->
+                </div>
+                <div class="flex justify-end mt-8">
+                    <div class="text-center">
+                        <p id="department-head-title" class="font-bold">TRƯỞNG KHOA</p>
+                        <p id="department-head-name" class="mt-16">PGS.TS Lê Đắc Nhường</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal Quản lý Công tác trọng tâm Tháng (NEW) -->
+    <div id="monthly-info-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" onclick="closeModal('monthly-info-modal')">&times;</span>
+            <h3 class="text-xl font-bold mb-4">Công tác trọng tâm Tháng</h3>
+            <form id="monthly-info-form" class="space-y-4">
+                <div>
+                    <label for="month-selector" class="block text-sm font-medium text-gray-700">Chọn tháng</label>
+                    <input type="month" id="month-selector" class="mt-1 p-2 border border-gray-300 rounded-md shadow-sm w-full">
+                </div>
+                <div>
+                    <label for="monthly-key-tasks-input" class="block text-sm font-medium text-gray-700">Nội dung công tác</label>
+                    <textarea id="monthly-key-tasks-input" rows="12" placeholder="Nhập nội dung công tác trọng tâm của tháng. Các dòng không bắt đầu bằng '-' sẽ được coi là tiêu đề." class="mt-1 block w-full p-2 border border-gray-300 rounded-md"></textarea>
+                </div>
+                <div class="flex justify-between items-center pt-4">
+                    <button type="button" id="print-monthly-report-btn" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg">
+                        <i class="fas fa-print mr-2"></i>In Báo cáo Tháng
+                    </button>
+                    <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg">
+                        <i class="fas fa-save mr-2"></i>Lưu Công tác Tháng
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
+    <!-- Modal Quản lý Thông tin Tuần -->
+    <div id="week-info-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" onclick="closeModal('week-info-modal')">&times;</span>
+            <h3 class="text-xl font-bold mb-4">Quản lý Thông tin Tuần</h3>
+            <form id="week-info-form" class="space-y-4">
+                <div>
+                    <label for="key-tasks-input" class="block text-sm font-medium text-gray-700">Công tác trọng tâm</label>
+                    <textarea id="key-tasks-input" rows="5" placeholder="Nhập mỗi công tác trọng tâm trên một dòng. Dòng bắt đầu bằng '-' sẽ được định dạng danh sách." class="mt-1 block w-full p-2 border border-gray-300 rounded-md"></textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Trực lãnh đạo</label>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
+                        <input type="text" id="duty-leader-2" placeholder="Thứ Hai" class="p-2 border rounded-md">
+                        <input type="text" id="duty-leader-3" placeholder="Thứ Ba" class="p-2 border rounded-md">
+                        <input type="text" id="duty-leader-4" placeholder="Thứ Tư" class="p-2 border rounded-md">
+                        <input type="text" id="duty-leader-5" placeholder="Thứ Năm" class="p-2 border rounded-md">
+                        <input type="text" id="duty-leader-6" placeholder="Thứ Sáu" class="p-2 border rounded-md">
+                        <input type="text" id="duty-leader-7" placeholder="Thứ Bảy" class="p-2 border rounded-md">
+                    </div>
+                </div>
+                 <div>
+                    <label for="notes-input" class="block text-sm font-medium text-gray-700">Ghi chú chung</label>
+                    <textarea id="notes-input" rows="5" placeholder="Nhập ghi chú chung cho cả tuần. Mỗi mục ghi chú trên một dòng." class="mt-1 block w-full p-2 border border-gray-300 rounded-md"></textarea>
+                </div>
+                <div class="flex justify-end pt-4">
+                    <button type="submit" class="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-lg">
+                        <i class="fas fa-save mr-2"></i>Lưu thông tin
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Quản lý Khoa -->
+    <div id="department-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" onclick="closeModal('department-modal')">&times;</span>
+            <h3 class="text-xl font-bold mb-4">Quản lý Khoa</h3>
+            <form id="department-form" class="mb-4 p-4 border rounded-lg bg-gray-50 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <input type="hidden" id="department-id">
+                <div class="md:col-span-2">
+                    <label for="department-name" class="block text-sm font-medium text-gray-700">Tên Khoa/Phòng ban</label>
+                    <input type="text" id="department-name" placeholder="VD: Khoa Công nghệ Thông tin" required class="mt-1 p-2 border rounded-md w-full">
+                </div>
+                <div>
+                    <label for="department-head-title-input" class="block text-sm font-medium text-gray-700">Chức vụ</label>
+                    <input type="text" id="department-head-title-input" placeholder="VD: TRƯỞNG KHOA" class="mt-1 p-2 border rounded-md w-full">
+                </div>
+                <div>
+                    <label for="department-head-name-input" class="block text-sm font-medium text-gray-700">Tên Trưởng đơn vị</label>
+                    <input type="text" id="department-head-name-input" placeholder="VD: PGS.TS Lê Đắc Nhường" class="mt-1 p-2 border rounded-md w-full">
+                </div>
+                <div class="md:col-span-2 flex justify-end">
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-md px-4">Lưu</button>
+                </div>
+            </form>
+            <div class="overflow-x-auto max-h-80">
+                <table class="min-w-full bg-white">
+                    <thead class="bg-gray-100 sticky top-0">
+                        <tr>
+                            <th class="px-4 py-2 text-left">Tên Khoa</th>
+                            <th class="px-4 py-2 text-left">Trưởng đơn vị</th>
+                            <th class="px-4 py-2 text-center">Hành động</th>
+                        </tr>
+                    </thead>
+                    <tbody id="departments-list-body"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Thêm/Sửa công việc -->
+    <div id="task-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" id="close-task-modal">&times;</span>
+            <h3 id="task-modal-title" class="text-xl font-bold mb-4">Thêm công việc mới</h3>
+            <form id="task-form" class="space-y-4">
+                <input type="hidden" id="task-id">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="md:col-span-1">
+                        <label for="task-date" class="block text-sm font-medium text-gray-700">Ngày</label>
+                        <input type="date" id="task-date" required class="mt-1 block w-full p-2 border border-gray-300 rounded-md">
+                    </div>
+                    <div class="md:col-span-1">
+                        <label for="task-start-time" class="block text-sm font-medium text-gray-700">Bắt đầu</label>
+                        <input type="time" id="task-start-time" class="mt-1 block w-full p-2 border border-gray-300 rounded-md">
+                    </div>
+                    <div class="md:col-span-1">
+                        <label for="task-end-time" class="block text-sm font-medium text-gray-700">Kết thúc</label>
+                        <input type="time" id="task-end-time" class="mt-1 block w-full p-2 border border-gray-300 rounded-md">
+                    </div>
+                </div>
+                <div>
+                    <label for="task-content" class="block text-sm font-medium text-gray-700">Nội dung (dùng **chữ** để in đậm)</label>
+                    <textarea id="task-content" rows="4" required placeholder="VD: **Họp giao ban:** Hoàn tất công tác..." class="mt-1 block w-full p-2 border border-gray-300 rounded-md"></textarea>
+                </div>
+                <div>
+                    <label for="task-location" class="block text-sm font-medium text-gray-700">Địa điểm</label>
+                    <input type="text" id="task-location" required class="mt-1 block w-full p-2 border border-gray-300 rounded-md">
+                </div>
+                <div class="flex justify-end pt-4">
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">
+                        <i class="fas fa-save mr-2"></i>Lưu công việc
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Alert & Confirm Modals -->
+    <div id="alert-modal" class="modal">
+        <div class="modal-content !max-w-sm">
+             <h3 id="alert-title" class="text-lg font-bold mb-4">Thông báo</h3>
+            <p id="alert-message" class="mb-6"></p>
+            <div class="flex justify-end">
+                <button id="alert-ok-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">OK</button>
+            </div>
+        </div>
+    </div>
+    <div id="confirm-modal" class="modal">
+        <div class="modal-content !max-w-sm">
+            <h3 class="text-lg font-bold mb-4">Xác nhận</h3>
+            <p id="confirm-message" class="mb-6"></p>
+            <div class="flex justify-end gap-3">
+                <button id="confirm-btn-no" class="bg-gray-200 hover:bg-gray-300 text-black font-bold py-2 px-4 rounded-lg">Hủy</button>
+                <button id="confirm-btn-yes" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg">Xác nhận</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Footer -->
+    <footer class="mt-8 text-center text-sm text-gray-500 no-print">
+        <div class="max-w-7xl mx-auto py-4 border-t border-gray-200">
+            <p>&copy; 2025 Bản quyền thuộc về Khoa Công nghệ Thông tin - Trường Đại học Hải Phòng.</p>
+        </div>
+    </footer>
+
+    <!-- Liên kết tới tệp JS -->
+    <script type="module" src="js/cong-tac-tuan.js"></script>
+</body>
+</html>
