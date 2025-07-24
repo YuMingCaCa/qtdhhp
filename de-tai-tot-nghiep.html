@@ -15,8 +15,14 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         body {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
             font-family: 'Inter', sans-serif;
             background-color: #f0f4f8;
+        }
+        main {
+            flex-grow: 1;
         }
         .modal { display: none; position: fixed; z-index: 50; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5); -webkit-animation-name: fadeIn; -webkit-animation-duration: 0.4s; animation-name: fadeIn; animation-duration: 0.4s; }
         .modal-content { background-color: #fefefe; margin: 5% auto; padding: 24px; border: 1px solid #888; width: 90%; max-width: 800px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1); -webkit-animation-name: slideIn; -webkit-animation-duration: 0.4s; animation-name: slideIn; animation-duration: 0.4s; }
@@ -31,8 +37,19 @@
     </style>
 </head>
 <body class="p-4 md:p-8">
-    <!-- Main content is hidden by default, shown by JS after auth check -->
-    <div id="thesis-module-content" class="max-w-7xl mx-auto hidden">
+    <main id="thesis-module-content" class="max-w-7xl mx-auto hidden">
+        <!-- NEW Header -->
+        <div class="bg-white p-6 rounded-2xl shadow-lg mb-8 no-print">
+            <div class="flex items-center justify-between">
+                <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRjTnSBGofmGpcMY_uEoXhgAB-FeeLjVslu1A&s" alt="Logo Trường Đại học Hải Phòng" class="h-16 md:h-20">
+                <div class="text-center">
+                    <h1 class="text-xl md:text-3xl font-bold text-blue-800">Quản lý Đề tài Tốt nghiệp</h1>
+                    <p class="text-md md:text-lg text-gray-600">Trường Đại học Hải Phòng</p>
+                </div>
+                <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQpzh7trviplRC5G2r75APp6H3wcTnXVixU-Q&s" alt="Logo Khoa Công nghệ Thông tin" class="h-16 md:h-20">
+            </div>
+        </div>
+
         <!-- Nút Quay lại -->
         <a href="index.html" class="mb-6 bg-white hover:bg-gray-100 border border-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg inline-flex items-center transition-colors no-underline no-print">
             <i class="fas fa-arrow-left mr-2"></i>
@@ -45,8 +62,8 @@
             <div class="mb-8 no-print">
                 <!-- Title and Description -->
                 <div>
-                    <h1 class="text-3xl font-bold text-gray-800">Quản lý Đề tài Tốt nghiệp</h1>
-                    <p class="text-gray-600 mt-2">Nơi quản lý, đề xuất và theo dõi các đề tài tốt nghiệp.</p>
+                    <h2 class="text-2xl font-bold text-gray-800">Bảng điều khiển</h2>
+                    <p class="text-gray-600 mt-1">Nơi quản lý, đề xuất và theo dõi các đề tài tốt nghiệp.</p>
                 </div>
                 
                 <!-- Action Buttons -->
@@ -149,7 +166,7 @@
                 </table>
             </div>
         </div>
-    </div>
+    </main>
 
     <!-- MODALS -->
     
@@ -565,6 +582,13 @@
             </div>
         </div>
     </div>
+    
+    <!-- NEW: Footer -->
+    <footer class="mt-8 text-center text-sm text-gray-500 no-print">
+        <div class="max-w-7xl mx-auto py-4 border-t border-gray-200">
+            <p>&copy; 2025 Bản quyền thuộc về Khoa Công nghệ Thông tin - Trường Đại học Hải Phòng.</p>
+        </div>
+    </footer>
 
     <!-- Liên kết tới tệp JS riêng của module này -->
     <script type="module" src="js/de-tai-tot-nghiep.js"></script>
