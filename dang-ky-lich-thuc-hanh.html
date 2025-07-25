@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRjTnSBGofmGpcMY_uEoXhgAB-FeeLjVslu1A&s">
+    <title>Đăng ký Lịch thực hành - ĐHHP</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f0f4f8; }
+        .modal { display: none; position: fixed; z-index: 50; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.6); animation: fadeIn 0.3s; }
+        .modal-content { background-color: #fefefe; margin: 5% auto; padding: 24px; border-radius: 12px; width: 90%; max-width: 550px; animation: slideIn 0.3s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideIn { from { transform: translateY(-30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        
+        /* Schedule Grid Styles */
+        .schedule-grid th, .schedule-grid td { border: 1px solid #e5e7eb; padding: 0; }
+        .schedule-grid .time-slot { font-weight: 600; background-color: #f9fafb; padding: 0.75rem 0.5rem; text-align: center; }
+        .schedule-grid .day-header { font-weight: 600; padding: 0.75rem; text-align: center; }
+        .schedule-grid .book-slot { height: 100px; vertical-align: top; padding: 6px; cursor: pointer; transition: background-color 0.2s; }
+        .schedule-grid .book-slot:hover { background-color: #eff6ff; }
+
+        /* Booking Status Colors */
+        .slot-pending { background-color: #fef9c3; border-left: 4px solid #facc15; }
+        .slot-approved { background-color: #dcfce7; border-left: 4px solid #4ade80; }
+        .slot-rejected { background-color: #fee2e2; border-left: 4px solid #f87171; }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div class="max-w-screen-2xl mx-auto">
+        <a href="index.html" class="mb-6 bg-white hover:bg-gray-100 text-gray-800 font-bold py-2 px-4 rounded-lg inline-flex items-center transition-colors no-underline">
+            <i class="fas fa-arrow-left mr-2"></i>
+            <span>Quay lại trang chọn hệ thống</span>
+        </a>
+
+        <div class="bg-white p-6 rounded-2xl shadow-lg">
+            <!-- Header & Controls -->
+            <div class="flex flex-col md:flex-row items-center justify-between mb-6 pb-4 border-b gap-4">
+                <h1 class="text-2xl md:text-3xl font-bold text-gray-800">Đăng ký Lịch thực hành</h1>
+                
+                <!-- Controls -->
+                <div class="flex items-center gap-4">
+                    <!-- Week Navigation -->
+                    <div class="flex items-center justify-center gap-2">
+                        <button id="prev-week-btn" class="p-3 bg-gray-100 hover:bg-gray-200 rounded-lg" title="Tuần trước"><i class="fas fa-chevron-left"></i></button>
+                        <div class="text-center w-40">
+                            <h3 id="week-title" class="text-lg font-semibold text-gray-800">Tuần ...</h3>
+                            <p id="week-dates" class="text-sm text-gray-600">...</p>
+                        </div>
+                        <button id="next-week-btn" class="p-3 bg-gray-100 hover:bg-gray-200 rounded-lg" title="Tuần sau"><i class="fas fa-chevron-right"></i></button>
+                    </div>
+                    
+                    <!-- Filters & Admin Actions -->
+                    <div>
+                        <label for="room-filter" class="sr-only">Lọc theo phòng</label>
+                        <select id="room-filter" class="p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-teal-500 focus:border-teal-500"></select>
+                    </div>
+                    <button id="manage-rooms-btn" class="admin-only p-3 bg-orange-100 text-orange-600 hover:bg-orange-200 rounded-lg" title="Quản lý phòng">
+                        <i class="fas fa-door-open"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Schedule Grid -->
+            <div id="schedule-container" class="overflow-x-auto">
+                <div id="loading-indicator" class="text-center p-12 text-gray-500">
+                    <i class="fas fa-spinner fa-spin fa-3x"></i>
+                    <p class="mt-4 text-lg">Đang tải lịch...</p>
+                </div>
+                <table id="schedule-grid-table" class="schedule-grid min-w-full hidden">
+                    <thead>
+                        <tr>
+                            <th class="time-slot">Ca</th>
+                            <th class="day-header">Thứ 2</th>
+                            <th class="day-header">Thứ 3</th>
+                            <th class="day-header">Thứ 4</th>
+                            <th class="day-header">Thứ 5</th>
+                            <th class="day-header">Thứ 6</th>
+                            <th class="day-header">Thứ 7</th>
+                            <th class="day-header">Chủ nhật</th>
+                        </tr>
+                    </thead>
+                    <tbody id="schedule-grid-body">
+                        <!-- Grid will be generated by JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Booking/Details Modal -->
+    <div id="booking-modal" class="modal">
+        <div class="modal-content">
+            <div class="flex justify-between items-center mb-4">
+                <h3 id="booking-modal-title" class="text-xl font-bold">Đăng ký Lịch thực hành</h3>
+                <button id="close-booking-modal-btn" class="text-gray-500 hover:text-gray-800 text-2xl">&times;</button>
+            </div>
+            
+            <!-- Booking Form -->
+            <form id="booking-form" class="space-y-4">
+                <input type="hidden" id="booking-id">
+                <input type="hidden" id="slot-date">
+                <input type="hidden" id="slot-session">
+                <input type="hidden" id="slot-shift">
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Phòng: <strong id="form-room-name" class="text-teal-700"></strong></label>
+                    <label class="block text-sm font-medium text-gray-700">Thời gian: <strong id="form-slot-time" class="text-teal-700"></strong></label>
+                </div>
+                
+                <div>
+                    <label for="booking-lecturer" class="block text-sm font-medium text-gray-700">Giảng viên đăng ký</label>
+                    <input type="text" id="booking-lecturer" readonly class="mt-1 bg-gray-100 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm">
+                </div>
+                
+                <div>
+                    <label for="booking-class-name" class="block text-sm font-medium text-gray-700">Lớp - Mã học phần</label>
+                    <input type="text" id="booking-class-name" placeholder="VD: CNTT K25.1 - 123456" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm">
+                </div>
+
+                <div>
+                    <label for="booking-subject" class="block text-sm font-medium text-gray-700">Tên học phần</label>
+                    <input type="text" id="booking-subject" placeholder="VD: Lập trình Web" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm">
+                </div>
+                
+                <div>
+                    <label for="booking-notes" class="block text-sm font-medium text-gray-700">Ghi chú</label>
+                    <textarea id="booking-notes" rows="2" placeholder="Yêu cầu thêm (nếu có)" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"></textarea>
+                </div>
+
+                <!-- User Actions -->
+                <div id="user-actions" class="flex justify-end gap-3 pt-4 border-t">
+                    <button type="button" id="delete-booking-btn" class="hidden bg-red-100 text-red-700 hover:bg-red-200 font-bold py-2 px-4 rounded-lg">Hủy Đăng ký</button>
+                    <button type="submit" id="submit-booking-btn" class="bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-lg">Gửi Đăng ký</button>
+                </div>
+            </form>
+
+            <!-- Details View (for existing bookings) -->
+            <div id="booking-details" class="hidden space-y-3">
+                 <div class="p-3 rounded-lg" id="details-status-badge">
+                    <p class="font-bold text-lg">Trạng thái: <span id="details-status"></span></p>
+                 </div>
+                 <p><strong>Phòng:</strong> <span id="details-room"></span></p>
+                 <p><strong>Thời gian:</strong> <span id="details-time"></span></p>
+                 <p><strong>Giảng viên:</strong> <span id="details-lecturer"></span></p>
+                 <p><strong>Lớp - Mã HP:</strong> <span id="details-class-name"></span></p>
+                 <p><strong>Học phần:</strong> <span id="details-subject"></span></p>
+                 <p><strong>Ghi chú:</strong> <span id="details-notes"></span></p>
+                 <p class="text-xs text-gray-500"><strong>ID:</strong> <span id="details-booking-id"></span></p>
+
+                 <!-- Admin Actions -->
+                 <div id="admin-actions" class="admin-only hidden flex justify-end gap-3 pt-4 border-t">
+                    <button id="reject-booking-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg">Từ chối</button>
+                    <button id="approve-booking-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg">Duyệt</button>
+                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Room Management Modal -->
+    <div id="room-management-modal" class="modal">
+        <div class="modal-content">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold">Quản lý Phòng thực hành</h3>
+                <button id="close-room-modal-btn" class="text-gray-500 hover:text-gray-800 text-2xl">&times;</button>
+            </div>
+
+            <!-- Add/Edit Room Form -->
+            <form id="room-form" class="space-y-4 p-4 border rounded-lg bg-gray-50 mb-4">
+                <input type="hidden" id="room-id">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="room-name" class="block text-sm font-medium text-gray-700">Tên phòng</label>
+                        <input type="text" id="room-name" placeholder="VD: C4.1" required class="mt-1 block w-full px-3 py-2 border-gray-300 rounded-md">
+                    </div>
+                    <div>
+                         <label for="room-status" class="block text-sm font-medium text-gray-700">Trạng thái</label>
+                        <select id="room-status" class="mt-1 block w-full px-3 py-2 border-gray-300 rounded-md">
+                            <option value="active">Hoạt động</option>
+                            <option value="maintenance">Bảo trì</option>
+                        </select>
+                    </div>
+                    <div class="md:col-span-2">
+                        <label for="room-description" class="block text-sm font-medium text-gray-700">Mô tả</label>
+                        <input type="text" id="room-description" placeholder="VD: Phòng thực hành Tin học cơ sở" class="mt-1 block w-full px-3 py-2 border-gray-300 rounded-md">
+                    </div>
+                </div>
+                <div class="flex justify-end">
+                    <button type="submit" class="bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded-lg">Lưu phòng</button>
+                </div>
+            </form>
+
+            <!-- Rooms List -->
+            <div id="rooms-list-container" class="max-h-64 overflow-y-auto">
+                <!-- List generated by JS -->
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="js/dang-ky-lich-thuc-hanh.js"></script>
+</body>
+</html>

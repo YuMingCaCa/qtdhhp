@@ -1,6 +1,6 @@
 // Import các hàm cần thiết từ Firebase SDK
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import { getFirestore, collection, addDoc, doc, getDoc, setDoc, updateDoc, deleteDoc, onSnapshot, query, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 // --- CẤU HÌNH FIREBASE ---
@@ -20,10 +20,11 @@ const auth = getAuth(app);
 // --- ĐỊNH NGHĨA ĐƯỜNG DẪN DỮ LIỆU ---
 const appId = firebaseConfig.projectId || 'hpu-workload-tracker-app';
 const basePath = `artifacts/${appId}/public/data`;
+const usersCol = collection(db, `${basePath}/users`);
 const departmentsCol = collection(db, `${basePath}/departments`);
 const weeklyTasksCol = collection(db, `${basePath}/weekly_tasks`);
 const weeklyInfoCol = collection(db, `${basePath}/weekly_info`);
-const monthlyInfoCol = collection(db, `${basePath}/monthly_info`); // NEW: Collection for monthly tasks
+const monthlyInfoCol = collection(db, `${basePath}/monthly_info`);
 
 // --- LẤY CÁC PHẦN TỬ GIAO DIỆN ---
 const mainContent = document.getElementById('weekly-task-module-content');
@@ -39,7 +40,7 @@ const addTaskBtn = document.getElementById('add-task-btn');
 const printScheduleBtn = document.getElementById('print-schedule-btn');
 const manageDepartmentsBtn = document.getElementById('manage-departments-btn');
 const manageWeekInfoBtn = document.getElementById('manage-week-info-btn');
-const manageMonthlyInfoBtn = document.getElementById('manage-monthly-info-btn'); // NEW
+const manageMonthlyInfoBtn = document.getElementById('manage-monthly-info-btn');
 
 // Modal công việc
 const taskModal = document.getElementById('task-modal');
@@ -68,7 +69,7 @@ const weekInfoForm = document.getElementById('week-info-form');
 const keyTasksInput = document.getElementById('key-tasks-input');
 const notesInput = document.getElementById('notes-input');
 
-// NEW: Modal Công tác Tháng
+// Modal Công tác Tháng
 const monthlyInfoModal = document.getElementById('monthly-info-modal');
 const monthlyInfoForm = document.getElementById('monthly-info-form');
 const monthSelector = document.getElementById('month-selector');
@@ -84,6 +85,7 @@ const confirmMessage = document.getElementById('confirm-message');
 const confirmBtnYes = document.getElementById('confirm-btn-yes');
 const confirmBtnNo = document.getElementById('confirm-btn-no');
 
+let currentUserInfo = null;
 let currentUnsubscribeTasks = null;
 let currentUnsubscribeDepartments = null;
 let currentUnsubscribeWeekInfo = null;
@@ -128,6 +130,16 @@ const formatDate = (date) => {
 const closeModal = (modalId) => {
     document.getElementById(modalId).style.display = 'none';
 };
+
+// --- PHÂN QUYỀN ---
+function updateUIForRole() {
+    const isAdmin = currentUserInfo && currentUserInfo.role === 'admin';
+    const adminElements = document.querySelectorAll('.admin-only');
+    
+    adminElements.forEach(el => {
+        el.style.display = isAdmin ? '' : 'none'; // Use '' to revert to default display
+    });
+}
 
 // --- QUẢN LÝ KHOA ---
 const renderDepartmentsList = (departments) => {
@@ -208,6 +220,7 @@ const renderSchedule = (tasks, weekInfo, weekMetadata) => {
     keyTasksSection.innerHTML = '';
     notesSection.innerHTML = '';
     
+    const isAdmin = currentUserInfo && currentUserInfo.role === 'admin';
     const selectedDeptId = departmentSelector.value;
     if (selectedDeptId !== 'general') {
         const dept = allDepartments.find(d => d.id === selectedDeptId);
@@ -236,40 +249,57 @@ const renderSchedule = (tasks, weekInfo, weekMetadata) => {
         const dayOfWeekIndex = currentDate.getDay();
         const dayName = daysOfWeek[dayOfWeekIndex];
         const dateString = formatDate(currentDate);
-        const isoDateString = currentDate.toISOString().split('T')[0];
+        
+        const year = currentDate.getFullYear();
+        const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+        const day = String(currentDate.getDate()).padStart(2, '0');
+        const isoDateString = `${year}-${month}-${day}`;
         
         const tasksForDay = tasks.filter(task => task.date === isoDateString);
         
-        if (tasksForDay.length === 0) continue;
+        const dutyLeader = weekMetadata.dutyLeaders?.[dayOfWeekIndex] || '';
+        const dutyLeaderHtml = dutyLeader ? `<br><i class="text-sm font-normal">(Trực: ${dutyLeader})</i>` : '';
+        const dayCellContent = `${dayName}<br>${dateString}${dutyLeaderHtml}`;
 
-        tasksForDay.forEach((task, index) => {
+        const actionCellHtml = isAdmin ? `
+            <td class="p-4 text-center align-top no-print">
+                <button data-id="{TASK_ID}" class="edit-task-btn text-blue-500 hover:text-blue-700"><i class="fas fa-edit"></i></button>
+                <button data-id="{TASK_ID}" class="delete-task-btn text-red-500 hover:text-red-700 ml-2"><i class="fas fa-trash"></i></button>
+            </td>` : '';
+
+        if (tasksForDay.length === 0) {
             const row = document.createElement('tr');
-            let dayCellHtml = '';
-            if (index === 0) {
-                const dutyLeader = weekMetadata.dutyLeaders?.[dayOfWeekIndex] || '';
-                const dutyLeaderHtml = dutyLeader ? `<br><i class="text-sm font-normal">(Trực: ${dutyLeader})</i>` : '';
-                dayCellHtml = `<td class="p-4 font-semibold text-center align-top" rowspan="${tasksForDay.length}">${dayName}<br>${dateString}${dutyLeaderHtml}</td>`;
-            }
-
-            let timeString = '';
-            if (task.startTime) timeString = `<strong>${task.startTime.replace(':', 'h')}${task.endTime ? ` - ${task.endTime.replace(':', 'h')}` : ''}:</strong> `;
-
-            // UPDATED: Replace newlines with <br> tags to preserve formatting
-            const contentHtml = task.content
-                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                .replace(/\n/g, '<br>');
-
             row.innerHTML = `
-                ${dayCellHtml}
-                <td class="p-4 text-left align-top">${timeString}${contentHtml}</td>
-                <td class="p-4 text-center align-top">${task.location}</td>
-                <td class="p-4 text-center align-top no-print">
-                    <button data-id="${task.id}" class="edit-task-btn text-blue-500 hover:text-blue-700"><i class="fas fa-edit"></i></button>
-                    <button data-id="${task.id}" class="delete-task-btn text-red-500 hover:text-red-700 ml-2"><i class="fas fa-trash"></i></button>
-                </td>
+                <td class="p-4 font-semibold text-center align-top h-20">${dayCellContent}</td>
+                <td class="p-4 text-left align-top"></td>
+                <td class="p-4 text-center align-top"></td>
+                ${isAdmin ? '<td class="p-4 text-center align-top no-print"></td>' : ''}
             `;
             scheduleBody.appendChild(row);
-        });
+        } else {
+            tasksForDay.forEach((task, index) => {
+                const row = document.createElement('tr');
+                let dayCellHtml = '';
+                if (index === 0) {
+                    dayCellHtml = `<td class="p-4 font-semibold text-center align-top" rowspan="${tasksForDay.length}">${dayCellContent}</td>`;
+                }
+
+                let timeString = '';
+                if (task.startTime) timeString = `<strong>${task.startTime.replace(':', 'h')}${task.endTime ? ` - ${task.endTime.replace(':', 'h')}` : ''}:</strong> `;
+
+                const contentHtml = task.content
+                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                    .replace(/\n/g, '<br>');
+
+                row.innerHTML = `
+                    ${dayCellHtml}
+                    <td class="p-4 text-left align-top">${timeString}${contentHtml}</td>
+                    <td class="p-4 text-center align-top">${task.location}</td>
+                    ${actionCellHtml.replace(/{TASK_ID}/g, task.id)}
+                `;
+                scheduleBody.appendChild(row);
+            });
+        }
     }
 
     if (weekMetadata.notes) {
@@ -277,6 +307,7 @@ const renderSchedule = (tasks, weekInfo, weekMetadata) => {
         notesSection.innerHTML = `<h3 class="font-bold">Ghi chú:</h3><ul class="list-disc list-inside">${formattedNotes}</ul>`;
     }
 };
+
 
 const loadAndRenderSchedule = () => {
     if (!weekSelector.value) return;
@@ -308,11 +339,20 @@ const loadAndRenderSchedule = () => {
 const handleTaskFormSubmit = async (e) => {
     e.preventDefault();
     const id = taskIdInput.value;
-    const date = new Date(taskDateInput.value.replace(/-/g, '/'));
+    const dateString = taskDateInput.value;
+
+    if (!dateString) {
+        showAlert("Vui lòng chọn một ngày.");
+        return;
+    }
+
+    const parts = dateString.split('-').map(part => parseInt(part, 10));
+    const date = new Date(parts[0], parts[1] - 1, parts[2]);
+    
     const weekInfo = getWeekInfo(date);
     
     const taskData = {
-        date: taskDateInput.value,
+        date: dateString,
         startTime: taskStartTimeInput.value || null,
         endTime: taskEndTimeInput.value || null,
         content: taskContentInput.value.trim(),
@@ -375,11 +415,11 @@ const openWeekInfoModal = () => {
     weekInfoForm.reset();
     keyTasksInput.value = currentWeekInfo.keyTasks || '';
     notesInput.value = currentWeekInfo.notes || '';
-    for (let i = 2; i <= 7; i++) {
-        const dayIndex = i === 7 ? 0 : i;
+    // Sunday is 0, Monday is 1, ..., Saturday is 6
+    for (let i = 0; i <= 6; i++) {
         const input = document.getElementById(`duty-leader-${i}`);
         if(input) {
-            input.value = currentWeekInfo.dutyLeaders?.[dayIndex] || '';
+            input.value = currentWeekInfo.dutyLeaders?.[i] || '';
         }
     }
     weekInfoModal.style.display = 'flex';
@@ -393,10 +433,10 @@ const handleWeekInfoFormSubmit = async (e) => {
     const weekInfoDocId = `${year}-W${String(parseInt(week)).padStart(2, '0')}_${selectedDeptId}`;
     
     const dutyLeaders = {};
-    for (let i = 2; i <= 7; i++) {
-        const dayIndex = i === 7 ? 0 : i;
+    // Sunday is 0, Monday is 1, ..., Saturday is 6
+    for (let i = 0; i <= 6; i++) {
         const leaderName = document.getElementById(`duty-leader-${i}`).value.trim();
-        if (leaderName) dutyLeaders[dayIndex] = leaderName;
+        if (leaderName) dutyLeaders[i] = leaderName;
     }
 
     const data = {
@@ -415,9 +455,9 @@ const handleWeekInfoFormSubmit = async (e) => {
     }
 };
 
-// --- QUẢN LÝ CÔNG TÁC THÁNG (NEW) ---
+// --- QUẢN LÝ CÔNG TÁC THÁNG ---
 const loadMonthlyInfo = async () => {
-    const monthValue = monthSelector.value; // YYYY-MM
+    const monthValue = monthSelector.value;
     const selectedDeptId = departmentSelector.value;
     if (!monthValue || !selectedDeptId) {
         monthlyKeyTasksInput.value = '';
@@ -577,52 +617,56 @@ const generatePrintableVersion = () => {
 const setupEventListeners = () => {
     weekSelector.addEventListener('change', loadAndRenderSchedule);
     departmentSelector.addEventListener('change', loadAndRenderSchedule);
-    addTaskBtn.addEventListener('click', () => openTaskModal(null));
     printScheduleBtn.addEventListener('click', generatePrintableVersion);
-    manageDepartmentsBtn.addEventListener('click', () => { departmentModal.style.display = 'flex'; });
-    manageWeekInfoBtn.addEventListener('click', openWeekInfoModal);
-    manageMonthlyInfoBtn.addEventListener('click', openMonthlyInfoModal);
-
-    closeTaskModalBtn.addEventListener('click', () => closeModal('task-modal'));
-    taskForm.addEventListener('submit', handleTaskFormSubmit);
-    
-    weekInfoForm.addEventListener('submit', handleWeekInfoFormSubmit);
-    document.querySelector('.close-button[onclick="closeModal(\'week-info-modal\')"]').addEventListener('click', () => closeModal('week-info-modal'));
-
-    monthlyInfoForm.addEventListener('submit', handleMonthlyInfoFormSubmit);
-    monthSelector.addEventListener('change', loadMonthlyInfo);
-    printMonthlyReportBtn.addEventListener('click', generateMonthlyReport);
-    document.querySelector('.close-button[onclick="closeModal(\'monthly-info-modal\')"]').addEventListener('click', () => closeModal('monthly-info-modal'));
-
-    departmentForm.addEventListener('submit', handleDepartmentFormSubmit);
-    document.querySelector('.close-button[onclick="closeModal(\'department-modal\')"]').addEventListener('click', () => closeModal('department-modal'));
-    departmentsListBody.addEventListener('click', (e) => {
-        const editBtn = e.target.closest('.edit-dept-btn');
-        if (editBtn) {
-            const dept = allDepartments.find(d => d.id === editBtn.dataset.id);
-            if (dept) {
-                departmentIdInput.value = dept.id;
-                departmentNameInput.value = dept.name;
-                departmentHeadTitleInput.value = dept.headTitle || '';
-                departmentHeadNameInput.value = dept.headName || '';
-            }
-        }
-        const deleteBtn = e.target.closest('.delete-dept-btn');
-        if (deleteBtn) deleteDepartment(deleteBtn.dataset.id);
-    });
-
-    scheduleBody.addEventListener('click', (e) => {
-        const editBtn = e.target.closest('.edit-task-btn');
-        if (editBtn) openTaskModal(editBtn.dataset.id);
-        const deleteBtn = e.target.closest('.delete-task-btn');
-        if (deleteBtn) deleteTask(deleteBtn.dataset.id);
-    });
-
     alertOkBtn.addEventListener('click', () => closeModal('alert-modal'));
+
+    // Chỉ gán sự kiện cho admin
+    const isAdmin = currentUserInfo && currentUserInfo.role === 'admin';
+    if (isAdmin) {
+        addTaskBtn.addEventListener('click', () => openTaskModal(null));
+        manageDepartmentsBtn.addEventListener('click', () => { departmentModal.style.display = 'flex'; });
+        manageWeekInfoBtn.addEventListener('click', openWeekInfoModal);
+        manageMonthlyInfoBtn.addEventListener('click', openMonthlyInfoModal);
+
+        closeTaskModalBtn.addEventListener('click', () => closeModal('task-modal'));
+        taskForm.addEventListener('submit', handleTaskFormSubmit);
+        
+        weekInfoForm.addEventListener('submit', handleWeekInfoFormSubmit);
+        document.querySelector('.close-button[onclick="closeModal(\'week-info-modal\')"]').addEventListener('click', () => closeModal('week-info-modal'));
+
+        monthlyInfoForm.addEventListener('submit', handleMonthlyInfoFormSubmit);
+        monthSelector.addEventListener('change', loadMonthlyInfo);
+        printMonthlyReportBtn.addEventListener('click', generateMonthlyReport);
+        document.querySelector('.close-button[onclick="closeModal(\'monthly-info-modal\')"]').addEventListener('click', () => closeModal('monthly-info-modal'));
+
+        departmentForm.addEventListener('submit', handleDepartmentFormSubmit);
+        document.querySelector('.close-button[onclick="closeModal(\'department-modal\')"]').addEventListener('click', () => closeModal('department-modal'));
+        departmentsListBody.addEventListener('click', (e) => {
+            const editBtn = e.target.closest('.edit-dept-btn');
+            if (editBtn) {
+                const dept = allDepartments.find(d => d.id === editBtn.dataset.id);
+                if (dept) {
+                    departmentIdInput.value = dept.id;
+                    departmentNameInput.value = dept.name;
+                    departmentHeadTitleInput.value = dept.headTitle || '';
+                    departmentHeadNameInput.value = dept.headName || '';
+                }
+            }
+            const deleteBtn = e.target.closest('.delete-dept-btn');
+            if (deleteBtn) deleteDepartment(deleteBtn.dataset.id);
+        });
+
+        scheduleBody.addEventListener('click', (e) => {
+            const editBtn = e.target.closest('.edit-task-btn');
+            if (editBtn) openTaskModal(editBtn.dataset.id);
+            const deleteBtn = e.target.closest('.delete-task-btn');
+            if (deleteBtn) deleteTask(deleteBtn.dataset.id);
+        });
+    }
 };
 
 const initializePage = () => {
-    mainContent.style.display = 'block';
+    mainContent.classList.remove('hidden');
     const today = new Date();
     const year = today.getFullYear();
     const week = getWeekInfo(today).weekNumber;
@@ -630,19 +674,24 @@ const initializePage = () => {
     loadDepartments();
     loadAndRenderSchedule();
     setupEventListeners();
+    updateUIForRole(); // Cập nhật giao diện dựa trên vai trò người dùng
 };
 
 // --- AUTHENTICATION ---
 onAuthStateChanged(auth, async (user) => {
-    if (!user) {
-        try {
-            await signInAnonymously(auth);
-            initializePage();
-        } catch (error) {
-            console.error("Anonymous sign-in failed:", error);
-            showAlert("Không thể xác thực. Vui lòng thử lại.");
+    if (user) {
+        const userDocRef = doc(usersCol, user.uid);
+        const userDoc = await getDoc(userDocRef);
+
+        if (userDoc.exists()) {
+            currentUserInfo = { uid: user.uid, ...userDoc.data() };
+        } else {
+            // Nếu không có thông tin, mặc định là viewer
+            currentUserInfo = { uid: user.uid, email: user.email, role: 'viewer' };
         }
-    } else {
         initializePage();
+    } else {
+        // Nếu chưa đăng nhập, chuyển về trang chủ
+        window.location.href = 'index.html';
     }
 });

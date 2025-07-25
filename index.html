@@ -23,6 +23,51 @@
         main {
             flex-grow: 1;
         }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 50;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.5);
+            -webkit-animation-name: fadeIn;
+            -webkit-animation-duration: 0.4s;
+            animation-name: fadeIn;
+            animation-duration: 0.4s
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: 5% auto;
+            padding: 24px;
+            border: 1px solid #888;
+            width: 90%;
+            max-width: 500px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            -webkit-animation-name: slideIn;
+            -webkit-animation-duration: 0.4s;
+            animation-name: slideIn;
+            animation-duration: 0.4s
+        }
+        @-webkit-keyframes slideIn {
+            from {top: -300px; opacity: 0}
+            to {top: 0; opacity: 1}
+        }
+        @keyframes slideIn {
+            from {margin-top: -5%; opacity: 0}
+            to {margin-top: 5%; opacity: 1}
+        }
+        @-webkit-keyframes fadeIn {
+            from {opacity: 0}
+            to {opacity: 1}
+        }
+        @keyframes fadeIn {
+            from {opacity: 0}
+            to {opacity: 1}
+        }
     </style>
 </head>
 <body class="p-4 md:p-8">
@@ -84,7 +129,6 @@
         
         <!-- Module Selection Page -->
         <div id="module-selection-page" class="hidden">
-             <!-- NEW Header -->
             <div class="max-w-7xl mx-auto bg-white p-6 rounded-2xl shadow-lg mb-8">
                 <div class="flex items-center justify-between">
                     <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRjTnSBGofmGpcMY_uEoXhgAB-FeeLjVslu1A&s" alt="Logo Trường Đại học Hải Phòng" class="h-16 md:h-20">
@@ -108,12 +152,22 @@
                     <div class="bg-blue-100 text-blue-600 rounded-full p-4 mb-4">
                         <i class="fas fa-tasks fa-2x"></i>
                     </div>
-                    <h3 class="text-xl font-bold text-gray-800 mb-2">Quản lý Giờ Lao động khác</h3>
-                    <p class="text-gray-600 flex-grow">Tổng hợp, báo cáo và quản lý giờ hoạt động phục vụ cộng đồng và chuyên môn khác.</p>
+                    <h3 class="text-xl font-bold text-gray-800 mb-2">Quản lý Giờ Lao động</h3>
+                    <p class="text-gray-600 flex-grow">Tổng hợp và báo cáo giờ hoạt động phục vụ cộng đồng và chuyên môn khác.</p>
                     <div class="mt-4 w-full bg-blue-600 text-white py-2 rounded-lg font-semibold hover:bg-blue-700 transition-colors">Truy cập</div>
                 </a>
 
-                <!-- Module 2: Teaching Schedule -->
+                <!-- Module 2: Practice Room Booking -->
+                <a href="dang-ky-lich-thuc-hanh.html" class="bg-white p-6 rounded-xl shadow-lg hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 flex flex-col items-center text-center no-underline">
+                    <div class="bg-teal-100 text-teal-600 rounded-full p-4 mb-4">
+                        <i class="fas fa-calendar-check fa-2x"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-gray-800 mb-2">Đăng ký Lịch thực hành</h3>
+                    <p class="text-gray-600 flex-grow">Đăng ký, xem và quản lý lịch sử dụng các phòng thực hành theo thời gian thực.</p>
+                    <div class="mt-4 w-full bg-teal-600 text-white py-2 rounded-lg font-semibold hover:bg-teal-700 transition-colors">Truy cập</div>
+                </a>
+
+                <!-- Module 3: Teaching Schedule -->
                 <a href="lich-giang-day.html" class="bg-white p-6 rounded-xl shadow-lg hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 flex flex-col items-center text-center no-underline">
                     <div class="bg-purple-100 text-purple-600 rounded-full p-4 mb-4">
                         <i class="fas fa-calendar-alt fa-2x"></i>
@@ -123,27 +177,27 @@
                     <div class="mt-4 w-full bg-purple-600 text-white py-2 rounded-lg font-semibold hover:bg-purple-700 transition-colors">Truy cập</div>
                 </a>
 
-                <!-- Module 3: Graduation Thesis -->
+                <!-- Module 4: Graduation Thesis -->
                 <a href="de-tai-tot-nghiep.html" class="bg-white p-6 rounded-xl shadow-lg hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 flex flex-col items-center text-center no-underline">
                     <div class="bg-green-100 text-green-600 rounded-full p-4 mb-4">
                         <i class="fas fa-graduation-cap fa-2x"></i>
                     </div>
                     <h3 class="text-xl font-bold text-gray-800 mb-2">Đăng ký Đề tài Tốt nghiệp</h3>
-                    <p class="text-gray-600 flex-grow">Quản lý danh sách đề tài, đăng ký và theo dõi tiến độ thực hiện của sinh viên.</p>
+                    <p class="text-gray-600 flex-grow">Quản lý danh sách đề tài, đăng ký và theo dõi tiến độ của sinh viên.</p>
                     <div class="mt-4 w-full bg-green-600 text-white py-2 rounded-lg font-semibold hover:bg-green-700 transition-colors">Truy cập</div>
                 </a>
 
-                <!-- Module 4: Student Fluctuation Monitoring -->
+                <!-- Module 5: Student Fluctuation Monitoring -->
                 <a href="https://studio--fithpuni-students.us-central1.hosted.app/" target="_blank" rel="noopener noreferrer" class="bg-white p-6 rounded-xl shadow-lg hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 flex flex-col items-center text-center no-underline">
                     <div class="bg-red-100 text-red-600 rounded-full p-4 mb-4">
                         <i class="fas fa-users-line fa-2x"></i>
                     </div>
-                    <h3 class="text-xl font-bold text-gray-800 mb-2">Theo dõi biến động sĩ số Sinh viên</h3>
+                    <h3 class="text-xl font-bold text-gray-800 mb-2">Theo dõi biến động sĩ số</h3>
                     <p class="text-gray-600 flex-grow">Công cụ theo dõi và báo cáo biến động số lượng sinh viên theo thời gian thực.</p>
                     <div class="mt-4 w-full bg-red-600 text-white py-2 rounded-lg font-semibold hover:bg-red-700 transition-colors">Truy cập</div>
                 </a>
 
-                <!-- NEW Module 5: Weekly Task Management -->
+                <!-- Module 6: Weekly Task Management -->
                 <a href="cong-tac-tuan.html" class="bg-white p-6 rounded-xl shadow-lg hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 flex flex-col items-center text-center no-underline">
                     <div class="bg-yellow-100 text-yellow-600 rounded-full p-4 mb-4">
                         <i class="fas fa-calendar-week fa-2x"></i>
@@ -157,7 +211,7 @@
 
         <!-- Alert & Confirm Modals -->
         <div id="alert-modal" class="modal">
-            <div class="modal-content max-w-sm">
+            <div class="modal-content">
                  <h3 id="alert-title" class="text-lg font-bold mb-4">Thông báo</h3>
                 <p id="alert-message" class="mb-6"></p>
                 <div class="flex justify-end">
@@ -166,7 +220,7 @@
             </div>
         </div>
         <div id="confirm-modal" class="modal">
-            <div class="modal-content max-w-sm">
+            <div class="modal-content">
                 <h3 class="text-lg font-bold mb-4">Xác nhận</h3>
                 <p id="confirm-message" class="mb-6"></p>
                 <div class="flex justify-end gap-3">
@@ -177,7 +231,7 @@
         </div>
     </main>
 
-    <!-- NEW: Footer -->
+    <!-- Footer -->
     <footer class="mt-8 text-center text-sm text-gray-500">
         <div class="max-w-7xl mx-auto py-4 border-t border-gray-200">
             <p>&copy; 2025 Bản quyền thuộc về Khoa Công nghệ Thông tin - Trường Đại học Hải Phòng.</p>
