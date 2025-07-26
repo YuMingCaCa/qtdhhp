@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Công cụ xuất File Excel</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- SheetJS for Excel file creation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+
+    <div class="bg-white p-8 rounded-2xl shadow-lg text-center max-w-lg mx-auto">
+        <div class="bg-blue-100 text-blue-600 rounded-full p-4 mb-4 inline-block">
+            <i class="fas fa-file-excel fa-2x"></i>
+        </div>
+        <h1 class="text-2xl font-bold text-gray-800 mb-2">Tải File Excel Mẫu</h1>
+        <p class="text-gray-600 mb-6">
+            Dữ liệu chương trình đào tạo của Khoa Công nghệ Thông tin đã được trích xuất từ file Word của bạn. Nhấn nút dưới đây để tải về file Excel (.xlsx) tương ứng.
+        </p>
+        <button id="download-btn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg shadow-md flex items-center justify-center gap-2 transition-transform transform hover:scale-105">
+            <i class="fas fa-download"></i>
+            Tải xuống File Excel Mẫu (Đã cập nhật đủ)
+        </button>
+        <p id="feedback-message" class="text-sm text-green-700 mt-4 font-medium hidden"></p>
+    </div>
+
+    <script>
+        // Data parsed from the user's Word document (Full version)
+        const curriculumData = [
+            // Khối kiến thức chuyên nghiệp - Các học phần của lĩnh vực
+            { tenKhoa: "Công nghệ Thông tin", maHocPhan: "MAS709", tenHocPhan: "Toán cao cấp 1", soTinChi: 2, soTietLyThuyet: 30, soTietThaoLuan: 0, soTietThucHanh: 0 },
+            { tenKhoa: "Công nghệ Thông tin", maHocPhan: "MAS710", tenHocPhan: "Toán cao cấp 2", soTinChi: 2, soTietLyThuyet: 10, soTietThaoLuan: 5, soTietThucHanh: 15 },
+            { tenKhoa: "Công nghệ Thông tin", maHocPhan: "MAS707", tenHocPhan: "Xác suất thống kê", soTinChi: 2, soTietLyThuyet: 24, soTietThaoLuan: 0, soTietThucHanh: 6 },
+            { tenKhoa: "Công nghệ Thông tin", maHocPhan: "INF718", tenHocPhan: "Nhập môn Trí tuệ nhân tạo", soTinChi: 2, soTietLyThuyet: 12, soTietThaoLuan: 8, soTietThucHanh: 10 },
+            // Các học phần của ngành - Bắt buộc
+            { tenKhoa: "Công nghệ Thông tin", maHocPhan: "INF705", tenHocPhan: "Tổng quan về Công nghệ thông tin và định hướng nghề nghiệp", soTinChi: 2, soTietLyThuyet: 10, soTietThaoLuan: 10, soTietThucHanh: 10 },
+            { tenKhoa: "Công nghệ Thông tin", maHocPhan: "INF706", tenHocPhan: "Nhập môn thuật toán", soTinChi: 2, soTietLyThuyet: 12, soTietThaoLuan: 12, soTietThucHanh: 6 },
+            { tenKhoa: "Công nghệ Thông tin", maHocPhan: "MAS711", tenHocPhan: "Toán học rời rạc", soTinChi: 2, soTietLyThuyet: 25, soTietThaoLuan: 0, soTietThucHanh: 5 },
+            { tenKhoa: "Công nghệ Thông tin", maHocPhan: "INF707", tenHocPhan: "Tổ chức và kiến trúc máy tính", soTinChi: 3, soTietLyThuyet: 21, soTietThaoLuan: 6, soTietThucHanh: 18 },
+            { tenKhoa: "Công nghệ Thông tin", maHocPhan: "INF710", tenHocPhan: "Lập trình cơ sở", soTinChi: 3, soTietLyThuyet: 23, soTietThaoLuan: 11, soTietThucHanh: 11 },
+            { tenKhoa: "Công nghệ Thông tin", maHocPhan: "INF710", tenHocPhan: "Mạng máy tính và các hệ thống mở", soTinChi: 3, soTietLyThuyet: 21, soTietThaoLuan: 6, soTietThucHanh: 18 },
+            { tenKhoa: "Công nghệ Thông tin", maHocPhan: "INF715", tenHocPhan: "Cấu trúc dữ liệu và giải thuật", soTinChi: 3, soTietLyThuyet: 15, soTietThaoLuan: 9, soTietThucHanh: 21 },
+            { tenKhoa: "Công nghệ Thông tin", maHocPhan: "INF716", tenHocPhan: "Lập trình hướng đối tượng", soTinChi: 3, soTietLyThuyet: 15, soTietThaoLuan: 7, soTietThucHanh: 23 },
+            { tenKhoa: "Công nghệ Thông tin", maHocPhan: "INF717", tenHocPhan: "Nhập môn hệ cơ sở dữ liệu", soTinChi: 3, soTietLyThuyet: 21, soTietThaoLuan: 6, soTietThucHanh: 18 },
+            { tenKhoa: "Công nghệ Thông tin", maHocPhan: "INF720", tenHocPhan: "An toàn và bảo mật thông tin", soTinChi: 3, soTietLyThuyet: 21, soTietThaoLuan: 12, soTietThucHanh: 12 },
+            { tenKhoa: "Công nghệ Thông tin", maHocPhan: "INF763", tenHocPhan: "Kỹ thuật xử lý ảnh và Thị giác máy tính", soTinChi: 3, soTietLyThuyet: 21, soTietThaoLuan: 12, soTietThucHanh: 12 },
+            { tenKhoa: "Công nghệ Thông tin", maHocPhan: "INF727", tenHocPhan: "Điện toán đám mây", soTinChi: 2, soTietLyThuyet: 14, soTietThaoLuan: 6, soTietThucHanh: 10 },
+            { tenKhoa: "Công nghệ Thông tin", maHocPhan: "INF724", tenHocPhan: "Phát triển ứng dụng với Python", soTinChi: 3, soTietLyThuyet: 15, soTietThaoLuan: 15, soTietThucHanh: 15 },
+            { tenKhoa: "Công nghệ Thông tin", maHocPhan: "FOR720", tenHocPhan: "Tiếng Anh chuyên ngành Công nghệ thông tin", soTinChi: 2, soTietLyThuyet: 0, soTietThaoLuan: 0, soTietThucHanh: 0 },
+            { tenKhoa: "Công nghệ Thông tin", maHocPhan: "INF7914", tenHocPhan: "Kỹ nghệ phần mềm", soTinChi: 3, soTietLyThuyet: 22, soTietThaoLuan: 15, soTietThucHanh: 8 },
+            { tenKhoa: "Công nghệ Thông tin", maHocPhan: "INF745", tenHocPhan: "Công nghệ Blockchain", soTinChi: 2, soTietLyThuyet: 14, soTietThaoLuan: 6, soTietThucHanh: 10 },
+            // Các học phần của ngành - Tự chọn
+            { tenKhoa: "Công nghệ Thông tin", maHocPhan: "INF708", tenHocPhan: "Lắp ráp và cài đặt máy tính", soTinChi: 2, soTietLyThuyet: 14, soTietThaoLuan: 6, soTietThucHanh: 10 },
+            { tenKhoa: "Công nghệ Thông tin", maHocPhan: "INF714", tenHocPhan: "Nguyên lý hệ điều hành", soTinChi: 2, soTietLyThuyet: 10, soTietThaoLuan: 8, soTietThucHanh: 12 },
+            { tenKhoa: "Công nghệ Thông tin", maHocPhan: "INF712", tenHocPhan: "Các hệ thống thông minh", soTinChi: 2, soTietLyThuyet: 10, soTietThaoLuan: 4, soTietThucHanh: 16 },
+            { tenKhoa: "Công nghệ Thông tin", maHocPhan: "INF726", tenHocPhan: "Lập trình nhúng", soTinChi: 2, soTietLyThuyet: 14, soTietThaoLuan: 6, soTietThucHanh: 10 },
+            { tenKhoa: "Công nghệ Thông tin", maHocPhan: "INF729", tenHocPhan: "Phần mềm mã nguồn mở", soTinChi: 2, soTietLyThuyet: 14, soTietThaoLuan: 6, soTietThucHanh: 10 },
+            { tenKhoa: "Công nghệ Thông tin", maHocPhan: "INF764", tenHocPhan: "Đạo đức AI và Quy định Pháp lý", soTinChi: 2, soTietLyThuyet: 14, soTietThaoLuan: 6, soTietThucHanh: 10 },
+            // Chuyên ngành CNTT - Bắt buộc
+            { tenKhoa: "Công nghệ Thông tin", maHocPhan: "INF731", tenHocPhan: "Phân tích và thiết kế hướng đối tượng (có BTL)", soTinChi: 3, soTietLyThuyet: 30, soTietThaoLuan: 6, soTietThucHanh: 9 },
+            { tenKhoa: "Công nghệ Thông tin", maHocPhan: "INF734", tenHocPhan: "Quản trị mạng", soTinChi: 3, soTietLyThuyet: 18, soTietThaoLuan: 6, soTietThucHanh: 21 },
+            { tenKhoa: "Công nghệ Thông tin", maHocPhan: "INF723", tenHocPhan: "Thiết kế và phát triển ứng dụng Web", soTinChi: 3, soTietLyThuyet: 18, soTietThaoLuan: 7, soTietThucHanh: 20 },
+            { tenKhoa: "Công nghệ Thông tin", maHocPhan: "INF744", tenHocPhan: "Internet vạn vật", soTinChi: 2, soTietLyThuyet: 14, soTietThaoLuan: 6, soTietThucHanh: 10 },
+            { tenKhoa: "Công nghệ Thông tin", maHocPhan: "INF765", tenHocPhan: "Học máy", soTinChi: 3, soTietLyThuyet: 21, soTietThaoLuan: 6, soTietThucHanh: 18 },
+            { tenKhoa: "Công nghệ Thông tin", maHocPhan: "INF737", tenHocPhan: "Hệ quản trị cơ sở dữ liệu", soTinChi: 3, soTietLyThuyet: 15, soTietThaoLuan: 15, soTietThucHanh: 15 },
+            { tenKhoa: "Công nghệ Thông tin", maHocPhan: "INF735", tenHocPhan: "Các vấn đề hiện đại trong Công nghệ thông tin", soTinChi: 2, soTietLyThuyet: 14, soTietThaoLuan: 9, soTietThucHanh: 7 },
+            { tenKhoa: "Công nghệ Thông tin", maHocPhan: "INF733", tenHocPhan: "Phát triển ứng dụng trên thiết bị di động", soTinChi: 3, soTietLyThuyet: 21, soTietThaoLuan: 9, soTietThucHanh: 15 },
+            { tenKhoa: "Công nghệ Thông tin", maHocPhan: "INF766", tenHocPhan: "Thực hành dự án Công nghệ thông tin", soTinChi: 3, soTietLyThuyet: 6, soTietThaoLuan: 6, soTietThucHanh: 33 },
+            // Chuyên ngành CNTT - Tự chọn
+            { tenKhoa: "Công nghệ Thông tin", maHocPhan: "INF736", tenHocPhan: "Lập trình nâng cao", soTinChi: 2, soTietLyThuyet: 14, soTietThaoLuan: 8, soTietThucHanh: 8 },
+            { tenKhoa: "Công nghệ Thông tin", maHocPhan: "INF739", tenHocPhan: "Lập trình cơ sở dữ liệu", soTinChi: 2, soTietLyThuyet: 10, soTietThaoLuan: 10, soTietThucHanh: 10 },
+            { tenKhoa: "Công nghệ Thông tin", maHocPhan: "INF741", tenHocPhan: "Quản trị hệ cơ sở dữ liệu (SQLite/NoSQL)", soTinChi: 2, soTietLyThuyet: 10, soTietThaoLuan: 5, soTietThucHanh: 15 },
+            { tenKhoa: "Công nghệ Thông tin", maHocPhan: "INF767", tenHocPhan: "Tương tác người máy", soTinChi: 2, soTietLyThuyet: 15, soTietThaoLuan: 7, soTietThucHanh: 8 },
+            { tenKhoa: "Công nghệ Thông tin", maHocPhan: "INF732", tenHocPhan: "Phát triển ứng dụng thương mại điện tử", soTinChi: 2, soTietLyThuyet: 14, soTietThaoLuan: 6, soTietThucHanh: 10 },
+            { tenKhoa: "Công nghệ Thông tin", maHocPhan: "INF768", tenHocPhan: "Nhận dạng mẫu", soTinChi: 2, soTietLyThuyet: 14, soTietThaoLuan: 6, soTietThucHanh: 10 },
+        ];
+
+        document.getElementById('download-btn').addEventListener('click', () => {
+            const feedback = document.getElementById('feedback-message');
+            try {
+                // Define headers matching the import function
+                const headers = ["tenKhoa", "maHocPhan", "tenHocPhan", "soTinChi", "soTietLyThuyet", "soTietThaoLuan", "soTietThucHanh"];
+                
+                // Create a new worksheet
+                const ws = XLSX.utils.json_to_sheet(curriculumData, { header: headers });
+                
+                // Create a new workbook
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "ChuongTrinhDaoTao");
+                
+                // Write the workbook and trigger download
+                XLSX.writeFile(wb, "Mau_Import_ChuongTrinhDaoTao_CNTT_Full.xlsx");
+
+                feedback.textContent = 'Đã bắt đầu tải xuống file Excel!';
+                feedback.classList.remove('hidden');
+                setTimeout(() => feedback.classList.add('hidden'), 3000);
+
+            } catch (error) {
+                feedback.textContent = 'Đã có lỗi xảy ra khi tạo file. Vui lòng thử lại.';
+                feedback.classList.remove('text-green-700');
+                feedback.classList.add('text-red-700');
+                feedback.classList.remove('hidden');
+                console.error("Error generating Excel file:", error);
+            }
+        });
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <link rel="icon" type="image/png" href="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRjTnSBGofmGpcMY_uEoXhgAB-FeeLjVslu1A&s">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tính giờ Lao động A - ĐHHP</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- SheetJS for Excel file reading -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- Custom styles will be injected by JS -->
+</head>
+<body class="p-4 md:p-8 bg-gray-100">
+
+    <!-- Main App Content (Workload Management A) -->
+    <div id="app-content" class="hidden">
+        <div class="max-w-7xl mx-auto">
+            <!-- Back to modules button -->
+            <a href="index.html" class="mb-4 bg-white hover:bg-gray-100 text-gray-800 font-bold py-2 px-4 rounded-lg inline-flex items-center transition-colors no-underline shadow-sm border">
+                <i class="fas fa-arrow-left mr-2"></i>
+                <span>Quay lại trang chọn hệ thống</span>
+            </a>
+            
+            <div class="bg-white p-6 rounded-2xl shadow-lg">
+                <!-- Header -->
+                <div class="flex items-center justify-between mb-8">
+                    <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRjTnSBGofmGpcMY_uEoXhgAB-FeeLjVslu1A&s" alt="Logo Trường Đại học Hải Phòng" class="h-16 md:h-20">
+                    <div class="text-center">
+                        <h1 class="text-xl md:text-3xl font-bold text-indigo-800">Hệ thống Thống kê Giờ Lao động A (Giờ Giảng dạy)</h1>
+                        <p class="text-md md:text-lg text-gray-600">Trường Đại học Hải Phòng</p>
+                    </div>
+                    <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQpzh7trviplRC5G2r75APp6H3wcTnXVixU-Q&s" alt="Logo Khoa Công nghệ Thông tin" class="h-16 md:h-20">
+                </div>
+
+                <!-- User Info and Logout -->
+                <div class="flex justify-between items-center mb-6 border-t border-b py-2">
+                    <div>
+                        <span class="text-sm text-gray-600">Xin chào, <strong id="user-email" class="text-indigo-700"></strong>!</span>
+                        <span id="user-role-badge" class="ml-2 text-xs font-semibold px-2.5 py-0.5 rounded-full"></span>
+                    </div>
+                    <button id="logout-btn" class="bg-red-500 hover:bg-red-600 text-white font-bold py-1 px-3 rounded-lg text-sm">
+                        <i class="fas fa-sign-out-alt mr-1"></i>Đăng xuất
+                    </button>
+                </div>
+
+                <!-- Admin Panel -->
+                <div id="admin-panel" class="admin-only mb-6 p-4 border-2 border-dashed rounded-lg bg-gray-50">
+                    <h3 class="text-lg font-bold text-gray-700 mb-2">Bảng điều khiển của Admin</h3>
+                    <p class="text-sm text-gray-600 mb-4">Khu vực để thêm mới, import và quản lý các phân công giảng dạy.</p>
+                    <div class="flex flex-wrap gap-3">
+                        <button id="add-assignment-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-md flex items-center gap-2">
+                            <i class="fas fa-plus-circle"></i> Thêm Phân công mới
+                        </button>
+                        <button id="manage-guidance-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md flex items-center gap-2">
+                            <i class="fas fa-graduation-cap"></i> Quản lý TTTN, ĐATN
+                        </button>
+                        <button id="manage-quota-btn" class="bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded-lg shadow-md flex items-center gap-2">
+                            <i class="fas fa-tasks"></i> Định mức & Giảm trừ
+                        </button>
+                        <button id="import-data-btn" class="bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-2 px-4 rounded-lg shadow-md flex items-center gap-2">
+                            <i class="fas fa-file-import"></i> Import từ Excel
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Filters and Management -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6 items-end">
+                    <div>
+                        <label for="department-select" class="block text-sm font-medium text-gray-700 mb-1">Chọn Khoa:</label>
+                        <select id="department-select" class="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500"></select>
+                    </div>
+                    <div>
+                        <label for="year-select" class="block text-sm font-medium text-gray-700 mb-1">Chọn Năm học:</label>
+                        <select id="year-select" class="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500"></select>
+                    </div>
+                    <div class="flex flex-wrap gap-2 justify-start lg:justify-end">
+                        <button id="export-report-btn" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg shadow-md flex items-center gap-2">
+                            <i class="fas fa-file-excel"></i> Xuất Báo cáo
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Main Content: Lecturers Table -->
+                <div id="main-content">
+                    <h2 id="department-title" class="text-2xl font-bold text-gray-800 mb-4">Tổng hợp Giờ Giảng dạy (Giờ chuẩn)</h2>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full bg-white border border-gray-200 rounded-lg">
+                            <thead class="bg-gray-100">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">STT</th>
+                                    <th class="px-6 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Họ và Tên</th>
+                                    <th class="px-6 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Mã Giảng viên</th>
+                                    <th class="px-6 py-3 text-center text-xs font-bold text-gray-600 uppercase tracking-wider">Tổng giờ chuẩn (HK Chính)</th>
+                                    <th class="px-6 py-3 text-center text-xs font-bold text-gray-600 uppercase tracking-wider">Hành động</th>
+                                </tr>
+                            </thead>
+                            <tbody id="lecturers-table-body" class="divide-y divide-gray-200">
+                                <!-- Rows will be populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Assignment Modal -->
+    <div id="assignment-modal" class="modal">
+        <div class="modal-content max-w-4xl">
+            <span class="close-button no-print" onclick="closeModal('assignment-modal')">&times;</span>
+            <h3 id="assignment-modal-title" class="text-2xl font-bold mb-6">Thêm Phân công Giảng dạy mới</h3>
+            <form id="assignment-form">
+                <input type="hidden" id="assignment-id">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <!-- Column 1 -->
+                    <div class="space-y-4">
+                        <div>
+                            <label for="assignment-semester" class="block text-sm font-medium text-gray-700">Học kỳ</label>
+                            <select id="assignment-semester" required class="mt-1 block w-full p-2 border border-gray-300 rounded-md"></select>
+                        </div>
+                        <div>
+                            <label for="assignment-department" class="block text-sm font-medium text-gray-700">Khoa phụ trách</label>
+                            <select id="assignment-department" required class="mt-1 block w-full p-2 border border-gray-300 rounded-md"></select>
+                        </div>
+                        <div>
+                            <label for="assignment-subject" class="block text-sm font-medium text-gray-700">Tên học phần</label>
+                            <select id="assignment-subject" required class="mt-1 block w-full p-2 border border-gray-300 rounded-md" disabled></select>
+                        </div>
+                    </div>
+                    <!-- Column 2 -->
+                    <div class="space-y-4">
+                        <div>
+                            <label for="assignment-lecturer" class="block text-sm font-medium text-gray-700">Giảng viên</label>
+                            <select id="assignment-lecturer" required class="mt-1 block w-full p-2 border border-gray-300 rounded-md" disabled></select>
+                        </div>
+                        <div>
+                            <label for="assignment-class" class="block text-sm font-medium text-gray-700">Lớp dạy</label>
+                            <select id="assignment-class" required class="mt-1 block w-full p-2 border border-gray-300 rounded-md" disabled></select>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label for="assignment-student-count" class="block text-sm font-medium text-gray-700">Sĩ số (tự động)</label>
+                                <input type="number" id="assignment-student-count" readonly class="mt-1 block w-full p-2 border border-gray-300 rounded-md bg-gray-200">
+                            </div>
+                            <div>
+                                <label for="assignment-coefficient" class="block text-sm font-medium text-gray-700">Hệ số lớp (tự động)</label>
+                                <input type="number" id="assignment-coefficient" readonly class="mt-1 block w-full p-2 border border-gray-300 rounded-md bg-gray-200">
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Column 3 -->
+                    <div class="space-y-4 p-3 bg-gray-50 rounded-lg border">
+                        <p class="text-sm font-bold text-center text-gray-600">Số tiết theo chương trình</p>
+                        <div class="grid grid-cols-2 gap-2">
+                             <div>
+                                <label for="periods-theory" class="block text-xs font-medium text-gray-700">Lý thuyết</label>
+                                <input type="number" id="periods-theory" readonly class="period-input mt-1 block w-full p-2 border border-gray-300 rounded-md bg-gray-200">
+                            </div>
+                             <div>
+                                <label for="periods-exercise" class="block text-xs font-medium text-gray-700">Bài tập</label>
+                                <input type="number" id="periods-exercise" value="0" min="0" class="period-input mt-1 block w-full p-2 border border-gray-300 rounded-md">
+                            </div>
+                             <div>
+                                <label for="periods-discussion" class="block text-xs font-medium text-gray-700">Thảo luận</label>
+                                <input type="number" id="periods-discussion" readonly class="period-input mt-1 block w-full p-2 border border-gray-300 rounded-md bg-gray-200">
+                            </div>
+                             <div>
+                                <label for="periods-practice" class="block text-xs font-medium text-gray-700">Thực hành</label>
+                                <input type="number" id="periods-practice" readonly class="period-input mt-1 block w-full p-2 border border-gray-300 rounded-md bg-gray-200">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-6 p-4 bg-blue-50 border-l-4 border-blue-500 rounded-r-lg">
+                    <label class="block text-sm font-medium text-gray-700">Tổng số giờ quy đổi (giờ chuẩn)</label>
+                    <p id="calculated-hours-display" class="text-3xl font-bold text-blue-700">0</p>
+                </div>
+                <div class="mt-6 flex justify-end gap-3">
+                    <button type="button" class="bg-gray-200 hover:bg-gray-300 text-black font-bold py-2 px-4 rounded-lg" onclick="closeModal('assignment-modal')">Hủy</button>
+                    <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg">Lưu Phân công</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Import Data Modal -->
+    <div id="import-modal" class="modal">
+        <div class="modal-content max-w-2xl">
+            <span class="close-button no-print" onclick="closeModal('import-modal')">&times;</span>
+            <h3 class="text-xl font-bold mb-4">Import Dữ liệu hàng loạt</h3>
+            <div class="p-4 border rounded-lg bg-gray-50 space-y-4">
+                <div>
+                    <label for="import-type-select" class="block text-sm font-medium text-gray-700">1. Chọn loại dữ liệu để import</label>
+                    <select id="import-type-select" class="mt-1 p-2 border rounded-md w-full">
+                        <option value="curriculum">Chương trình đào tạo (Môn học)</option>
+                        <option value="classes">Danh sách Lớp học</option>
+                        <option value="assignments">Bảng phân công giảng dạy</option>
+                    </select>
+                </div>
+                <div>
+                     <label for="import-file-input" class="block text-sm font-medium text-gray-700">2. Chọn file Excel (.xlsx)</label>
+                     <input type="file" id="import-file-input" accept=".xlsx" class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                </div>
+                <div class="flex justify-between items-center">
+                    <button id="download-template-btn" type="button" class="text-blue-600 hover:underline text-sm"><i class="fas fa-download mr-1"></i> Tải file mẫu</button>
+                    <button id="start-import-btn" class="bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-2 px-4 rounded-lg">
+                        <i class="fas fa-rocket mr-2"></i>Bắt đầu Import
+                    </button>
+                </div>
+            </div>
+             <div id="import-results-container" class="mt-4 hidden">
+                <h4 class="font-semibold text-gray-800 mb-2">Kết quả Import:</h4>
+                <div id="import-log" class="max-h-60 overflow-y-auto border rounded-md p-3 bg-gray-50 text-sm"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Details Modal -->
+    <div id="details-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button no-print" onclick="closeModal('details-modal')">&times;</span>
+            <h3 id="details-title" class="text-xl font-bold mb-4">Chi tiết Giờ Giảng dạy</h3>
+            <div id="details-content" class="max-h-96 overflow-y-auto">
+                <!-- Details will be populated by JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Export Report Modal -->
+    <div id="export-modal" class="modal">
+        <div class="modal-content max-w-lg">
+            <span class="close-button no-print" onclick="closeModal('export-modal')">&times;</span>
+            <h3 class="text-xl font-bold mb-4">Xuất Báo cáo Giờ giảng dạy</h3>
+            <div class="p-4 border rounded-lg bg-gray-50 space-y-4">
+                <div>
+                    <label for="export-lecturer-select" class="block text-sm font-medium text-gray-700">1. Chọn giảng viên để xuất báo cáo</label>
+                    <select id="export-lecturer-select" class="mt-1 p-2 border rounded-md w-full"></select>
+                </div>
+                <div class="border-t pt-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">2. Chọn loại báo cáo</label>
+                    <div class="flex flex-col sm:flex-row gap-3">
+                        <button id="generate-main-report-btn" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">
+                            <i class="fas fa-cogs mr-2"></i>Tạo Báo cáo HK Chính
+                        </button>
+                        <button id="generate-extra-report-btn" class="flex-1 bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-lg">
+                            <i class="fas fa-cogs mr-2"></i>Tạo Báo cáo HK Hè/Phụ
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Guidance Task Modal -->
+    <div id="guidance-modal" class="modal">
+        <div class="modal-content max-w-4xl">
+            <span class="close-button no-print" onclick="closeModal('guidance-modal')">&times;</span>
+            <h3 class="text-xl font-bold mb-4">Quản lý Hướng dẫn Tốt nghiệp & Thực tập</h3>
+            <form id="guidance-form" class="mb-6 p-4 border rounded-lg bg-gray-50">
+                <input type="hidden" id="guidance-id">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                    <div>
+                        <label for="guidance-department" class="block text-sm font-medium text-gray-700">Khoa</label>
+                        <select id="guidance-department" required class="mt-1 p-2 border rounded-md w-full"></select>
+                    </div>
+                    <div>
+                        <label for="guidance-lecturer" class="block text-sm font-medium text-gray-700">Giảng viên</label>
+                        <select id="guidance-lecturer" required class="mt-1 p-2 border rounded-md w-full" disabled></select>
+                    </div>
+                    <div>
+                        <label for="guidance-year" class="block text-sm font-medium text-gray-700">Năm học</label>
+                        <select id="guidance-year" required class="mt-1 p-2 border rounded-md w-full"></select>
+                    </div>
+                    <div>
+                        <label for="guidance-type" class="block text-sm font-medium text-gray-700">Loại hình</label>
+                        <select id="guidance-type" required class="mt-1 p-2 border rounded-md w-full">
+                            <option value="Đồ án tốt nghiệp">Đồ án tốt nghiệp</option>
+                            <option value="Thực tập tốt nghiệp">Thực tập tốt nghiệp</option>
+                            <option value="Thực tập chuyên ngành">Thực tập chuyên ngành</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="guidance-course" class="block text-sm font-medium text-gray-700">Nội dung (VD: K22)</label>
+                        <input type="text" id="guidance-course" required placeholder="K22" class="mt-1 p-2 border rounded-md w-full">
+                    </div>
+                    <div>
+                        <label for="guidance-credits" class="block text-sm font-medium text-gray-700">Số tín chỉ</label>
+                        <input type="number" id="guidance-credits" required value="4" min="0" step="0.5" class="mt-1 p-2 border rounded-md w-full">
+                    </div>
+                    <div>
+                        <label for="guidance-students" class="block text-sm font-medium text-gray-700">Số sinh viên</label>
+                        <input type="number" id="guidance-students" required value="10" min="1" class="mt-1 p-2 border rounded-md w-full">
+                    </div>
+                    <div class="md:col-start-3 flex gap-2">
+                        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-md w-full">Lưu</button>
+                        <button type="button" id="clear-guidance-form-btn" class="bg-gray-200 hover:bg-gray-300 text-black p-2 rounded-md w-full">Mới</button>
+                    </div>
+                </div>
+            </form>
+            <div class="overflow-x-auto max-h-80">
+                <table class="min-w-full bg-white">
+                    <thead class="bg-gray-100 sticky top-0">
+                        <tr>
+                            <th class="px-4 py-2 text-left">Nội dung</th>
+                            <th class="px-4 py-2 text-left">Giảng viên</th>
+                            <th class="px-4 py-2 text-center">Số SV</th>
+                            <th class="px-4 py-2 text-center">Giờ chuẩn</th>
+                            <th class="px-4 py-2 text-center">Hành động</th>
+                        </tr>
+                    </thead>
+                    <tbody id="guidance-list-body"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- NEW: Quota & Reduction Management Modal -->
+    <div id="management-modal" class="modal">
+        <div class="modal-content max-w-4xl">
+            <span class="close-button no-print" onclick="closeModal('management-modal')">&times;</span>
+            <h3 class="text-xl font-bold mb-4">Quản lý Định mức & Giảm trừ</h3>
+            <form id="management-form" class="mb-6 p-4 border rounded-lg bg-gray-50">
+                <input type="hidden" id="management-id">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
+                    <div>
+                        <label for="management-department" class="block text-sm font-medium text-gray-700">Khoa</label>
+                        <select id="management-department" required class="mt-1 p-2 border rounded-md w-full"></select>
+                    </div>
+                    <div>
+                        <label for="management-lecturer" class="block text-sm font-medium text-gray-700">Giảng viên</label>
+                        <select id="management-lecturer" required class="mt-1 p-2 border rounded-md w-full" disabled></select>
+                    </div>
+                    <div>
+                        <label for="management-year" class="block text-sm font-medium text-gray-700">Năm học</label>
+                        <select id="management-year" required class="mt-1 p-2 border rounded-md w-full"></select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 mt-4 border-t pt-4">
+                     <div>
+                        <label for="management-quota" class="block text-sm font-medium text-gray-700">Định mức giờ chuẩn</label>
+                        <input type="number" id="management-quota" value="270" min="0" step="any" class="mt-1 p-2 border rounded-md w-full">
+                    </div>
+                    <div>
+                        <label for="management-reduction" class="block text-sm font-medium text-gray-700">Số giờ giảm trừ</label>
+                        <input type="number" id="management-reduction" value="0" min="0" step="any" class="mt-1 p-2 border rounded-md w-full">
+                    </div>
+                    <div class="md:col-span-2">
+                        <label for="management-reduction-reason" class="block text-sm font-medium text-gray-700">Nội dung giảm trừ (mỗi nội dung một dòng)</label>
+                        <textarea id="management-reduction-reason" rows="3" placeholder="VD: Cố vấn học tập K22.6 CNTT" class="mt-1 p-2 border rounded-md w-full"></textarea>
+                    </div>
+                </div>
+                 <div class="flex justify-end gap-2 mt-4">
+                    <button type="button" id="clear-management-form-btn" class="bg-gray-200 hover:bg-gray-300 text-black p-2 rounded-md">Làm mới</button>
+                    <button type="submit" class="bg-orange-600 hover:bg-orange-700 text-white p-2 rounded-md">Lưu Định mức/Giảm trừ</button>
+                </div>
+            </form>
+            <div id="management-list-container" class="overflow-x-auto max-h-80">
+                <!-- Table will be rendered here by JS -->
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Alert Modal -->
+    <div id="alert-modal" class="modal">
+        <div class="modal-content max-w-sm">
+             <h3 id="alert-title" class="text-lg font-bold mb-4">Thông báo</h3>
+            <p id="alert-message" class="mb-6"></p>
+            <div class="flex justify-end">
+                <button id="alert-ok-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">OK</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- JavaScript File -->
+    <script type="module" src="js/quan-ly-lao-dong-a.js"></script>
+
+    <footer class="mt-8 text-center text-sm text-gray-500">
+        <div class="max-w-7xl mx-auto py-4 border-t border-gray-200">
+            <p>&copy; 2025 Bản quyền thuộc về Khoa Công nghệ Thông tin - Trường Đại học Hải Phòng.</p>
+        </div>
+    </footer>
+
+</body>
+</html>
