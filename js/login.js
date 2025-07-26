@@ -1,5 +1,6 @@
 // File: js/login.js
 // Handles logic for the main index.html page (Login and Module Selection).
+// UPDATED: Added Google Sign-in functionality with domain check and account linking.
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import {
@@ -7,8 +8,18 @@ import {
     onAuthStateChanged,
     createUserWithEmailAndPassword,
     signInWithEmailAndPassword,
-    signOut
+    signOut,
+    GoogleAuthProvider, // Added for Google Sign-in
+    signInWithPopup,    // Added for Google Sign-in
+    linkWithCredential  // Added for account linking
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+import {
+    getFirestore,       // Added to check/create user documents
+    doc,
+    getDoc,
+    setDoc
+} from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
 
 // --- UI Elements ---
 const loginPage = document.getElementById('login-page');
@@ -18,6 +29,8 @@ const registerFormContainer = document.getElementById('register-form-container')
 
 // --- Firebase variables ---
 let auth;
+let db; // Added for Firestore
+let usersColPath; // Added for user collection path
 
 /**
  * Injects all necessary CSS styles into the document's head.
@@ -154,6 +167,10 @@ async function initializeFirebase() {
     try {
         const app = initializeApp(firebaseConfig);
         auth = getAuth(app);
+        db = getFirestore(app); // Initialize Firestore
+
+        const appId = firebaseConfig.projectId || 'hpu-workload-tracker-app';
+        usersColPath = `artifacts/${appId}/public/data/users`;
 
         onAuthStateChanged(auth, (user) => {
             if (user) {
@@ -188,7 +205,74 @@ function addEventListeners() {
         loginFormContainer.classList.remove('hidden');
     });
 
-    // Auth actions
+    // --- UPDATED: Google Sign-in event listener with account linking ---
+    document.getElementById('google-signin-btn').addEventListener('click', async () => {
+        const btn = document.getElementById('google-signin-btn');
+        setButtonLoading(btn, true);
+        const provider = new GoogleAuthProvider();
+        try {
+            const result = await signInWithPopup(auth, provider);
+            const user = result.user;
+            const email = user.email;
+
+            // **CRITICAL: Check if the email domain is correct**
+            if (email.endsWith('@dhhp.edu.vn')) {
+                // Email is valid, check if user doc exists, create if not.
+                // This ensures new users get a default 'viewer' role.
+                const userDocRef = doc(db, usersColPath, user.uid);
+                const userDoc = await getDoc(userDocRef);
+                if (!userDoc.exists()) {
+                    await setDoc(userDocRef, {
+                        email: user.email,
+                        role: 'viewer', // Default role for new users
+                        createdAt: new Date()
+                    });
+                }
+                // onAuthStateChanged will handle showing the module page automatically.
+            } else {
+                // Email is NOT from the correct domain, so sign them out immediately.
+                await signOut(auth);
+                showAlert('Vui lòng sử dụng tài khoản email của trường (@dhhp.edu.vn) để đăng nhập.');
+            }
+        } catch (error) {
+            // --- NEW: Handle account linking for existing email/password users ---
+            if (error.code === 'auth/account-exists-with-different-credential') {
+                const pendingCred = error.credential;
+                const email = error.customData.email;
+                
+                // For a better user experience, you could replace prompt() with a custom modal.
+                const password = prompt(
+                    `Tài khoản với email ${email} đã tồn tại với phương thức đăng nhập bằng mật khẩu.\n` +
+                    `Vui lòng nhập mật khẩu của bạn để liên kết hai phương thức đăng nhập này.`
+                );
+
+                if (password) {
+                    try {
+                        // Sign in with the existing email and password
+                        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+                        
+                        // Link the new Google credential to the existing account
+                        await linkWithCredential(userCredential.user, pendingCred);
+                        
+                        showAlert('Tài khoản Google đã được liên kết thành công! Từ giờ bạn có thể đăng nhập bằng cả hai cách.');
+                    } catch (linkError) {
+                        console.error("Linking error:", linkError);
+                        showAlert('Liên kết thất bại. Mật khẩu không đúng hoặc đã có lỗi xảy ra.');
+                    }
+                } else {
+                    showAlert('Quá trình liên kết đã bị hủy.');
+                }
+            } else if (error.code !== 'auth/popup-closed-by-user') {
+                console.error("Google Sign-in Error:", error);
+                 showAlert(`Lỗi đăng nhập bằng Google: ${error.message}`);
+            }
+        } finally {
+            setButtonLoading(btn, false);
+        }
+    });
+
+
+    // Auth actions (Email/Password)
     document.getElementById('login-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const btn = e.target.querySelector('button[type="submit"]');
@@ -198,7 +282,7 @@ function addEventListeners() {
         try {
             await signInWithEmailAndPassword(auth, email, password);
         } catch (error) {
-            showAlert(error.message);
+            showAlert("Sai email hoặc mật khẩu. Vui lòng thử lại.");
         } finally {
             setButtonLoading(btn, false);
         }
@@ -211,9 +295,24 @@ function addEventListeners() {
         const email = document.getElementById('register-email').value;
         const password = document.getElementById('register-password').value;
         try {
-            await createUserWithEmailAndPassword(auth, email, password);
+            // Create user in Auth
+            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+            const user = userCredential.user;
+
+            // Create corresponding user document in Firestore with default 'viewer' role
+            const userDocRef = doc(db, usersColPath, user.uid);
+            await setDoc(userDocRef, {
+                email: user.email,
+                role: 'viewer',
+                createdAt: new Date()
+            });
+
         } catch (error) {
-            showAlert(error.message);
+            if (error.code === 'auth/email-already-in-use') {
+                showAlert('Email này đã được đăng ký. Vui lòng đăng nhập hoặc sử dụng email khác.');
+            } else {
+                showAlert(error.message);
+            }
         } finally {
             setButtonLoading(btn, false);
         }
