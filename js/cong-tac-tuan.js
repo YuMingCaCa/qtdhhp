@@ -107,18 +107,40 @@ const showConfirm = (message) => {
     });
 };
 
+/**
+ * Lấy thông tin tuần (năm, số tuần, ngày bắt đầu, ngày kết thúc) theo chuẩn ISO 8601.
+ * Chuẩn này đảm bảo tính nhất quán với cách trình duyệt xử lý <input type="week">.
+ * @param {Date} date - Ngày cần kiểm tra.
+ * @returns {{year: number, weekNumber: number, startDate: Date, endDate: Date}}
+ */
 const getWeekInfo = (date) => {
-    const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-    d.setHours(0, 0, 0, 0);
-    const day = d.getDay() === 0 ? 6 : d.getDay() - 1;
-    const startDate = new Date(d.setDate(d.getDate() - day));
+    // Tạo một bản sao của ngày để tránh thay đổi ngày gốc
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    
+    // Đặt ngày thành thứ Năm gần nhất của tuần đó.
+    d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+    
+    // Lấy năm của ngày thứ Năm đó, đây là năm của tuần theo chuẩn ISO.
+    const year = d.getUTCFullYear();
+    
+    // Lấy ngày đầu tiên của năm đó.
+    const yearStart = new Date(Date.UTC(year, 0, 1));
+    
+    // Tính số tuần bằng cách đếm số ngày từ đầu năm đến thứ Năm và chia cho 7.
+    const weekNumber = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+
+    // Tính ngày bắt đầu (Thứ Hai) và kết thúc (Chủ Nhật) của tuần.
+    const localDate = new Date(date);
+    const dayOfWeek = localDate.getDay() === 0 ? 6 : localDate.getDay() - 1; // Thứ Hai=0, ..., Chủ Nhật=6
+    const startDate = new Date(localDate.setDate(localDate.getDate() - dayOfWeek));
+    startDate.setHours(0, 0, 0, 0);
+    
     const endDate = new Date(new Date(startDate).setDate(startDate.getDate() + 6));
-    const year = startDate.getFullYear();
-    const oneJan = new Date(year, 0, 1);
-    const numberOfDays = Math.floor((startDate - oneJan) / (24 * 60 * 60 * 1000));
-    const weekNumber = Math.ceil((numberOfDays + oneJan.getDay() + 1) / 7);
+    endDate.setHours(23, 59, 59, 999);
+
     return { year, weekNumber, startDate, endDate };
 };
+
 
 const formatDate = (date) => {
     const day = String(date.getDate()).padStart(2, '0');
@@ -137,7 +159,7 @@ function updateUIForRole() {
     const adminElements = document.querySelectorAll('.admin-only');
     
     adminElements.forEach(el => {
-        el.style.display = isAdmin ? '' : 'none'; // Use '' to revert to default display
+        el.style.display = isAdmin ? '' : 'none';
     });
 }
 
@@ -160,15 +182,49 @@ const renderDepartmentsList = (departments) => {
 
 const populateDepartmentSelector = (departments) => {
     const currentValue = departmentSelector.value;
-    departmentSelector.innerHTML = '<option value="general">Lịch chung toàn khoa</option>';
+    // [UPDATED] Thay đổi "toàn khoa" thành "toàn trường"
+    departmentSelector.innerHTML = '<option value="general">Lịch chung Toàn Khoa Công Nghệ Thông Tin</option>';
     departments.forEach(dept => {
         const option = document.createElement('option');
         option.value = dept.id;
         option.textContent = dept.name;
         departmentSelector.appendChild(option);
     });
-    if (currentValue) departmentSelector.value = currentValue;
+    // Cố gắng khôi phục lựa chọn trước đó nếu nó vẫn tồn tại
+    if (departments.some(d => d.id === currentValue)) {
+        departmentSelector.value = currentValue;
+    }
 };
+
+const loadDepartments = () => {
+    if (currentUnsubscribeDepartments) currentUnsubscribeDepartments();
+    const q = query(departmentsCol);
+
+    let isFirstSnapshot = true;
+
+    currentUnsubscribeDepartments = onSnapshot(q, (snapshot) => {
+        allDepartments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a,b) => a.name.localeCompare(b.name));
+        
+        // Cập nhật cả danh sách quản lý và danh sách chọn
+        renderDepartmentsList(allDepartments);
+        populateDepartmentSelector(allDepartments);
+
+        // [UPDATED] Trong lần tải dữ liệu đầu tiên, đặt khoa mặc định và tải lịch
+        if (isFirstSnapshot) {
+            isFirstSnapshot = false; // Ngăn không cho khối này chạy lại
+
+            // [UPDATED] Thêm .trim() để đảm bảo so sánh chuỗi chính xác
+            const itDepartment = allDepartments.find(dept => dept.name.trim() === "Khoa Công nghệ Thông Tin");
+            if (itDepartment) {
+                departmentSelector.value = itDepartment.id;
+            }
+            
+            // Bây giờ các giá trị mặc định đã được đặt, tải lịch lần đầu tiên
+            loadAndRenderSchedule();
+        }
+    });
+};
+
 
 const handleDepartmentFormSubmit = async (e) => {
     e.preventDefault();
@@ -202,17 +258,7 @@ const deleteDepartment = async (id) => {
             showAlert('Lỗi khi xóa khoa.');
         }
     }
-};
-
-const loadDepartments = () => {
-    if (currentUnsubscribeDepartments) currentUnsubscribeDepartments();
-    const q = query(departmentsCol);
-    currentUnsubscribeDepartments = onSnapshot(q, (snapshot) => {
-        allDepartments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a,b) => a.name.localeCompare(b.name));
-        renderDepartmentsList(allDepartments);
-        populateDepartmentSelector(allDepartments);
-    });
-};
+}
 
 // --- QUẢN LÝ CÔNG VIỆC & LỊCH TRÌNH ---
 const renderSchedule = (tasks, weekInfo, weekMetadata) => {
@@ -227,8 +273,9 @@ const renderSchedule = (tasks, weekInfo, weekMetadata) => {
         departmentHeadTitle.textContent = dept?.headTitle || 'TRƯỞNG ĐƠN VỊ';
         departmentHeadName.textContent = dept?.headName || '';
     } else {
-        departmentHeadTitle.textContent = 'TRƯỞNG KHOA';
-        departmentHeadName.textContent = 'PGS.TS Lê Đắc Nhường';
+        // [UPDATED] Thay đổi chữ ký cho lịch toàn trường
+        departmentHeadTitle.textContent = 'BAN GIÁM HIỆU';
+        departmentHeadName.textContent = ''; // Để trống tên cho lịch chung
     }
     
     scheduleTitle.textContent = `LỊCH CÔNG TÁC TUẦN ${weekInfo.weekNumber} (Từ ngày ${formatDate(weekInfo.startDate)} đến ngày ${formatDate(weekInfo.endDate)})`;
@@ -668,13 +715,16 @@ const setupEventListeners = () => {
 const initializePage = () => {
     mainContent.classList.remove('hidden');
     const today = new Date();
-    const year = today.getFullYear();
-    const week = getWeekInfo(today).weekNumber;
+    const weekInfo = getWeekInfo(today);
+    const year = weekInfo.year;
+    const week = weekInfo.weekNumber;
     weekSelector.value = `${year}-W${String(week).padStart(2, '0')}`;
+    
+    // [UPDATED] Hàm này bây giờ xử lý việc điền danh sách khoa, đặt giá trị mặc định, và tải lịch ban đầu
     loadDepartments();
-    loadAndRenderSchedule();
+    
     setupEventListeners();
-    updateUIForRole(); // Cập nhật giao diện dựa trên vai trò người dùng
+    updateUIForRole();
 };
 
 // --- AUTHENTICATION ---

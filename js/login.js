@@ -161,7 +161,12 @@ async function initializeFirebase() {
       apiKey: "AIzaSyCJcTMUwO-w7V0YsGUKWeaW-zl42Ww7fxo",
       authDomain: "qlylaodongbdhhp.firebaseapp.com",
       projectId: "qlylaodongbdhhp",
-      storageBucket: "qlylaodongbdhhp.appspot.com",
+      // =======================================================
+      // ============ CẬP NHẬT THEO YÊU CẦU CỦA BẠN ============
+      // =======================================================
+      storageBucket: "qlylaodongbdhhp.firebasestorage.app",
+      // =======================================================
+      // =======================================================
       messagingSenderId: "462439202995",
       appId: "1:462439202995:web:06bc11042efb9b99d4f0c6"
     };
