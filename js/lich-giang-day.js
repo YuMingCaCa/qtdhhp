@@ -1,6 +1,7 @@
 // File: js/lich-giang-day.js
 // Logic for the "Teaching Schedule" module.
-// FIXED: Rewrote the auto-scheduling logic to correctly prioritize preferred slots and prevent race conditions.
+// OPTIMIZED: Changed data fetching for 'schedules' from onSnapshot to on-demand getDocs to reduce Firebase reads.
+// ADDED: Main semester filter to control data loading.
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -153,8 +154,8 @@ async function initializeFirebase() {
                 updateUIForRole(); 
                 setupOnSnapshotListeners(); 
                 addEventListeners();
-                populateYearSelect();
-                updateSemesterName();
+                // populateYearSelect(); // This is for a form, not the main filter
+                // updateSemesterName(); // This is for a form, not the main filter
             } else {
                 window.location.href = 'index.html';
             }
@@ -209,7 +210,8 @@ let departments = [];
 let lecturers = [];
 let officialClasses = [];
 let majors = [];
-let schedules = [];
+let schedules = []; // OPTIMIZED: This will only hold data for the selected semester
+let selectedSemesterId = null; // To track the current semester
 
 // --- Searchable Select Component Logic ---
 function initSearchableSelect(containerId, options, config) {
@@ -369,12 +371,14 @@ function renderScheduleForClass(classId) {
     }
     scheduleTitle.textContent = `Thời khóa biểu lớp: ${selectedClass.maLopCQ}`;
 
-    const sectionsForClass = courseSections.filter(cs => cs.lopChinhQuyId === classId);
+    // OPTIMIZED: Now filters course sections that belong to the current semester
+    const sectionsForClass = courseSections.filter(cs => cs.lopChinhQuyId === classId && cs.hocKyId === selectedSemesterId);
     if (sectionsForClass.length === 0) return;
 
     const isAdmin = scheduleModuleUserInfo && scheduleModuleUserInfo.role === 'admin';
 
     sectionsForClass.forEach(section => {
+        // OPTIMIZED: Filters the pre-loaded `schedules` array for the current semester
         const schedulesForSection = schedules.filter(s => s.lopHocPhanId === section.id);
 
         schedulesForSection.forEach(scheduleInfo => {
@@ -472,7 +476,7 @@ function renderDepartmentSchedule(departmentId) {
         classNameCell.textContent = oClass.maLopCQ;
         row.appendChild(classNameCell);
 
-        const sectionsForClass = courseSections.filter(cs => cs.lopChinhQuyId === oClass.id);
+        const sectionsForClass = courseSections.filter(cs => cs.lopChinhQuyId === oClass.id && cs.hocKyId === selectedSemesterId);
         const sectionIdsForClass = sectionsForClass.map(cs => cs.id);
 
         for (let day = 2; day <= 7; day++) {
@@ -643,10 +647,32 @@ window.editSemester = (id) => {
 };
 
 window.deleteSemester = (id) => {
-    showConfirm('Bạn có chắc muốn xóa học kỳ này?', async () => {
+    showConfirm('Bạn có chắc muốn xóa học kỳ này? Thao tác này sẽ xóa tất cả phân công và lịch học liên quan!', async () => {
         try {
-            await deleteDoc(doc(hocKyCol, id));
-            showAlert('Xóa học kỳ thành công!', true);
+            const batch = writeBatch(db);
+            
+            // Find and delete course sections
+            const sectionsQuery = query(lopHocPhanCol, where("hocKyId", "==", id));
+            const sectionsSnapshot = await getDocs(sectionsQuery);
+            const sectionIds = sectionsSnapshot.docs.map(doc => doc.id);
+            sectionsSnapshot.forEach(doc => batch.delete(doc.ref));
+
+            // Find and delete schedules using chunked queries
+            if (sectionIds.length > 0) {
+                const chunkSize = 30;
+                for (let i = 0; i < sectionIds.length; i += chunkSize) {
+                    const chunk = sectionIds.slice(i, i + chunkSize);
+                    const schedulesQuery = query(thoiKhoaBieuCol, where("lopHocPhanId", "in", chunk));
+                    const schedulesSnapshot = await getDocs(schedulesQuery);
+                    schedulesSnapshot.forEach(doc => batch.delete(doc.ref));
+                }
+            }
+
+            // Delete the semester itself
+            batch.delete(doc(hocKyCol, id));
+
+            await batch.commit();
+            showAlert('Xóa học kỳ và dữ liệu liên quan thành công!', true);
         } catch (error) {
             showAlert(`Lỗi khi xóa học kỳ: ${error.message}`);
         }
@@ -1016,10 +1042,19 @@ window.editCourseSection = (id) => {
 };
 
 window.deleteCourseSection = (id) => {
-    showConfirm('Bạn có chắc muốn xóa phân công này?', async () => {
+    showConfirm('Bạn có chắc muốn xóa phân công này? Thao tác này sẽ xóa cả lịch học liên quan!', async () => {
         try {
-            await deleteDoc(doc(lopHocPhanCol, id));
-            showAlert('Xóa phân công thành công!', true);
+            const batch = writeBatch(db);
+            // Find and delete related schedules
+            const schedulesQuery = query(thoiKhoaBieuCol, where("lopHocPhanId", "==", id));
+            const schedulesSnapshot = await getDocs(schedulesQuery);
+            schedulesSnapshot.forEach(doc => batch.delete(doc.ref));
+
+            // Delete the course section itself
+            batch.delete(doc(lopHocPhanCol, id));
+            
+            await batch.commit();
+            showAlert('Xóa phân công và lịch học liên quan thành công!', true);
         } catch (error) {
             showAlert(`Lỗi khi xóa: ${error.message}`);
         }
@@ -1086,7 +1121,10 @@ function populateManualScheduleModal() {
     const sectionSelect = document.getElementById('ms-section-select');
     sectionSelect.innerHTML = '<option value="">-- Chọn Lớp học phần --</option>';
     
-    courseSections.forEach(cs => {
+    // Only show sections for the currently selected semester
+    const sectionsInCurrentSemester = courseSections.filter(cs => cs.hocKyId === selectedSemesterId);
+
+    sectionsInCurrentSemester.forEach(cs => {
         const subject = subjects.find(s => s.id === cs.monHocId);
         const officialClass = officialClasses.find(oc => oc.id === cs.lopChinhQuyId);
         if (subject && officialClass) {
@@ -1148,7 +1186,15 @@ function trySlot(section, day, startPeriod, numPeriods, tempSchedules) {
 async function runAutoScheduler(btn) {
     setButtonLoading(btn, true);
     
-    let unscheduledSections = courseSections
+    if (!selectedSemesterId) {
+        showAlert("Vui lòng chọn một học kỳ để chạy xếp lịch tự động.");
+        setButtonLoading(btn, false);
+        return;
+    }
+
+    const sectionsInSemester = courseSections.filter(cs => cs.hocKyId === selectedSemesterId);
+
+    let unscheduledSections = sectionsInSemester
         .filter(cs => !schedules.some(s => s.lopHocPhanId === cs.id))
         .map(cs => {
             const officialClass = officialClasses.find(oc => oc.id === cs.lopChinhQuyId);
@@ -1156,7 +1202,7 @@ async function runAutoScheduler(btn) {
         });
 
     if (unscheduledSections.length === 0) {
-        showAlert("Tất cả các lớp học phần đã được xếp lịch.", true);
+        showAlert("Tất cả các lớp học phần trong học kỳ này đã được xếp lịch.", true);
         setButtonLoading(btn, false);
         return;
     }
@@ -2029,20 +2075,26 @@ async function saveLecturerPreferences() {
 
 // --- Event Listeners and Initial Setup ---
 function addEventListeners() {
-    // --- Department and Class filter listeners ---
+    // --- OPTIMIZED: Main filter listeners ---
+    document.getElementById('main-semester-select').addEventListener('change', (e) => {
+        loadDataForSemester(e.target.value);
+    });
     document.getElementById('department-filter-select').addEventListener('change', (e) => {
         const departmentId = e.target.value;
         populateClassFilterSelect(departmentId);
         renderDepartmentSchedule(departmentId);
         renderScheduleForClass(''); 
     });
-
     document.getElementById('class-filter-select').addEventListener('change', (e) => {
         renderScheduleForClass(e.target.value);
     });
 
     // Manual Schedule Modal Listener
     document.getElementById('manual-schedule-btn').addEventListener('click', () => {
+        if (!selectedSemesterId) {
+            showAlert("Vui lòng chọn một học kỳ trước khi xếp lịch.");
+            return;
+        }
         populateManualScheduleModal();
         document.getElementById('ms-section-select').disabled = false;
         document.getElementById('manual-schedule-form').reset();
@@ -2052,13 +2104,17 @@ function addEventListeners() {
 
     // Auto Schedule Button Listener
     document.getElementById('auto-schedule-btn').addEventListener('click', (e) => {
-        showConfirm("Bạn có chắc muốn chạy xếp lịch tự động cho tất cả các lớp chưa có lịch?", () => {
+        showConfirm("Bạn có chắc muốn chạy xếp lịch tự động cho tất cả các lớp chưa có lịch trong học kỳ này?", () => {
              runAutoScheduler(e.currentTarget);
         });
     });
     
     // Conflict Check Button Listener
     document.getElementById('conflict-check-btn').addEventListener('click', () => {
+        if (!selectedSemesterId) {
+            showAlert("Vui lòng chọn một học kỳ để kiểm tra xung đột.");
+            return;
+        }
         runConflictCheck();
     });
 
@@ -2421,10 +2477,92 @@ function addEventListeners() {
     setupBulkDelete('manage-course-sections-modal', 'select-all-course-sections', 'course-section-checkbox', 'delete-selected-course-sections-btn', lopHocPhanCol, 'phân công');
 }
 
+// --- OPTIMIZED: Data Loading Logic ---
+
+/**
+ * NEW: Loads schedule data for a specific semester on demand.
+ * @param {string} semesterId - The ID of the semester to load data for.
+ */
+async function loadDataForSemester(semesterId) {
+    selectedSemesterId = semesterId;
+    const scheduleContainer = document.getElementById('department-schedule-container');
+    scheduleContainer.innerHTML = '<p class="text-gray-500 p-4 text-center"><i class="fas fa-spinner fa-spin mr-2"></i>Đang tải dữ liệu lịch học...</p>';
+
+    if (!semesterId) {
+        schedules.length = 0; // Clear schedules array
+        renderDepartmentSchedule(document.getElementById('department-filter-select').value);
+        renderScheduleForClass(document.getElementById('class-filter-select').value);
+        return;
+    }
+
+    try {
+        // Step 1: Get all course sections for the selected semester
+        const sectionsQuery = query(lopHocPhanCol, where("hocKyId", "==", semesterId));
+        const sectionsSnapshot = await getDocs(sectionsQuery);
+        const sectionIds = sectionsSnapshot.docs.map(doc => doc.id);
+
+        if (sectionIds.length === 0) {
+            schedules.length = 0;
+        } else {
+            // Step 2: Chunk IDs and fetch schedules to avoid query limits
+            const schedulesPromises = [];
+            const chunkSize = 30; // Firestore 'in' query limit is 30
+            for (let i = 0; i < sectionIds.length; i += chunkSize) {
+                const chunk = sectionIds.slice(i, i + chunkSize);
+                const schedulesQuery = query(thoiKhoaBieuCol, where("lopHocPhanId", "in", chunk));
+                schedulesPromises.push(getDocs(schedulesQuery));
+            }
+
+            const snapshots = await Promise.all(schedulesPromises);
+            schedules.length = 0; // Clear existing schedules before populating
+            snapshots.forEach(snapshot => {
+                snapshot.forEach(doc => {
+                    schedules.push({ id: doc.id, ...doc.data() });
+                });
+            });
+        }
+
+        // Step 3: Re-render the UI with the new semester-specific data
+        const currentDepId = document.getElementById('department-filter-select').value;
+        const currentClassId = document.getElementById('class-filter-select').value;
+        renderDepartmentSchedule(currentDepId);
+        renderScheduleForClass(currentClassId);
+
+    } catch (error) {
+        console.error("Error loading schedule data for semester:", error);
+        showAlert("Đã xảy ra lỗi khi tải dữ liệu lịch học.");
+        scheduleContainer.innerHTML = '<p class="text-red-500 p-4 text-center">Lỗi tải dữ liệu.</p>';
+    }
+}
+
+/**
+ * NEW: Populates the main semester filter and triggers the initial data load.
+ */
+async function populateMainSemesterSelect() {
+    const select = document.getElementById('main-semester-select');
+    select.innerHTML = '<option value="">-- Chọn học kỳ --</option>';
+    semesters.forEach(semester => {
+        const option = document.createElement('option');
+        option.value = semester.id;
+        option.textContent = semester.tenHocKy;
+        select.appendChild(option);
+    });
+
+    // Automatically select the most recent semester
+    if (semesters.length > 0) {
+        const mostRecentSemester = semesters[0]; // Assumes semesters are sorted descending
+        select.value = mostRecentSemester.id;
+        await loadDataForSemester(mostRecentSemester.id);
+    } else {
+        await loadDataForSemester(null); // Handle case with no semesters
+    }
+}
+
+
 // --- Data Snapshot Listeners ---
 let isDataReady = {
     semesters: false, subjects: false, rooms: false, courseSections: false,
-    departments: false, lecturers: false, officialClasses: false, schedules: false,
+    departments: false, lecturers: false, officialClasses: false,
     majors: false, settings: false
 };
 let initialLoadDone = false;
@@ -2433,19 +2571,16 @@ function checkAllDataReady() {
     if (initialLoadDone) return;
     if (Object.values(isDataReady).every(status => status === true)) {
         initialLoadDone = true;
-        console.log("All initial data loaded.");
+        console.log("All foundational data loaded. Populating semester select and loading schedule data.");
         
-        // Render the class-specific table structure
-        renderClassScheduleTable();
+        // This will now trigger the first load of schedule data
+        populateMainSemesterSelect(); 
         
-        // Populate filters
+        // Populate other filters and render empty structure
         populateDepartmentFilterSelect();
         const initialDeptId = document.getElementById('department-filter-select').value;
-        
-        // Render initial views
-        renderDepartmentSchedule(initialDeptId);
         populateClassFilterSelect(initialDeptId);
-        renderScheduleForClass(''); // Start with the class view hidden
+        renderClassScheduleTable();
     }
 }
 
@@ -2458,7 +2593,6 @@ function setupOnSnapshotListeners() {
         { name: 'departments', col: departmentsCol, state: departments, render: renderMajorsList, sort: (a, b) => a.name.localeCompare(b.name) },
         { name: 'lecturers', col: lecturersCol, state: lecturers, render: null, sort: (a, b) => a.name.localeCompare(b.name) },
         { name: 'officialClasses', col: lopChinhQuyCol, state: officialClasses, render: renderOfficialClassesList, sort: (a, b) => a.maLopCQ.localeCompare(b.maLopCQ) },
-        { name: 'schedules', col: thoiKhoaBieuCol, state: schedules, render: null, sort: null },
         { name: 'majors', col: nganhHocCol, state: majors, render: renderMajorsList, sort: (a, b) => a.tenNganh.localeCompare(b.tenNganh) }
     ];
 
@@ -2470,9 +2604,9 @@ function setupOnSnapshotListeners() {
             
             if (c.render) c.render();
 
-            // --- REVISED RE-RENDERING LOGIC ---
+            // Re-render views if foundational data changes
             const scheduleAffectingCollections = [
-                'schedules', 'courseSections', 'subjects', 'lecturers', 'rooms', 
+                'courseSections', 'subjects', 'lecturers', 'rooms', 
                 'officialClasses', 'departments'
             ];
 
@@ -2492,7 +2626,10 @@ function setupOnSnapshotListeners() {
                 renderDepartmentSchedule(currentDepId);
                 renderScheduleForClass(currentClassId);
             }
-            // --- END OF REVISED LOGIC ---
+            
+            if (c.name === 'semesters') {
+                populateMainSemesterSelect();
+            }
 
             if (!isDataReady[c.name]) {
                 isDataReady[c.name] = true;

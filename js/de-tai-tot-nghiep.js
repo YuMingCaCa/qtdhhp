@@ -1,6 +1,7 @@
 // File: js/de-tai-tot-nghiep.js
 // Logic for the "Graduation Thesis Management" module.
-// UPDATED: Added class and location filters to the internship print modal.
+// OPTIMIZED: Changed data fetching for 'topics' and 'students' from onSnapshot to on-demand getDocs.
+// ADDED: Main academic year filter to control data loading.
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -105,12 +106,13 @@ async function initializeFirebase() {
 }
 
 // --- Global State ---
-let allTopics = [];
+let allTopics = []; // OPTIMIZED: Will only hold topics for the selected year
 let allLecturers = [];
 let allDepartments = [];
-let allStudents = [];
+let allStudents = []; // OPTIMIZED: Will be loaded on demand
 let allInternshipLocations = [];
 let academicYears = [];
+let selectedYear = null;
 
 // --- UI Rendering & Logic ---
 
@@ -231,11 +233,19 @@ function renderTopicsList() {
 
 function populateFilterDropdowns() {
     const depSelect = document.getElementById('filter-department');
+    const yearSelect = document.getElementById('filter-year');
     
     depSelect.innerHTML = '<option value="all">Tất cả Khoa</option>';
     allDepartments.forEach(dep => {
         depSelect.innerHTML += `<option value="${dep.id}">${dep.name}</option>`;
     });
+
+    yearSelect.innerHTML = '';
+    academicYears.forEach(year => {
+        yearSelect.innerHTML += `<option value="${year}">Năm học ${year}</option>`;
+    });
+    yearSelect.value = getCurrentAcademicYear();
+    selectedYear = yearSelect.value;
 
     updateLecturerFilterDropdown('all');
 }
@@ -262,7 +272,7 @@ function populateModalDropdowns() {
     academicYears.forEach(year => {
         yearSelect.innerHTML += `<option value="${year}">Năm học ${year}</option>`;
     });
-    yearSelect.value = getCurrentAcademicYear();
+    yearSelect.value = selectedYear || getCurrentAcademicYear();
 
     depSelect.innerHTML = '<option value="">-- Chọn Khoa --</option>';
     allDepartments.forEach(dep => {
@@ -392,7 +402,7 @@ async function handleTopicImport() {
             logContainer.innerHTML += `Đã đọc ${jsonData.length} dòng. Đang xử lý...<br>`;
             const batch = writeBatch(db);
             let successCount = 0, errorCount = 0;
-            const currentYear = getCurrentAcademicYear();
+            const currentYear = selectedYear || getCurrentAcademicYear();
             for (const [index, row] of jsonData.entries()) {
                 try {
                     const tenDeTai = String(row.tenDeTai || '').trim();
@@ -977,6 +987,10 @@ function addEventListeners() {
     document.getElementById('start-location-import-btn').addEventListener('click', handleInternshipLocationImport);
 
     // Filter listeners
+    document.getElementById('filter-year').addEventListener('change', (e) => {
+        selectedYear = e.target.value;
+        loadDataForYear(selectedYear);
+    });
     document.getElementById('filter-department').addEventListener('change', () => {
         updateLecturerFilterDropdown(document.getElementById('filter-department').value);
         renderTopicsList();
@@ -993,7 +1007,7 @@ function addEventListeners() {
         const locationSelect = document.getElementById('print-location-select');
 
         // Populate Year and Department always
-        yearSelect.innerHTML = academicYears.map(y => `<option value="${y}" ${y === getCurrentAcademicYear() ? 'selected' : ''}>Năm học ${y}</option>`).join('');
+        yearSelect.innerHTML = academicYears.map(y => `<option value="${y}" ${y === selectedYear ? 'selected' : ''}>Năm học ${y}</option>`).join('');
         depSelect.innerHTML = '<option value="all">Tất cả Khoa</option>' + allDepartments.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
 
         if (isAdvanced) {
@@ -1095,8 +1109,10 @@ function addEventListeners() {
     document.getElementById('bulk-assignment-topic-list').addEventListener('change', updateSelectedCounts);
     
     // --- NEW: Management Modal Listeners ---
-    document.getElementById('manage-students-btn').addEventListener('click', (e) => {
+    document.getElementById('manage-students-btn').addEventListener('click', async (e) => {
         e.preventDefault();
+        // OPTIMIZED: Load students only when the modal is opened
+        await loadAllStudents();
         openManageStudentsModal();
         manageMenuDropdown.classList.add('hidden');
     });
@@ -1312,11 +1328,42 @@ window.deleteLocationForManagement = (id) => {
 }
 
 
+// --- OPTIMIZED: Data Loading Logic ---
+async function loadDataForYear(year) {
+    selectedYear = year;
+    const listBody = document.getElementById('topics-list-body');
+    listBody.innerHTML = `<tr><td colspan="5" class="text-center p-6 text-gray-500"><i class="fas fa-spinner fa-spin mr-2"></i>Đang tải dữ liệu năm học ${year}...</td></tr>`;
+
+    try {
+        const q = query(topicsCol, where("academicYear", "==", year));
+        const snapshot = await getDocs(q);
+        allTopics = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+        renderTopicsList();
+    } catch (error) {
+        console.error(`Error loading topics for year ${year}:`, error);
+        showAlert(`Lỗi khi tải dữ liệu đề tài: ${error.message}`);
+        listBody.innerHTML = `<tr><td colspan="5" class="text-center p-6 text-red-500">Lỗi tải dữ liệu.</td></tr>`;
+    }
+}
+
+async function loadAllStudents() {
+    if (allStudents.length > 0) return; // Don't reload if already loaded
+    try {
+        const snapshot = await getDocs(query(studentsCol));
+        allStudents = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    } catch (error) {
+        console.error("Error loading students:", error);
+        showAlert("Không thể tải danh sách sinh viên.");
+    }
+}
+
 // --- Data Snapshot Listeners ---
 function setupOnSnapshotListeners() {
     onSnapshot(doc(settingsCol, 'appSettings'), (docSnapshot) => {
         const customYears = docSnapshot.exists() ? (docSnapshot.data().customYears || []) : [];
         academicYears = Array.from(new Set([getCurrentAcademicYear(), ...customYears])).sort().reverse();
+        populateFilterDropdowns();
+        loadDataForYear(selectedYear || getCurrentAcademicYear());
     }, (error) => console.error("Error listening to settings:", error));
 
     onSnapshot(query(departmentsCol), (snapshot) => {
@@ -1331,19 +1378,11 @@ function setupOnSnapshotListeners() {
         renderTopicsList();
     }, (error) => console.error("Error listening to lecturers:", error));
 
-    onSnapshot(query(topicsCol), (snapshot) => {
-        allTopics = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
-        renderTopicsList();
-    }, (error) => console.error("Error listening to topics:", error));
-
-    onSnapshot(query(studentsCol), (snapshot) => {
-        allStudents = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        renderStudentsForManagement(); // Re-render management list on change
-    }, (error) => console.error("Error listening to students:", error));
+    // OPTIMIZED: Removed onSnapshot for topicsCol and studentsCol
 
     onSnapshot(query(internshipLocationsCol), (snapshot) => {
         allInternshipLocations = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a, b) => a.name.localeCompare(b.name));
-        renderLocationsForManagement(); // Re-render management list on change
+        renderLocationsForManagement();
     }, (error) => console.error("Error listening to internship locations:", error));
 }
 
