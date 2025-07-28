@@ -11,6 +11,7 @@
 // SIMPLIFICATION: Removed faculty selection from main view/upload UI.
 // NEW FEATURE: Added search functionality for subjects.
 // NEW FEATURE: Added 20MB file size limit for uploads.
+// NEW FEATURE: Made subject management section collapsible and added a filter for its table.
 
 // Import Firebase modules
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
@@ -43,6 +44,9 @@ function injectStyles() {
         @keyframes slideIn { from {margin-top: -5%; opacity: 0} to {margin-top: 5%; opacity: 1} }
         @-webkit-keyframes fadeIn { from {opacity: 0} to {opacity: 1} }
         @keyframes fadeIn { from {opacity: 0} to {opacity: 1} }
+        #toggle-subject-icon.rotate-180 {
+            transform: rotate(180deg);
+        }
     `;
     document.head.appendChild(style);
 }
@@ -178,19 +182,26 @@ function renderViewSubjectSelect(filterText = '') {
 }
 
 // Renders the table of subjects in the subject management panel
-function renderSubjectsTable() {
+function renderSubjectsTable(filterText = '') {
     const tableBody = document.getElementById('subjects-table-body');
     tableBody.innerHTML = ''; // Clear existing rows
     state.selectedSubjectIdsToDelete.clear(); // Clear selections when re-rendering
     updateDeleteSelectedButtonState(); // Update button state
 
-    const subjectsTitleElement = document.getElementById('subjects-table-title'); // Get the title element
+    const subjectsTitleElement = document.getElementById('subjects-table-title');
+    
+    const lowercasedFilter = filterText.toLowerCase().trim();
+    const filteredSubjects = lowercasedFilter ? state.subjects.filter(subject => 
+        subject.subjectName.toLowerCase().includes(lowercasedFilter) || 
+        (subject.subjectCode && subject.subjectCode.toLowerCase().includes(lowercasedFilter))
+    ) : state.subjects;
+
     if (subjectsTitleElement) {
-        subjectsTitleElement.textContent = `Danh sách môn học hiện có (${state.subjects.length} môn):`; // Update the title with count
+        subjectsTitleElement.textContent = `Danh sách môn học hiện có (${filteredSubjects.length} / ${state.subjects.length} môn):`;
     }
 
-    if (state.subjects.length === 0) {
-        tableBody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-gray-500">Chưa có môn học nào.</td></tr>`; // Updated colspan
+    if (filteredSubjects.length === 0) {
+        tableBody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-gray-500">Không tìm thấy môn học nào.</td></tr>`;
         document.getElementById('select-all-subjects').checked = false;
         document.getElementById('select-all-subjects').disabled = true;
         return;
@@ -198,7 +209,7 @@ function renderSubjectsTable() {
 
     document.getElementById('select-all-subjects').disabled = false;
 
-    const sortedSubjects = [...state.subjects].sort((a, b) => a.subjectName.localeCompare(b.subjectName));
+    const sortedSubjects = [...filteredSubjects].sort((a, b) => a.subjectName.localeCompare(b.subjectName));
 
     sortedSubjects.forEach(subject => {
         const facultyName = state.faculties.find(f => f.id === subject.facultyId)?.facultyName || 'Không rõ';
@@ -933,6 +944,20 @@ function addEventListeners() {
 
     // New: Event listener for delete selected subjects button
     document.getElementById('delete-selected-subjects-btn').addEventListener('click', handleDeleteSelectedSubjects);
+    
+    // New: Event listener for toggling subject management section
+    document.getElementById('toggle-subject-management').addEventListener('click', () => {
+        const content = document.getElementById('subject-management-content');
+        const icon = document.getElementById('toggle-subject-icon');
+        content.classList.toggle('hidden');
+        icon.classList.toggle('fa-chevron-down');
+        icon.classList.toggle('fa-chevron-up');
+    });
+
+    // New: Event listener for admin subject table filter
+    document.getElementById('admin-search-subject-input').addEventListener('input', (e) => {
+        renderSubjectsTable(e.target.value);
+    });
 }
 
 
