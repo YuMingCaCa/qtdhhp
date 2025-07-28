@@ -1,0 +1,57 @@
+/* File: css/portal-viec-lam.css */
+/* Custom styles for the Job Portal module */
+
+body {
+    font-family: 'Inter', sans-serif;
+}
+
+/* Style for the selected job listing */
+.job-card.selected {
+    border-color: #2563eb; /* blue-600 */
+    box-shadow: 0 0 0 2px #2563eb;
+    transform: translateY(-2px);
+}
+
+/* Smooth transition for all job cards */
+.job-card {
+    transition: all 0.2s ease-in-out;
+}
+
+/* Custom scrollbar for job details to make it look cleaner */
+#job-details-content {
+    max-height: calc(100vh - 200px); /* Adjust height based on your layout */
+    overflow-y: auto;
+    padding-right: 15px; /* Add padding to avoid content touching the scrollbar */
+}
+
+/* Webkit scrollbar styling */
+#job-details-content::-webkit-scrollbar {
+    width: 8px;
+}
+
+#job-details-content::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 10px;
+}
+
+#job-details-content::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 10px;
+}
+
+#job-details-content::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1024px) {
+    /* On smaller screens, the job details section is not sticky */
+    aside.lg\:col-span-4 {
+        position: static;
+        margin-top: 2rem;
+    }
+    
+    #job-details-content {
+        max-height: none;
+    }
+}
