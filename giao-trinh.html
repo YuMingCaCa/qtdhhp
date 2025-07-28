@@ -50,14 +50,20 @@
                     <h3 class="text-lg font-bold text-gray-700 mb-4">Tải lên tài liệu mới</h3>
                     <form id="upload-form" class="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
                         <div>
-                            <label for="upload-subject-select" class="block text-sm font-medium text-gray-700 mb-1">Chọn Môn học</label>
-                            <select id="upload-subject-select" required class="w-full p-2 border border-gray-300 rounded-lg shadow-sm focus:ring-orange-500 focus:border-orange-500"></select>
+                            <label for="upload-search-subject-input" class="block text-sm font-medium text-gray-700 mb-1">Chọn Môn học</label>
+                            <div class="relative">
+                                <input type="text" id="upload-search-subject-input" required placeholder="Tìm kiếm môn học..." autocomplete="off" class="w-full p-2 border border-gray-300 rounded-lg shadow-sm focus:ring-orange-500 focus:border-orange-500">
+                                <div id="upload-search-results" class="absolute z-20 w-full bg-white border border-gray-300 rounded-lg mt-1 max-h-60 overflow-y-auto hidden shadow-lg">
+                                    <!-- Results will be populated by JS -->
+                                </div>
+                            </div>
+                            <input type="hidden" id="upload-subject-id">
                         </div>
                         <div>
                             <label for="file-input" class="block text-sm font-medium text-gray-700 mb-1">Chọn File</label>
                             <input type="file" id="file-input" required class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100">
                         </div>
-                        <div class="md:self-end col-span-full md:col-span-1">
+                        <div class="md:self-end col-span-full">
                             <button type="submit" id="upload-btn" class="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded-lg shadow-md flex items-center justify-center gap-2">
                                 <i class="fas fa-upload"></i> Tải lên
                             </button>
@@ -158,21 +164,19 @@ Lập trình web | LT002      | Khoa Công nghệ Thông tin</pre>
                 </div>
 
                 <!-- Filters -->
-                <div class="mb-6 grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
-                    <div>
-                        <label for="search-subject-input" class="block text-sm font-medium text-gray-700 mb-1">Tìm kiếm Môn học</label>
-                        <div class="relative">
-                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                <i class="fas fa-search text-gray-400"></i>
-                            </div>
-                            <input type="text" id="search-subject-input" placeholder="Nhập tên hoặc mã môn học..." class="w-full p-3 pl-10 border border-gray-300 rounded-lg shadow-sm focus:ring-orange-500 focus:border-orange-500">
+                <div class="mb-6">
+                    <label for="search-subject-input" class="block text-sm font-medium text-gray-700 mb-1">Tìm kiếm & Chọn Môn học</label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i class="fas fa-search text-gray-400"></i>
+                        </div>
+                        <input type="text" id="search-subject-input" placeholder="Nhập tên hoặc mã môn học..." autocomplete="off" class="w-full p-3 pl-10 border border-gray-300 rounded-lg shadow-sm focus:ring-orange-500 focus:border-orange-500">
+                        <div id="view-search-results" class="absolute z-10 w-full bg-white border border-gray-300 rounded-lg mt-1 max-h-60 overflow-y-auto hidden shadow-lg">
+                            <!-- Results will be populated by JS -->
                         </div>
                     </div>
-                    <div>
-                        <label for="view-subject-select" class="block text-sm font-medium text-gray-700 mb-1">Chọn từ danh sách</label>
-                        <select id="view-subject-select" class="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-orange-500 focus:border-orange-500"></select>
-                    </div>
                 </div>
+
 
                 <!-- Main Content: Documents List -->
                 <div>

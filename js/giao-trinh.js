@@ -12,6 +12,7 @@
 // NEW FEATURE: Added search functionality for subjects.
 // NEW FEATURE: Added 20MB file size limit for uploads.
 // NEW FEATURE: Made subject management section collapsible and added a filter for its table.
+// NEW FEATURE: Implemented autocomplete search UI for subject selection.
 
 // Import Firebase modules
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
@@ -138,48 +139,34 @@ function updateUIForRole() {
     }
 }
 
-// Renders the subject select dropdown for the admin upload section
-function renderUploadSubjectSelect() {
-    const uploadSelect = document.getElementById('upload-subject-select');
-    const sortedSubjects = [...state.subjects].sort((a, b) => a.subjectName.localeCompare(b.subjectName));
-    const defaultOption = '<option value="">-- Chọn Môn học --</option>';
-    uploadSelect.innerHTML = defaultOption;
-    sortedSubjects.forEach(subject => {
-        const option = `<option value="${subject.id}">${subject.subjectName} (${subject.subjectCode})</option>`;
-        uploadSelect.innerHTML += option;
-    });
-}
+// Renders the list of subjects for the custom autocomplete components
+function renderSearchResultsList(filterText, resultsContainer) {
+    resultsContainer.innerHTML = '';
+    resultsContainer.classList.remove('hidden');
 
-// Renders the main subject select dropdown for viewing documents, with optional filtering
-function renderViewSubjectSelect(filterText = '') {
-    const viewSelect = document.getElementById('view-subject-select');
-    const currentSelectedId = viewSelect.value;
-
-    const sortedSubjects = [...state.subjects].sort((a, b) => a.subjectName.localeCompare(b.subjectName));
-    
     const lowercasedFilter = filterText.toLowerCase().trim();
-    const filteredSubjects = lowercasedFilter ? sortedSubjects.filter(subject => 
-        subject.subjectName.toLowerCase().includes(lowercasedFilter) || 
+    const filteredSubjects = lowercasedFilter ? state.subjects.filter(subject =>
+        subject.subjectName.toLowerCase().includes(lowercasedFilter) ||
         (subject.subjectCode && subject.subjectCode.toLowerCase().includes(lowercasedFilter))
-    ) : sortedSubjects;
+    ) : [...state.subjects];
 
-    viewSelect.innerHTML = '<option value="">-- Chọn Môn học --</option>';
-    filteredSubjects.forEach(subject => {
-        const option = `<option value="${subject.id}">${subject.subjectName} (${subject.subjectCode})</option>`;
-        viewSelect.innerHTML += option;
-    });
+    const sortedSubjects = filteredSubjects.sort((a, b) => a.subjectName.localeCompare(b.subjectName));
 
-    // Restore selection if it's still in the filtered list
-    const isSelectionStillValid = filteredSubjects.some(s => s.id === currentSelectedId);
-    if (isSelectionStillValid) {
-        viewSelect.value = currentSelectedId;
-    } else {
-        // If the current selection was filtered out, we should clear the documents list
-        if (state.selectedSubjectId && state.selectedSubjectId === currentSelectedId) {
-             fetchDocumentsForSubject(''); // Clear documents
-        }
+    if (sortedSubjects.length === 0) {
+        resultsContainer.innerHTML = `<div class="p-3 text-gray-500 text-sm">Không có kết quả</div>`;
+        return;
     }
+
+    sortedSubjects.forEach(subject => {
+        const item = document.createElement('div');
+        item.className = 'p-3 hover:bg-orange-100 cursor-pointer text-sm';
+        item.textContent = `${subject.subjectName} (${subject.subjectCode})`;
+        item.dataset.subjectId = subject.id;
+        item.dataset.subjectName = `${subject.subjectName} (${subject.subjectCode})`;
+        resultsContainer.appendChild(item);
+    });
 }
+
 
 // Renders the table of subjects in the subject management panel
 function renderSubjectsTable(filterText = '') {
@@ -446,9 +433,8 @@ function fetchSubjects() {
     }
     subjectsUnsubscribe = onSnapshot(curriculumSubjectsCol, (snapshot) => {
         state.subjects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        renderUploadSubjectSelect();
-        renderViewSubjectSelect(); // Initial render with full list
-        renderSubjectsTable(); // Render table in subject management
+        // No longer need to render select dropdowns, just the admin table
+        renderSubjectsTable(); 
     }, (error) => {
         console.error("Error fetching subjects: ", error);
         showAlert("Không thể tải danh sách môn học.");
@@ -482,7 +468,7 @@ function fetchDocumentsForSubject(subjectId) {
 // --- Event Handlers ---
 async function handleUpload(event) {
     event.preventDefault();
-    const subjectId = document.getElementById('upload-subject-select').value;
+    const subjectId = document.getElementById('upload-subject-id').value;
     const fileInput = document.getElementById('file-input');
     const uploadBtn = document.getElementById('upload-btn');
     const progressBarContainer = document.getElementById('upload-progress-bar');
@@ -502,7 +488,6 @@ async function handleUpload(event) {
     const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024; // 20MB
     const FREE_QUOTA_BYTES = 5 * 1024 * 1024 * 1024; // 5GB
 
-    // NEW: Check file size limit
     if (fileSize > MAX_FILE_SIZE_BYTES) {
         showAlert('Kích thước tệp không được vượt quá 20MB.');
         fileInput.value = ''; // Reset file input
@@ -512,16 +497,14 @@ async function handleUpload(event) {
     setButtonLoading(uploadBtn, true, `<i class="fas fa-upload"></i> Tải lên`);
 
     try {
-        // Get the facultyId from the selected subject
         const selectedSubject = state.subjects.find(s => s.id === subjectId);
         if (!selectedSubject) {
             showAlert("Môn học đã chọn không hợp lệ.");
             setButtonLoading(uploadBtn, false, `<i class="fas fa-upload"></i> Tải lên`);
             return;
         }
-        const facultyId = selectedSubject.facultyId || 'unknown_faculty'; // Use 'unknown_faculty' if not set
+        const facultyId = selectedSubject.facultyId || 'unknown_faculty';
 
-        // --- DUPLICATE FILE NAME CHECK ---
         const q = query(syllabusCol, where("subjectId", "==", subjectId), where("fileName", "==", file.name));
         const querySnapshot = await getDocs(q);
         if (!querySnapshot.empty) {
@@ -530,7 +513,6 @@ async function handleUpload(event) {
             return;
         }
 
-        // --- QUOTA CHECK ---
         const storageMetadataRef = doc(storageMetadataCol, 'main_bucket');
         const metadataDoc = await getDoc(storageMetadataRef);
         const currentTotalSize = metadataDoc.exists() ? metadataDoc.data().totalSizeInBytes : 0;
@@ -541,8 +523,7 @@ async function handleUpload(event) {
             return;
         }
 
-        // --- UPLOAD PROCESS ---
-        const filePath = `giao_trinh/${facultyId}/${subjectId}/${Date.now()}_${file.name}`; // Use facultyId in path
+        const filePath = `giao_trinh/${facultyId}/${subjectId}/${Date.now()}_${file.name}`;
         const storageRef = ref(storage, filePath);
 
         progressBarContainer.style.display = 'block';
@@ -564,9 +545,8 @@ async function handleUpload(event) {
             async () => {
                 const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
                 
-                // Save metadata to Firestore, including the file size and facultyId
                 await addDoc(syllabusCol, {
-                    facultyId: facultyId, // Store faculty ID
+                    facultyId: facultyId,
                     subjectId: subjectId,
                     fileName: file.name,
                     fileType: file.type,
@@ -578,7 +558,6 @@ async function handleUpload(event) {
                     uploaderEmail: state.currentUser.email,
                 });
 
-                // Update total storage size
                 await setDoc(storageMetadataRef, { 
                     totalSizeInBytes: increment(fileSize) 
                 }, { merge: true });
@@ -587,6 +566,7 @@ async function handleUpload(event) {
                 setButtonLoading(uploadBtn, false, `<i class="fas fa-upload"></i> Tải lên`);
                 progressBarContainer.style.display = 'none';
                 document.getElementById('upload-form').reset();
+                document.getElementById('upload-subject-id').value = '';
             }
         );
     } catch (error) {
@@ -663,13 +643,12 @@ async function handleImportSubjects() {
             const worksheet = workbook.Sheets[sheetName];
             const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
 
-            // Normalize headers to handle variations (e.g., "Tên môn học", "ten mon hoc")
             const headers = json.length > 0 ? json[0].map(h => h?.toString().trim().toLowerCase()) : [];
             const subjectNameColIndex = headers.indexOf('tên môn học');
-            const subjectCodeColIndex = headers.indexOf('mã môn học'); // New: Subject Code column index
+            const subjectCodeColIndex = headers.indexOf('mã môn học');
             const facultyNameColIndex = headers.indexOf('tên khoa');
 
-            if (subjectNameColIndex === -1 || subjectCodeColIndex === -1 || facultyNameColIndex === -1) { // Updated check
+            if (subjectNameColIndex === -1 || subjectCodeColIndex === -1 || facultyNameColIndex === -1) {
                 showAlert("Tệp Excel không đúng định dạng. Cần có 3 cột: 'Tên môn học', 'Mã môn học' và 'Tên khoa'.");
                 setButtonLoading(importBtn, false, `<i class="fas fa-file-excel"></i> Nhập môn học`);
                 return;
@@ -679,11 +658,11 @@ async function handleImportSubjects() {
             for (let i = 1; i < json.length; i++) {
                 const row = json[i];
                 const subjectName = row[subjectNameColIndex]?.toString().trim();
-                const subjectCode = row[subjectCodeColIndex]?.toString().trim(); // New: Get subject code
+                const subjectCode = row[subjectCodeColIndex]?.toString().trim();
                 const facultyName = row[facultyNameColIndex]?.toString().trim();
 
-                if (subjectName && subjectCode && facultyName) { // Updated check
-                    subjectsToImport.push({ subjectName, subjectCode, facultyName }); // Include subject code
+                if (subjectName && subjectCode && facultyName) {
+                    subjectsToImport.push({ subjectName, subjectCode, facultyName });
                 }
             }
 
@@ -696,23 +675,21 @@ async function handleImportSubjects() {
             let importedCount = 0;
             let skippedCount = 0;
 
-            for (const { subjectName, subjectCode, facultyName } of subjectsToImport) { // Destructure subjectCode
+            for (const { subjectName, subjectCode, facultyName } of subjectsToImport) {
                 try {
-                    // Find or create faculty
                     let facultyDoc = state.faculties.find(f => f.facultyName.toLowerCase() === facultyName.toLowerCase());
                     let facultyId;
 
                     if (!facultyDoc) {
                         const newFacultyRef = await addDoc(facultiesCol, { facultyName: facultyName });
                         facultyId = newFacultyRef.id;
-                        state.faculties.push({ id: facultyId, facultyName: facultyName }); // Update local state
+                        state.faculties.push({ id: facultyId, facultyName: facultyName });
                     } else {
                         facultyId = facultyDoc.id;
                     }
 
-                    // Check if subject already exists for this faculty and subject code
                     const q = query(curriculumSubjectsCol, 
-                        where("subjectCode", "==", subjectCode), // Check by subject code
+                        where("subjectCode", "==", subjectCode),
                         where("facultyId", "==", facultyId)
                     );
                     const existingSubjects = await getDocs(q);
@@ -720,7 +697,7 @@ async function handleImportSubjects() {
                     if (existingSubjects.empty) {
                         await addDoc(curriculumSubjectsCol, {
                             subjectName: subjectName,
-                            subjectCode: subjectCode, // Store subject code
+                            subjectCode: subjectCode,
                             facultyId: facultyId,
                             createdAt: serverTimestamp()
                         });
@@ -730,12 +707,10 @@ async function handleImportSubjects() {
                     }
                 } catch (innerError) {
                     console.error(`Error processing subject ${subjectName} (${subjectCode}) from faculty ${facultyName}:`, innerError);
-                    // Do not show individual alerts for each error during batch import,
-                    // but log them and provide a summary.
                 }
             }
             showAlert(`Nhập môn học thành công! Đã thêm: ${importedCount}, Đã bỏ qua (tồn tại): ${skippedCount}.`);
-            fileInput.value = ''; // Clear the file input
+            fileInput.value = '';
         } catch (error) {
             console.error("Error processing Excel file:", error);
             showAlert(`Lỗi khi đọc tệp Excel: ${error.message}`);
@@ -753,10 +728,9 @@ async function handleImportSubjects() {
     reader.readAsArrayBuffer(file);
 }
 
-// New: Function to download Excel template
 function downloadExcelTemplate() {
     const ws_data = [
-        ["Tên môn học", "Mã môn học", "Tên khoa"], // Updated headers
+        ["Tên môn học", "Mã môn học", "Tên khoa"],
         ["Toán cao cấp", "TC001", "Khoa Cơ bản"],
         ["Lập trình web", "LT002", "Khoa Công nghệ Thông tin"]
     ];
@@ -766,19 +740,18 @@ function downloadExcelTemplate() {
     XLSX.writeFile(wb, "mau_nhap_mon_hoc.xlsx");
 }
 
-// New: Handle adding a subject manually
 async function handleAddSubjectManually(event) {
     event.preventDefault();
     const subjectNameInput = document.getElementById('manual-subject-name');
-    const subjectCodeInput = document.getElementById('manual-subject-code'); // New: Subject code input
+    const subjectCodeInput = document.getElementById('manual-subject-code');
     const facultyNameInput = document.getElementById('manual-faculty-name');
     const addSubjectBtn = document.getElementById('add-subject-btn');
 
     const subjectName = subjectNameInput.value.trim();
-    const subjectCode = subjectCodeInput.value.trim(); // Get subject code
+    const subjectCode = subjectCodeInput.value.trim();
     const facultyName = facultyNameInput.value.trim();
 
-    if (!subjectName || !subjectCode || !facultyName) { // Updated check
+    if (!subjectName || !subjectCode || !facultyName) {
         showAlert("Vui lòng nhập đầy đủ Tên môn học, Mã môn học và Tên khoa.");
         return;
     }
@@ -786,21 +759,19 @@ async function handleAddSubjectManually(event) {
     setButtonLoading(addSubjectBtn, true, `<i class="fas fa-plus-circle"></i> Thêm môn học`);
 
     try {
-        // Find or create faculty
         let facultyDoc = state.faculties.find(f => f.facultyName.toLowerCase() === facultyName.toLowerCase());
         let facultyId;
 
         if (!facultyDoc) {
             const newFacultyRef = await addDoc(facultiesCol, { facultyName: facultyName });
             facultyId = newFacultyRef.id;
-            state.faculties.push({ id: facultyId, facultyName: facultyName }); // Update local state
+            state.faculties.push({ id: facultyId, facultyName: facultyName });
         } else {
             facultyId = facultyDoc.id;
         }
 
-        // Check if subject already exists for this faculty and subject code
         const q = query(curriculumSubjectsCol, 
-            where("subjectCode", "==", subjectCode), // Check by subject code
+            where("subjectCode", "==", subjectCode),
             where("facultyId", "==", facultyId)
         );
         const existingSubjects = await getDocs(q);
@@ -808,14 +779,14 @@ async function handleAddSubjectManually(event) {
         if (existingSubjects.empty) {
             await addDoc(curriculumSubjectsCol, {
                 subjectName: subjectName,
-                subjectCode: subjectCode, // Store subject code
+                subjectCode: subjectCode,
                 facultyId: facultyId,
                 createdAt: serverTimestamp()
             });
             showAlert(`Thêm môn học "${subjectName}" (${subjectCode}) thành công!`);
-            subjectNameInput.value = ''; // Clear input
-            subjectCodeInput.value = ''; // Clear input
-            facultyNameInput.value = ''; // Clear input
+            subjectNameInput.value = '';
+            subjectCodeInput.value = '';
+            facultyNameInput.value = '';
         } else {
             showAlert(`Môn học "${subjectName}" (${subjectCode}) thuộc khoa "${facultyName}" đã tồn tại.`);
         }
@@ -828,10 +799,9 @@ async function handleAddSubjectManually(event) {
 }
 
 
-// Updated: Handle deleting a subject (now accepts an array of IDs)
 async function handleDeleteSubject(subjectIds) {
     if (!Array.isArray(subjectIds)) {
-        subjectIds = [subjectIds]; // Ensure it's an array for single deletes too
+        subjectIds = [subjectIds];
     }
 
     if (subjectIds.length === 0) {
@@ -849,18 +819,15 @@ async function handleDeleteSubject(subjectIds) {
         return;
     }
 
-    // Disable the delete buttons during processing
     document.querySelectorAll('.delete-subject-btn').forEach(btn => setButtonLoading(btn, true));
     const deleteSelectedBtn = document.getElementById('delete-selected-subjects-btn');
     if (deleteSelectedBtn) setButtonLoading(deleteSelectedBtn, true, `<i class="fas fa-trash"></i> Xóa các môn đã chọn`);
-
 
     let successfulDeletions = 0;
     let failedDeletions = 0;
 
     for (const subjectId of subjectIds) {
         try {
-            // 1. Delete all documents associated with this subject
             const docsToDeleteQuery = query(syllabusCol, where("subjectId", "==", subjectId));
             const docsSnapshot = await getDocs(docsToDeleteQuery);
             let totalFileSizeDeleted = 0;
@@ -870,7 +837,6 @@ async function handleDeleteSubject(subjectIds) {
                 const filePath = docData.filePath;
                 const fileSize = docData.fileSize || 0;
 
-                // Delete file from Storage
                 try {
                     const fileRef = ref(storage, filePath);
                     await deleteObject(fileRef);
@@ -878,11 +844,9 @@ async function handleDeleteSubject(subjectIds) {
                 } catch (storageError) {
                     console.warn(`Could not delete file ${filePath} from storage (might not exist):`, storageError);
                 }
-                // Delete document from Firestore
                 await deleteDoc(doc(syllabusCol, docSnap.id));
             }
 
-            // 2. Decrement total storage size
             if (totalFileSizeDeleted > 0) {
                 const storageMetadataRef = doc(storageMetadataCol, 'main_bucket');
                 await setDoc(storageMetadataRef, { 
@@ -890,7 +854,6 @@ async function handleDeleteSubject(subjectIds) {
                 }, { merge: true });
             }
 
-            // 3. Delete the subject document itself
             await deleteDoc(doc(curriculumSubjectsCol, subjectId));
             successfulDeletions++;
         } catch (error) {
@@ -899,7 +862,6 @@ async function handleDeleteSubject(subjectIds) {
         }
     }
 
-    // Re-enable buttons and provide summary
     document.querySelectorAll('.delete-subject-btn').forEach(btn => setButtonLoading(btn, false, `<i class="fas fa-trash"></i> Xóa`));
     if (deleteSelectedBtn) setButtonLoading(deleteSelectedBtn, false, `<i class="fas fa-trash"></i> Xóa các môn đã chọn`);
 
@@ -910,11 +872,10 @@ async function handleDeleteSubject(subjectIds) {
     } else {
         showAlert(`Không có môn học nào được xóa. Vui lòng kiểm tra lại.`);
     }
-    state.selectedSubjectIdsToDelete.clear(); // Clear selections after operation
-    renderSubjectsTable(); // Re-render table to reflect changes and clear checkboxes
+    state.selectedSubjectIdsToDelete.clear();
+    renderSubjectsTable();
 }
 
-// New: Handle deleting multiple selected subjects
 async function handleDeleteSelectedSubjects() {
     const idsToDelete = Array.from(state.selectedSubjectIdsToDelete);
     await handleDeleteSubject(idsToDelete);
@@ -922,30 +883,59 @@ async function handleDeleteSelectedSubjects() {
 
 
 function addEventListeners() {
-    // New listener for the search input
-    document.getElementById('search-subject-input').addEventListener('input', (e) => {
-        renderViewSubjectSelect(e.target.value);
+    const searchInput = document.getElementById('search-subject-input');
+    const searchResults = document.getElementById('view-search-results');
+    const uploadSearchInput = document.getElementById('upload-search-subject-input');
+    const uploadSearchResults = document.getElementById('upload-search-results');
+    const uploadSubjectIdInput = document.getElementById('upload-subject-id');
+
+    // --- Main View Search Logic ---
+    searchInput.addEventListener('input', () => renderSearchResultsList(searchInput.value, searchResults));
+    searchInput.addEventListener('focus', () => renderSearchResultsList(searchInput.value, searchResults));
+
+    searchResults.addEventListener('click', (e) => {
+        if (e.target.dataset.subjectId) {
+            const subjectId = e.target.dataset.subjectId;
+            const subjectName = e.target.dataset.subjectName;
+            searchInput.value = subjectName;
+            searchResults.classList.add('hidden');
+            fetchDocumentsForSubject(subjectId);
+        }
     });
 
-    document.getElementById('view-subject-select').addEventListener('change', (e) => {
-        fetchDocumentsForSubject(e.target.value);
+    // --- Admin Upload Search Logic ---
+    uploadSearchInput.addEventListener('input', () => {
+        uploadSubjectIdInput.value = ''; // Clear hidden ID when user types
+        renderSearchResultsList(uploadSearchInput.value, uploadSearchResults);
+    });
+    uploadSearchInput.addEventListener('focus', () => renderSearchResultsList(uploadSearchInput.value, uploadSearchResults));
+
+    uploadSearchResults.addEventListener('click', (e) => {
+        if (e.target.dataset.subjectId) {
+            const subjectId = e.target.dataset.subjectId;
+            const subjectName = e.target.dataset.subjectName;
+            uploadSearchInput.value = subjectName;
+            uploadSubjectIdInput.value = subjectId;
+            uploadSearchResults.classList.add('hidden');
+        }
+    });
+
+    // --- Global listener to hide results ---
+    document.addEventListener('click', (e) => {
+        if (!searchInput.parentElement.contains(e.target)) {
+            searchResults.classList.add('hidden');
+        }
+        if (!uploadSearchInput.parentElement.contains(e.target)) {
+            uploadSearchResults.classList.add('hidden');
+        }
     });
 
     document.getElementById('upload-form').addEventListener('submit', handleUpload);
-
-    // Event listener for subject import button
     document.getElementById('import-subjects-btn').addEventListener('click', handleImportSubjects);
-
-    // Event listener for download template button
     document.getElementById('download-template-btn').addEventListener('click', downloadExcelTemplate);
-
-    // Event listener for manual add subject form
     document.getElementById('add-subject-form').addEventListener('submit', handleAddSubjectManually);
-
-    // New: Event listener for delete selected subjects button
     document.getElementById('delete-selected-subjects-btn').addEventListener('click', handleDeleteSelectedSubjects);
     
-    // New: Event listener for toggling subject management section
     document.getElementById('toggle-subject-management').addEventListener('click', () => {
         const content = document.getElementById('subject-management-content');
         const icon = document.getElementById('toggle-subject-icon');
@@ -954,7 +944,6 @@ function addEventListeners() {
         icon.classList.toggle('fa-chevron-up');
     });
 
-    // New: Event listener for admin subject table filter
     document.getElementById('admin-search-subject-input').addEventListener('input', (e) => {
         renderSubjectsTable(e.target.value);
     });
