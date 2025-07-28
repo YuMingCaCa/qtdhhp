@@ -13,6 +13,7 @@
 // NEW FEATURE: Added 20MB file size limit for uploads.
 // NEW FEATURE: Made subject management section collapsible and added a filter for its table.
 // NEW FEATURE: Implemented autocomplete search UI for subject selection.
+// NEW FEATURE: Added real-time storage usage display.
 
 // Import Firebase modules
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
@@ -68,6 +69,16 @@ let facultiesCol, curriculumSubjectsCol, syllabusCol, storageMetadataCol;
 let documentsUnsubscribe = null; // To detach listener when changing subjects
 let subjectsUnsubscribe = null; // To detach listener for subjects table
 
+// --- Helper Functions ---
+function formatBytes(bytes, decimals = 2) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const dm = decimals < 0 ? 0 : decimals;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+}
+
 // --- Custom Modal Logic ---
 function showAlert(message) {
     const modal = document.getElementById('alert-modal');
@@ -76,11 +87,6 @@ function showAlert(message) {
     document.getElementById('alert-ok-btn').onclick = () => modal.style.display = 'none';
 }
 
-/**
- * Shows a confirmation modal and returns a Promise that resolves to true if 'Yes' is clicked, false otherwise.
- * @param {string} message The confirmation message.
- * @returns {Promise<boolean>} A promise that resolves to true if 'Yes' is clicked, false otherwise.
- */
 function showConfirm(message) {
     return new Promise((resolve) => {
         const modal = document.getElementById('confirm-modal');
@@ -139,7 +145,6 @@ function updateUIForRole() {
     }
 }
 
-// Renders the list of subjects for the custom autocomplete components
 function renderSearchResultsList(filterText, resultsContainer) {
     resultsContainer.innerHTML = '';
     resultsContainer.classList.remove('hidden');
@@ -167,13 +172,11 @@ function renderSearchResultsList(filterText, resultsContainer) {
     });
 }
 
-
-// Renders the table of subjects in the subject management panel
 function renderSubjectsTable(filterText = '') {
     const tableBody = document.getElementById('subjects-table-body');
-    tableBody.innerHTML = ''; // Clear existing rows
-    state.selectedSubjectIdsToDelete.clear(); // Clear selections when re-rendering
-    updateDeleteSelectedButtonState(); // Update button state
+    tableBody.innerHTML = '';
+    state.selectedSubjectIdsToDelete.clear();
+    updateDeleteSelectedButtonState();
 
     const subjectsTitleElement = document.getElementById('subjects-table-title');
     
@@ -203,65 +206,42 @@ function renderSubjectsTable(filterText = '') {
         const row = document.createElement('tr');
         row.className = 'hover:bg-gray-50';
         row.innerHTML = `
-            <td class="py-2 px-4 border-b">
-                <input type="checkbox" class="subject-checkbox form-checkbox h-4 w-4 text-blue-600 rounded" data-subject-id="${subject.id}">
-            </td>
+            <td class="py-2 px-4 border-b"><input type="checkbox" class="subject-checkbox form-checkbox h-4 w-4 text-blue-600 rounded" data-subject-id="${subject.id}"></td>
             <td class="py-2 px-4 border-b text-sm text-gray-800">${subject.subjectName}</td>
             <td class="py-2 px-4 border-b text-sm text-gray-600">${subject.subjectCode || 'N/A'}</td>
             <td class="py-2 px-4 border-b text-sm text-gray-600">${facultyName}</td>
-            <td class="py-2 px-4 border-b text-sm">
-                <button data-subject-id="${subject.id}" class="delete-subject-btn bg-red-500 hover:bg-red-600 text-white font-bold py-1 px-3 rounded-lg text-xs flex items-center gap-1">
-                    <i class="fas fa-trash"></i> Xóa
-                </button>
-            </td>
+            <td class="py-2 px-4 border-b text-sm"><button data-subject-id="${subject.id}" class="delete-subject-btn bg-red-500 hover:bg-red-600 text-white font-bold py-1 px-3 rounded-lg text-xs flex items-center gap-1"><i class="fas fa-trash"></i> Xóa</button></td>
         `;
         tableBody.appendChild(row);
     });
 
-    // Add event listeners for individual delete buttons
-    document.querySelectorAll('.delete-subject-btn').forEach(button => {
-        button.addEventListener('click', (e) => handleDeleteSubject([e.currentTarget.dataset.subjectId]));
-    });
-
-    // Add event listeners for checkboxes
+    document.querySelectorAll('.delete-subject-btn').forEach(button => button.addEventListener('click', (e) => handleDeleteSubject([e.currentTarget.dataset.subjectId])));
     document.querySelectorAll('.subject-checkbox').forEach(checkbox => {
         checkbox.addEventListener('change', (e) => {
             const subjectId = e.target.dataset.subjectId;
-            if (e.target.checked) {
-                state.selectedSubjectIdsToDelete.add(subjectId);
-            } else {
-                state.selectedSubjectIdsToDelete.delete(subjectId);
-            }
+            if (e.target.checked) state.selectedSubjectIdsToDelete.add(subjectId);
+            else state.selectedSubjectIdsToDelete.delete(subjectId);
             updateDeleteSelectedButtonState();
             updateSelectAllCheckboxState();
         });
     });
-
-    // Add event listener for select all checkbox
     document.getElementById('select-all-subjects').addEventListener('change', (e) => {
         const isChecked = e.target.checked;
         document.querySelectorAll('.subject-checkbox').forEach(checkbox => {
             checkbox.checked = isChecked;
             const subjectId = checkbox.dataset.subjectId;
-            if (isChecked) {
-                state.selectedSubjectIdsToDelete.add(subjectId);
-            } else {
-                state.selectedSubjectIdsToDelete.delete(subjectId);
-            }
+            if (isChecked) state.selectedSubjectIdsToDelete.add(subjectId);
+            else state.selectedSubjectIdsToDelete.delete(subjectId);
         });
         updateDeleteSelectedButtonState();
     });
 }
 
-// New: Update the state of the "Delete Selected" button
 function updateDeleteSelectedButtonState() {
     const deleteSelectedBtn = document.getElementById('delete-selected-subjects-btn');
-    if (deleteSelectedBtn) {
-        deleteSelectedBtn.disabled = state.selectedSubjectIdsToDelete.size === 0;
-    }
+    if (deleteSelectedBtn) deleteSelectedBtn.disabled = state.selectedSubjectIdsToDelete.size === 0;
 }
 
-// New: Update the state of the "Select All" checkbox
 function updateSelectAllCheckboxState() {
     const selectAllCheckbox = document.getElementById('select-all-subjects');
     const allCheckboxes = document.querySelectorAll('.subject-checkbox');
@@ -285,33 +265,24 @@ function updateSelectAllCheckboxState() {
     }
 }
 
-
 function renderDocumentsList() {
     const listContainer = document.getElementById('documents-list');
     const documentsTitle = document.getElementById('documents-title');
-    
-    // Set the title based on the selected subject
     const subject = state.subjects.find(s => s.id === state.selectedSubjectId);
-    documentsTitle.textContent = subject ? `Tài liệu môn: ${subject.subjectName} (${subject.subjectCode})` : 'Danh sách tài liệu'; // Display subject code
+    documentsTitle.textContent = subject ? `Tài liệu môn: ${subject.subjectName} (${subject.subjectCode})` : 'Danh sách tài liệu';
 
-    // Always clear the list container first
     listContainer.innerHTML = '';
 
-    // Case 1: No subject selected
     if (!state.selectedSubjectId) {
         listContainer.innerHTML = `<p class="text-center text-gray-500 py-8">Vui lòng chọn một môn học để xem tài liệu.</p>`;
         return;
     }
-
-    // Case 2: Subject selected, but no documents found
     if (state.documents.length === 0) {
         listContainer.innerHTML = `<p class="text-center text-gray-500 py-8">Chưa có tài liệu nào cho môn học này.</p>`;
         return;
     }
 
-    // Case 3: Subject selected and documents exist
     const isAdmin = state.currentUser?.role === 'admin';
-
     state.documents.forEach(docData => {
         const docElement = document.createElement('div');
         docElement.className = 'p-4 bg-gray-50 rounded-lg border flex flex-col md:flex-row justify-between items-start md:items-center gap-3';
@@ -323,47 +294,30 @@ function renderDocumentsList() {
             dateString = uploadedDate.toLocaleDateString('vi-VN');
             const fiveYearsAgo = new Date();
             fiveYearsAgo.setFullYear(fiveYearsAgo.getFullYear() - 5);
-            if (uploadedDate < fiveYearsAgo) {
-                isOld = true;
-            }
+            if (uploadedDate < fiveYearsAgo) isOld = true;
         }
 
         let fileIcon = 'fa-file';
         if (docData.fileType?.startsWith('image/')) fileIcon = 'fa-file-image';
         if (docData.fileType === 'application/pdf') fileIcon = 'fa-file-pdf';
         if (docData.fileType?.includes('word')) fileIcon = 'fa-file-word';
-        if (docData.fileType?.includes('excel') || docData.fileType?.includes('spreadsheet')) fileIcon = 'fa-file-excel';
-
+        if (docData.fileType?.includes('excel')) fileIcon = 'fa-file-excel';
 
         docElement.innerHTML = `
             <div class="flex-grow">
-                <p class="font-semibold text-gray-800 flex items-center">
-                    <i class="fas ${fileIcon} mr-3 text-gray-500"></i>
-                    ${docData.fileName}
-                </p>
-                <p class="text-xs text-gray-500 mt-1">
-                    Ngày tải lên: ${dateString}
-                    ${isOld ? `<span class="ml-3 text-red-600 font-bold"><i class="fas fa-exclamation-triangle mr-1"></i>Tài liệu cũ (trên 5 năm)</span>` : ''}
-                </p>
+                <p class="font-semibold text-gray-800 flex items-center"><i class="fas ${fileIcon} mr-3 text-gray-500"></i>${docData.fileName}</p>
+                <p class="text-xs text-gray-500 mt-1">Ngày tải lên: ${dateString}${isOld ? `<span class="ml-3 text-red-600 font-bold"><i class="fas fa-exclamation-triangle mr-1"></i>Tài liệu cũ (trên 5 năm)</span>` : ''}</p>
             </div>
             <div class="flex items-center gap-3 flex-shrink-0">
-                <a href="${docData.downloadURL}" target="_blank" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg text-sm flex items-center gap-2">
-                    <i class="fas fa-download"></i> Tải về
-                </a>
-                ${isAdmin ? `<button data-doc-id="${docData.id}" data-file-path="${docData.filePath}" class="delete-btn bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg text-sm flex items-center gap-2">
-                    <i class="fas fa-trash"></i> Xóa
-                </button>` : ''}
+                <a href="${docData.downloadURL}" target="_blank" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg text-sm flex items-center gap-2"><i class="fas fa-download"></i> Tải về</a>
+                ${isAdmin ? `<button data-doc-id="${docData.id}" data-file-path="${docData.filePath}" class="delete-btn bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg text-sm flex items-center gap-2"><i class="fas fa-trash"></i> Xóa</button>` : ''}
             </div>
         `;
         listContainer.appendChild(docElement);
     });
     
-    // Add event listeners for the new delete buttons
-    document.querySelectorAll('.delete-btn').forEach(button => {
-        button.addEventListener('click', handleDelete);
-    });
+    document.querySelectorAll('.delete-btn').forEach(button => button.addEventListener('click', handleDelete));
 }
-
 
 // --- Firebase Initialization and Auth State ---
 async function initializeFirebase() {
@@ -416,24 +370,60 @@ async function initializeFirebase() {
 
 // --- Data Fetching ---
 function fetchInitialData() {
-    // Fetch faculties (needed for subject display, but not for direct UI selection)
     onSnapshot(facultiesCol, (snapshot) => {
         state.faculties = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        // After faculties are loaded, fetch subjects
         fetchSubjects();
     }, (error) => {
         console.error("Error fetching faculties: ", error);
         showAlert("Không thể tải danh sách khoa.");
     });
+    
+    listenToStorageUsage();
 }
 
+function listenToStorageUsage() {
+    const storageMetadataRef = doc(storageMetadataCol, 'main_bucket');
+    onSnapshot(storageMetadataRef, (docSnap) => {
+        const usedStorageEl = document.getElementById('used-storage');
+        const totalStorageEl = document.getElementById('total-storage');
+        const remainingStorageEl = document.getElementById('remaining-storage');
+        const storageProgressBar = document.getElementById('storage-progress-bar');
+        
+        const FREE_QUOTA_BYTES = 5 * 1024 * 1024 * 1024; // 5GB
+        let usedBytes = 0;
+
+        if (docSnap.exists()) {
+            usedBytes = docSnap.data().totalSizeInBytes || 0;
+        }
+
+        const remainingBytes = FREE_QUOTA_BYTES - usedBytes;
+        const percentageUsed = (usedBytes / FREE_QUOTA_BYTES) * 100;
+
+        usedStorageEl.textContent = formatBytes(usedBytes);
+        totalStorageEl.textContent = formatBytes(FREE_QUOTA_BYTES);
+        remainingStorageEl.textContent = formatBytes(remainingBytes);
+        storageProgressBar.style.width = `${percentageUsed}%`;
+
+        if (percentageUsed > 90) {
+            storageProgressBar.classList.remove('bg-green-600', 'bg-yellow-500');
+            storageProgressBar.classList.add('bg-red-600');
+        } else if (percentageUsed > 70) {
+            storageProgressBar.classList.remove('bg-green-600', 'bg-red-600');
+            storageProgressBar.classList.add('bg-yellow-500');
+        } else {
+            storageProgressBar.classList.remove('bg-yellow-500', 'bg-red-600');
+            storageProgressBar.classList.add('bg-green-600');
+        }
+    }, (error) => {
+        console.error("Error listening to storage metadata:", error);
+    });
+}
+
+
 function fetchSubjects() {
-    if (subjectsUnsubscribe) {
-        subjectsUnsubscribe();
-    }
+    if (subjectsUnsubscribe) subjectsUnsubscribe();
     subjectsUnsubscribe = onSnapshot(curriculumSubjectsCol, (snapshot) => {
         state.subjects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        // No longer need to render select dropdowns, just the admin table
         renderSubjectsTable(); 
     }, (error) => {
         console.error("Error fetching subjects: ", error);
@@ -442,18 +432,13 @@ function fetchSubjects() {
 }
 
 function fetchDocumentsForSubject(subjectId) {
-    if (documentsUnsubscribe) {
-        documentsUnsubscribe();
-    }
-    
+    if (documentsUnsubscribe) documentsUnsubscribe();
     state.selectedSubjectId = subjectId;
-    
     if (!subjectId) {
         state.documents = [];
         renderDocumentsList();
         return;
     }
-
     const q = query(syllabusCol, where("subjectId", "==", subjectId));
     documentsUnsubscribe = onSnapshot(q, (snapshot) => {
         state.documents = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -463,7 +448,6 @@ function fetchDocumentsForSubject(subjectId) {
         showAlert("Không thể tải danh sách tài liệu cho môn học này.");
     });
 }
-
 
 // --- Event Handlers ---
 async function handleUpload(event) {
@@ -490,7 +474,7 @@ async function handleUpload(event) {
 
     if (fileSize > MAX_FILE_SIZE_BYTES) {
         showAlert('Kích thước tệp không được vượt quá 20MB.');
-        fileInput.value = ''; // Reset file input
+        fileInput.value = '';
         return;
     }
     
@@ -546,21 +530,13 @@ async function handleUpload(event) {
                 const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
                 
                 await addDoc(syllabusCol, {
-                    facultyId: facultyId,
-                    subjectId: subjectId,
-                    fileName: file.name,
-                    fileType: file.type,
-                    filePath: filePath,
-                    downloadURL: downloadURL,
-                    fileSize: fileSize,
+                    facultyId, subjectId,
+                    fileName: file.name, fileType: file.type, filePath, downloadURL, fileSize,
                     uploadedAt: serverTimestamp(),
-                    uploaderUid: state.currentUser.uid,
-                    uploaderEmail: state.currentUser.email,
+                    uploaderUid: state.currentUser.uid, uploaderEmail: state.currentUser.email,
                 });
 
-                await setDoc(storageMetadataRef, { 
-                    totalSizeInBytes: increment(fileSize) 
-                }, { merge: true });
+                await setDoc(storageMetadataRef, { totalSizeInBytes: increment(fileSize) }, { merge: true });
 
                 showAlert("Tải lên tài liệu thành công!");
                 setButtonLoading(uploadBtn, false, `<i class="fas fa-upload"></i> Tải lên`);
@@ -576,18 +552,13 @@ async function handleUpload(event) {
     }
 }
 
-
 async function handleDelete(event) {
     const button = event.currentTarget;
     const docId = button.dataset.docId;
     const filePath = button.dataset.filePath;
     const originalButtonHtml = button.innerHTML;
 
-    const confirmed = await showConfirm('Bạn có chắc chắn muốn xóa tài liệu này không? Hành động này không thể hoàn tác.');
-
-    if (!confirmed) {
-        return;
-    }
+    if (!await showConfirm('Bạn có chắc chắn muốn xóa tài liệu này không? Hành động này không thể hoàn tác.')) return;
 
     setButtonLoading(button, true, originalButtonHtml);
 
@@ -595,23 +566,17 @@ async function handleDelete(event) {
         const docRef = doc(syllabusCol, docId);
         const docSnap = await getDoc(docRef);
 
-        if (!docSnap.exists()) {
-            throw new Error("Không tìm thấy thông tin tài liệu trong database.");
-        }
+        if (!docSnap.exists()) throw new Error("Không tìm thấy thông tin tài liệu trong database.");
+        
         const fileSize = docSnap.data().fileSize || 0;
-
         const fileRef = ref(storage, filePath);
         await deleteObject(fileRef);
-
         await deleteDoc(docRef);
         
         if (fileSize > 0) {
             const storageMetadataRef = doc(storageMetadataCol, 'main_bucket');
-            await setDoc(storageMetadataRef, { 
-                totalSizeInBytes: increment(-fileSize) 
-            }, { merge: true });
+            await setDoc(storageMetadataRef, { totalSizeInBytes: increment(-fileSize) }, { merge: true });
         }
-
         showAlert("Xóa tài liệu thành công!");
     } catch (error) {
         console.error("Error deleting document:", error);
@@ -620,7 +585,6 @@ async function handleDelete(event) {
     }
 }
 
-// New: Handle Excel import for subjects
 async function handleImportSubjects() {
     const fileInput = document.getElementById('subject-excel-input');
     const importBtn = document.getElementById('import-subjects-btn');
@@ -660,10 +624,7 @@ async function handleImportSubjects() {
                 const subjectName = row[subjectNameColIndex]?.toString().trim();
                 const subjectCode = row[subjectCodeColIndex]?.toString().trim();
                 const facultyName = row[facultyNameColIndex]?.toString().trim();
-
-                if (subjectName && subjectCode && facultyName) {
-                    subjectsToImport.push({ subjectName, subjectCode, facultyName });
-                }
+                if (subjectName && subjectCode && facultyName) subjectsToImport.push({ subjectName, subjectCode, facultyName });
             }
 
             if (subjectsToImport.length === 0) {
@@ -681,26 +642,16 @@ async function handleImportSubjects() {
                     let facultyId;
 
                     if (!facultyDoc) {
-                        const newFacultyRef = await addDoc(facultiesCol, { facultyName: facultyName });
+                        const newFacultyRef = await addDoc(facultiesCol, { facultyName });
                         facultyId = newFacultyRef.id;
-                        state.faculties.push({ id: facultyId, facultyName: facultyName });
+                        state.faculties.push({ id: facultyId, facultyName });
                     } else {
                         facultyId = facultyDoc.id;
                     }
 
-                    const q = query(curriculumSubjectsCol, 
-                        where("subjectCode", "==", subjectCode),
-                        where("facultyId", "==", facultyId)
-                    );
-                    const existingSubjects = await getDocs(q);
-
-                    if (existingSubjects.empty) {
-                        await addDoc(curriculumSubjectsCol, {
-                            subjectName: subjectName,
-                            subjectCode: subjectCode,
-                            facultyId: facultyId,
-                            createdAt: serverTimestamp()
-                        });
+                    const q = query(curriculumSubjectsCol, where("subjectCode", "==", subjectCode), where("facultyId", "==", facultyId));
+                    if ((await getDocs(q)).empty) {
+                        await addDoc(curriculumSubjectsCol, { subjectName, subjectCode, facultyId, createdAt: serverTimestamp() });
                         importedCount++;
                     } else {
                         skippedCount++;
@@ -718,22 +669,16 @@ async function handleImportSubjects() {
             setButtonLoading(importBtn, false, `<i class="fas fa-file-excel"></i> Nhập môn học`);
         }
     };
-
     reader.onerror = (error) => {
         console.error("File reader error:", error);
         showAlert(`Lỗi đọc tệp: ${error.message}`);
         setButtonLoading(importBtn, false, `<i class="fas fa-file-excel"></i> Nhập môn học`);
     };
-
     reader.readAsArrayBuffer(file);
 }
 
 function downloadExcelTemplate() {
-    const ws_data = [
-        ["Tên môn học", "Mã môn học", "Tên khoa"],
-        ["Toán cao cấp", "TC001", "Khoa Cơ bản"],
-        ["Lập trình web", "LT002", "Khoa Công nghệ Thông tin"]
-    ];
+    const ws_data = [["Tên môn học", "Mã môn học", "Tên khoa"], ["Toán cao cấp", "TC001", "Khoa Cơ bản"], ["Lập trình web", "LT002", "Khoa Công nghệ Thông tin"]];
     const ws = XLSX.utils.aoa_to_sheet(ws_data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Môn học");
@@ -763,26 +708,16 @@ async function handleAddSubjectManually(event) {
         let facultyId;
 
         if (!facultyDoc) {
-            const newFacultyRef = await addDoc(facultiesCol, { facultyName: facultyName });
+            const newFacultyRef = await addDoc(facultiesCol, { facultyName });
             facultyId = newFacultyRef.id;
-            state.faculties.push({ id: facultyId, facultyName: facultyName });
+            state.faculties.push({ id: facultyId, facultyName });
         } else {
             facultyId = facultyDoc.id;
         }
 
-        const q = query(curriculumSubjectsCol, 
-            where("subjectCode", "==", subjectCode),
-            where("facultyId", "==", facultyId)
-        );
-        const existingSubjects = await getDocs(q);
-
-        if (existingSubjects.empty) {
-            await addDoc(curriculumSubjectsCol, {
-                subjectName: subjectName,
-                subjectCode: subjectCode,
-                facultyId: facultyId,
-                createdAt: serverTimestamp()
-            });
+        const q = query(curriculumSubjectsCol, where("subjectCode", "==", subjectCode), where("facultyId", "==", facultyId));
+        if ((await getDocs(q)).empty) {
+            await addDoc(curriculumSubjectsCol, { subjectName, subjectCode, facultyId, createdAt: serverTimestamp() });
             showAlert(`Thêm môn học "${subjectName}" (${subjectCode}) thành công!`);
             subjectNameInput.value = '';
             subjectCodeInput.value = '';
@@ -798,33 +733,23 @@ async function handleAddSubjectManually(event) {
     }
 }
 
-
 async function handleDeleteSubject(subjectIds) {
-    if (!Array.isArray(subjectIds)) {
-        subjectIds = [subjectIds];
-    }
-
-    if (subjectIds.length === 0) {
+    if (!Array.isArray(subjectIds) || subjectIds.length === 0) {
         showAlert("Không có môn học nào được chọn để xóa.");
         return;
     }
 
     const confirmationMessage = subjectIds.length > 1
-        ? `Bạn có chắc chắn muốn xóa ${subjectIds.length} môn học đã chọn không? Tất cả tài liệu liên quan đến các môn học này cũng sẽ bị xóa.`
-        : 'Bạn có chắc chắn muốn xóa môn học này không? Tất cả tài liệu liên quan đến môn học này cũng sẽ bị xóa.';
+        ? `Bạn có chắc chắn muốn xóa ${subjectIds.length} môn học đã chọn không? Tất cả tài liệu liên quan cũng sẽ bị xóa.`
+        : 'Bạn có chắc chắn muốn xóa môn học này không? Tất cả tài liệu liên quan cũng sẽ bị xóa.';
 
-    const confirmed = await showConfirm(confirmationMessage);
-
-    if (!confirmed) {
-        return;
-    }
+    if (!await showConfirm(confirmationMessage)) return;
 
     document.querySelectorAll('.delete-subject-btn').forEach(btn => setButtonLoading(btn, true));
     const deleteSelectedBtn = document.getElementById('delete-selected-subjects-btn');
     if (deleteSelectedBtn) setButtonLoading(deleteSelectedBtn, true, `<i class="fas fa-trash"></i> Xóa các môn đã chọn`);
 
-    let successfulDeletions = 0;
-    let failedDeletions = 0;
+    let successfulDeletions = 0, failedDeletions = 0;
 
     for (const subjectId of subjectIds) {
         try {
@@ -833,25 +758,18 @@ async function handleDeleteSubject(subjectIds) {
             let totalFileSizeDeleted = 0;
 
             for (const docSnap of docsSnapshot.docs) {
-                const docData = docSnap.data();
-                const filePath = docData.filePath;
-                const fileSize = docData.fileSize || 0;
-
+                const { filePath, fileSize = 0 } = docSnap.data();
                 try {
-                    const fileRef = ref(storage, filePath);
-                    await deleteObject(fileRef);
+                    await deleteObject(ref(storage, filePath));
                     totalFileSizeDeleted += fileSize;
                 } catch (storageError) {
-                    console.warn(`Could not delete file ${filePath} from storage (might not exist):`, storageError);
+                    console.warn(`Could not delete file ${filePath} from storage:`, storageError);
                 }
                 await deleteDoc(doc(syllabusCol, docSnap.id));
             }
 
             if (totalFileSizeDeleted > 0) {
-                const storageMetadataRef = doc(storageMetadataCol, 'main_bucket');
-                await setDoc(storageMetadataRef, { 
-                    totalSizeInBytes: increment(-totalFileSizeDeleted) 
-                }, { merge: true });
+                await setDoc(doc(storageMetadataCol, 'main_bucket'), { totalSizeInBytes: increment(-totalFileSizeDeleted) }, { merge: true });
             }
 
             await deleteDoc(doc(curriculumSubjectsCol, subjectId));
@@ -865,22 +783,16 @@ async function handleDeleteSubject(subjectIds) {
     document.querySelectorAll('.delete-subject-btn').forEach(btn => setButtonLoading(btn, false, `<i class="fas fa-trash"></i> Xóa`));
     if (deleteSelectedBtn) setButtonLoading(deleteSelectedBtn, false, `<i class="fas fa-trash"></i> Xóa các môn đã chọn`);
 
-    if (successfulDeletions > 0 && failedDeletions === 0) {
-        showAlert(`Xóa thành công ${successfulDeletions} môn học và tất cả tài liệu liên quan!`);
-    } else if (successfulDeletions > 0 && failedDeletions > 0) {
-        showAlert(`Đã xóa thành công ${successfulDeletions} môn học. Có ${failedDeletions} môn học không thể xóa.`);
-    } else {
-        showAlert(`Không có môn học nào được xóa. Vui lòng kiểm tra lại.`);
-    }
+    if (successfulDeletions > 0) showAlert(`Xóa thành công ${successfulDeletions} môn học. Thất bại: ${failedDeletions}.`);
+    else showAlert(`Không có môn học nào được xóa. Vui lòng kiểm tra lại.`);
+    
     state.selectedSubjectIdsToDelete.clear();
     renderSubjectsTable();
 }
 
 async function handleDeleteSelectedSubjects() {
-    const idsToDelete = Array.from(state.selectedSubjectIdsToDelete);
-    await handleDeleteSubject(idsToDelete);
+    await handleDeleteSubject(Array.from(state.selectedSubjectIdsToDelete));
 }
-
 
 function addEventListeners() {
     const searchInput = document.getElementById('search-subject-input');
@@ -889,45 +801,34 @@ function addEventListeners() {
     const uploadSearchResults = document.getElementById('upload-search-results');
     const uploadSubjectIdInput = document.getElementById('upload-subject-id');
 
-    // --- Main View Search Logic ---
     searchInput.addEventListener('input', () => renderSearchResultsList(searchInput.value, searchResults));
     searchInput.addEventListener('focus', () => renderSearchResultsList(searchInput.value, searchResults));
-
     searchResults.addEventListener('click', (e) => {
         if (e.target.dataset.subjectId) {
-            const subjectId = e.target.dataset.subjectId;
-            const subjectName = e.target.dataset.subjectName;
+            const { subjectId, subjectName } = e.target.dataset;
             searchInput.value = subjectName;
             searchResults.classList.add('hidden');
             fetchDocumentsForSubject(subjectId);
         }
     });
 
-    // --- Admin Upload Search Logic ---
     uploadSearchInput.addEventListener('input', () => {
-        uploadSubjectIdInput.value = ''; // Clear hidden ID when user types
+        uploadSubjectIdInput.value = '';
         renderSearchResultsList(uploadSearchInput.value, uploadSearchResults);
     });
     uploadSearchInput.addEventListener('focus', () => renderSearchResultsList(uploadSearchInput.value, uploadSearchResults));
-
     uploadSearchResults.addEventListener('click', (e) => {
         if (e.target.dataset.subjectId) {
-            const subjectId = e.target.dataset.subjectId;
-            const subjectName = e.target.dataset.subjectName;
+            const { subjectId, subjectName } = e.target.dataset;
             uploadSearchInput.value = subjectName;
             uploadSubjectIdInput.value = subjectId;
             uploadSearchResults.classList.add('hidden');
         }
     });
 
-    // --- Global listener to hide results ---
     document.addEventListener('click', (e) => {
-        if (!searchInput.parentElement.contains(e.target)) {
-            searchResults.classList.add('hidden');
-        }
-        if (!uploadSearchInput.parentElement.contains(e.target)) {
-            uploadSearchResults.classList.add('hidden');
-        }
+        if (!searchInput.parentElement.contains(e.target)) searchResults.classList.add('hidden');
+        if (!uploadSearchInput.parentElement.contains(e.target)) uploadSearchResults.classList.add('hidden');
     });
 
     document.getElementById('upload-form').addEventListener('submit', handleUpload);
@@ -937,18 +838,12 @@ function addEventListeners() {
     document.getElementById('delete-selected-subjects-btn').addEventListener('click', handleDeleteSelectedSubjects);
     
     document.getElementById('toggle-subject-management').addEventListener('click', () => {
-        const content = document.getElementById('subject-management-content');
-        const icon = document.getElementById('toggle-subject-icon');
-        content.classList.toggle('hidden');
-        icon.classList.toggle('fa-chevron-down');
-        icon.classList.toggle('fa-chevron-up');
+        document.getElementById('subject-management-content').classList.toggle('hidden');
+        document.getElementById('toggle-subject-icon').classList.toggle('fa-chevron-up');
     });
 
-    document.getElementById('admin-search-subject-input').addEventListener('input', (e) => {
-        renderSubjectsTable(e.target.value);
-    });
+    document.getElementById('admin-search-subject-input').addEventListener('input', (e) => renderSubjectsTable(e.target.value));
 }
-
 
 // --- Initial Load ---
 document.addEventListener('DOMContentLoaded', () => {
