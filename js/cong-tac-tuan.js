@@ -274,8 +274,8 @@ const renderSchedule = (tasks, weekInfo, weekMetadata) => {
         departmentHeadName.textContent = dept?.headName || '';
     } else {
         // [UPDATED] Thay đổi chữ ký cho lịch toàn trường
-        departmentHeadTitle.textContent = 'BAN GIÁM HIỆU';
-        departmentHeadName.textContent = ''; // Để trống tên cho lịch chung
+        departmentHeadTitle.textContent = 'TRƯỞNG KHOA';
+        departmentHeadName.textContent = 'PGS.TS LÊ ĐẮC NHƯỜNG'; // Để trống tên cho lịch chung
     }
     
     scheduleTitle.textContent = `LỊCH CÔNG TÁC TUẦN ${weekInfo.weekNumber} (Từ ngày ${formatDate(weekInfo.startDate)} đến ngày ${formatDate(weekInfo.endDate)})`;
