@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Danh sách Học phần Rút gọn K26</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for better table appearance and responsiveness */
+        body {
+            font-family: "Inter", sans-serif;
+            background-color: #f3f4f6; /* Light gray background */
+        }
+        /* Ensure table cells wrap content and are readable */
+        td, th {
+            word-wrap: break-word; /* Allow long words to break */
+            white-space: normal; /* Allow text to wrap naturally */
+            border: 1px solid #d1d5db; /* Clearer borders for cells */
+        }
+        /* Table and header specific styles */
+        table {
+            border-collapse: collapse; /* Collapse borders for a clean look */
+        }
+        thead th {
+            border-bottom: 2px solid #60a5fa; /* Thicker bottom border for header */
+        }
+        /* Responsive table behavior for smaller screens */
+        @media (max-width: 768px) {
+            table, thead, tbody, th, td, tr {
+                display: block;
+            }
+            thead tr {
+                position: absolute;
+                top: -9999px;
+                left: -9999px;
+            }
+            tr {
+                border: 1px solid #e5e7eb; /* Light border for rows */
+                margin-bottom: 1rem;
+                border-radius: 0.5rem; /* Rounded corners for rows */
+                overflow: hidden; /* Hide overflow for rounded corners */
+            }
+            td {
+                border: none;
+                border-bottom: 1px solid #e5e7eb;
+                position: relative;
+                padding-left: 50%; /* Space for the pseudo-element label */
+                text-align: right;
+            }
+            td:last-child {
+                border-bottom: 0;
+            }
+            td:before {
+                /* Create a pseudo-element for the label */
+                content: attr(data-label);
+                position: absolute;
+                left: 0;
+                width: 45%;
+                padding-left: 10px;
+                font-weight: bold;
+                text-align: left;
+                color: #4b5563; /* Darker gray for labels */
+            }
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8 bg-gray-100 text-gray-800">
+
+    <div class="max-w-3xl mx-auto bg-white shadow-lg rounded-xl p-6 md:p-10">
+        <h1 class="text-3xl md:text-4xl font-extrabold text-center text-blue-700 mb-4">
+            DANH SÁCH HỌC PHẦN RÚT GỌN
+        </h1>
+        <h2 class="text-xl md:text-2xl font-semibold text-center text-blue-600 mb-8">
+            KHOA CÔNG NGHỆ THÔNG TIN - Năm học 2024 - 2025
+        </h2>
+
+        <div class="overflow-x-auto rounded-lg shadow-md">
+            <table class="min-w-full bg-white border border-gray-200">
+                <thead class="bg-blue-100 text-blue-800 uppercase text-sm leading-normal">
+                    <tr>
+                        <th class="py-3 px-6 text-left">Mã học phần</th>
+                        <th class="py-3 px-6 text-left">Nội dung kiến thức (Tên môn học)</th>
+                        <th class="py-3 px-6 text-left">Số TC</th>
+                    </tr>
+                </thead>
+                <tbody class="text-gray-700 text-sm font-light">
+                    <!-- Row 1 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF762</td>
+                        <td data-label="Nội dung kiến thức (Tên môn học)" class="py-3 px-6 text-left whitespace-normal">Công nghệ số (Digital Technology)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">3</td>
+                    </tr>
+                    <!-- Row 2 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF718</td>
+                        <td data-label="Nội dung kiến thức (Tên môn học)" class="py-3 px-6 text-left whitespace-normal">Nhập môn Trí tuệ nhân tạo (Introduction to Artificial Intelligence)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">2</td>
+                    </tr>
+                    <!-- Row 3 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF705</td>
+                        <td data-label="Nội dung kiến thức (Tên môn học)" class="py-3 px-6 text-left whitespace-normal">Tổng quan về Công nghệ thông tin và định hướng nghề nghiệp (Overview of Information Technology and Career Orientation)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">2</td>
+                    </tr>
+                    <!-- Row 4 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF706</td>
+                        <td data-label="Nội dung kiến thức (Tên môn học)" class="py-3 px-6 text-left whitespace-normal">Nhập môn thuật toán (Introduction to Algorithms)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">2</td>
+                    </tr>
+                    <!-- Row 5 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF707</td>
+                        <td data-label="Nội dung kiến thức (Tên môn học)" class="py-3 px-6 text-left whitespace-normal">Tổ chức và kiến trúc máy tính (Computer Organization and Architecture)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">3</td>
+                    </tr>
+                    <!-- Row 6 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF710</td>
+                        <td data-label="Nội dung kiến thức (Tên môn học)" class="py-3 px-6 text-left whitespace-normal">Lập trình cơ sở (Basic Programming)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">3</td>
+                    </tr>
+                    <!-- Row 7 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF710</td>
+                        <td data-label="Nội dung kiến thức (Tên môn học)" class="py-3 px-6 text-left whitespace-normal">Mạng máy tính và các hệ thống mở (Computer Networks and Open Systems)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">3</td>
+                    </tr>
+                    <!-- Row 8 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF715</td>
+                        <td data-label="Nội dung kiến thức (Tên môn học)" class="py-3 px-6 text-left whitespace-normal">Cấu trúc dữ liệu và giải thuật (Data Structures and Algorithms)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">3</td>
+                    </tr>
+                    <!-- Row 9 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF716</td>
+                        <td data-label="Nội dung kiến thức (Tên môn học)" class="py-3 px-6 text-left whitespace-normal">Lập trình hướng đối tượng (Object-oriented Programming)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">3</td>
+                    </tr>
+                    <!-- Row 10 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF717</td>
+                        <td data-label="Nội dung kiến thức (Tên môn học)" class="py-3 px-6 text-left whitespace-normal">Nhập môn hệ cơ sở dữ liệu (Introduction to Database System)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">3</td>
+                    </tr>
+                    <!-- Row 11 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF720</td>
+                        <td data-label="Nội dung kiến thức (Tên môn học)" class="py-3 px-6 text-left whitespace-normal">An toàn và bảo mật thông tin (Information Safety and Security)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">3</td>
+                    </tr>
+                    <!-- Row 12 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF763</td>
+                        <td data-label="Nội dung kiến thức (Tên môn học)" class="py-3 px-6 text-left whitespace-normal">Kỹ thuật xử lý ảnh và Thị giác máy tính (Image Processing and Computer Vision)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">3</td>
+                    </tr>
+                    <!-- Row 13 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF727</td>
+                        <td data-label="Nội dung kiến thức (Tên môn học)" class="py-3 px-6 text-left whitespace-normal">Điện toán đám mây (Cloud Computing)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">2</td>
+                    </tr>
+                    <!-- Row 14 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF724</td>
+                        <td data-label="Nội dung kiến thức (Tên môn học)" class="py-3 px-6 text-left whitespace-normal">Phát triển ứng dụng với Python (Application Development with Python)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">3</td>
+                    </tr>
+                    <!-- Row 15 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF7914</td>
+                        <td data-label="Nội dung kiến thức (Tên môn học)" class="py-3 px-6 text-left whitespace-normal">Kỹ nghệ phần mềm (Software Engineering)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">3</td>
+                    </tr>
+                    <!-- Row 16 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF745</td>
+                        <td data-label="Nội dung kiến thức (Tên môn học)" class="py-3 px-6 text-left whitespace-normal">Công nghệ Blockchain (Blockchain Technology)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">2</td>
+                    </tr>
+                    <!-- Row 17 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF708</td>
+                        <td data-label="Nội dung kiến thức (Tên môn học)" class="py-3 px-6 text-left whitespace-normal">Lắp ráp và cài đặt máy tính (Assembling and Setting up the Computer)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">2</td>
+                    </tr>
+                    <!-- Row 18 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF714</td>
+                        <td data-label="Nội dung kiến thức (Tên môn học)" class="py-3 px-6 text-left whitespace-normal">Nguyên lý hệ điều hành (Principles of Operating Systems)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">2</td>
+                    </tr>
+                    <!-- Row 19 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF712</td>
+                        <td data-label="Nội dung kiến thức (Tên môn học)" class="py-3 px-6 text-left whitespace-normal">Các hệ thống thông minh (Intelligent Systems)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">2</td>
+                    </tr>
+                    <!-- Row 20 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF726</td>
+                        <td data-label="Nội dung kiến thức (Tên môn học)" class="py-3 px-6 text-left whitespace-normal">Lập trình nhúng (Embedded Programming)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">2</td>
+                    </tr>
+                    <!-- Row 21 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF729</td>
+                        <td data-label="Nội dung kiến thức (Tên môn học)" class="py-3 px-6 text-left whitespace-normal">Phần mềm mã nguồn mở (Open Source Software)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">2</td>
+                    </tr>
+                    <!-- Row 22 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF764</td>
+                        <td data-label="Nội dung kiến thức (Tên môn học)" class="py-3 px-6 text-left whitespace-normal">Đạo đức AI và Quy định Pháp lý (AI Ethics and Legal Regulation)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">2</td>
+                    </tr>
+                    <!-- Row 23 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF734</td>
+                        <td data-label="Nội dung kiến thức (Tên môn học)" class="py-3 px-6 text-left whitespace-normal">Quản trị mạng (Network Administration)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">3</td>
+                    </tr>
+                    <!-- Row 24 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF723</td>
+                        <td data-label="Nội dung kiến thức (Tên môn học)" class="py-3 px-6 text-left whitespace-normal">Thiết kế và phát triển ứng dụng Web (Web Application Design and Development)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">3</td>
+                    </tr>
+                    <!-- Row 25 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF744</td>
+                        <td data-label="Nội dung kiến thức (Tên môn học)" class="py-3 px-6 text-left whitespace-normal">Internet vạn vật (Internet of Things)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">2</td>
+                    </tr>
+                    <!-- Row 26 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF765</td>
+                        <td data-label="Nội dung kiến thức (Tên môn học)" class="py-3 px-6 text-left whitespace-normal">Học máy (Machine Learning)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">3</td>
+                    </tr>
+                    <!-- Row 27 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF737</td>
+                        <td data-label="Nội dung kiến thức (Tên môn học)" class="py-3 px-6 text-left whitespace-normal">Hệ quản trị cơ sở dữ liệu (Database Management System)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">3</td>
+                    </tr>
+                    <!-- Row 28 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF735</td>
+                        <td data-label="Nội dung kiến thức (Tên môn học)" class="py-3 px-6 text-left whitespace-normal">Các vấn đề hiện đại trong Công nghệ thông tin (Contemporary Issues in Information Technology)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">2</td>
+                    </tr>
+                    <!-- Row 29 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF733</td>
+                        <td data-label="Nội dung kiến thức (Tên môn học)" class="py-3 px-6 text-left whitespace-normal">Phát triển ứng dụng trên thiết bị di động (Mobile Application Development)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">3</td>
+                    </tr>
+                    <!-- Row 30 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF766</td>
+                        <td data-label="Nội dung kiến thức (Tên môn học)" class="py-3 px-6 text-left whitespace-normal">Thực hành dự án Công nghệ thông tin (Information Technology Project Practice)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">3</td>
+                    </tr>
+                    <!-- Row 31 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF736</td>
+                        <td data-label="Nội dung kiến thức (Tên môn học)" class="py-3 px-6 text-left whitespace-normal">Lập trình nâng cao (Advanced Programming)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">2</td>
+                    </tr>
+                    <!-- Row 32 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF739</td>
+                        <td data-label="Nội dung kiến thức (Tên môn học)" class="py-3 px-6 text-left whitespace-normal">Lập trình cơ sở dữ liệu (Database Programming)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">2</td>
+                    </tr>
+                    <!-- Row 33 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF741</td>
+                        <td data-label="Nội dung kiến thức (Tên môn học)" class="py-3 px-6 text-left whitespace-normal">Quản trị hệ cơ sở dữ liệu (SQLite/NoSQL)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">2</td>
+                    </tr>
+                    <!-- Row 34 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF767</td>
+                        <td data-label="Nội dung kiến thức (Tên môn học)" class="py-3 px-6 text-left whitespace-normal">Tương tác người máy (Human-Machine Interaction)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">2</td>
+                    </tr>
+                    <!-- Row 35 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF732</td>
+                        <td data-label="Nội dung kiến thức (Tên môn học)" class="py-3 px-6 text-left whitespace-normal">Phát triển ứng dụng thương mại điện tử (E-commerce Application Development)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">2</td>
+                    </tr>
+                    <!-- Row 36 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF768</td>
+                        <td data-label="Nội dung kiến thức (Tên môn học)" class="py-3 px-6 text-left whitespace-normal">Nhận dạng mẫu (Pattern Recognition)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">2</td>
+                    </tr>
+                    <!-- Row 37 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF731</td>
+                        <td data-label="Nội dung kiến thức (Tên môn học)" class="py-3 px-6 text-left whitespace-normal">Phân tích và thiết kế hướng đối tượng (Object-Oriented Analysis and Design)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">3</td>
+                    </tr>
+                    <!-- Row 38 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF769</td>
+                        <td data-label="Nội dung kiến thức (Tên môn học)" class="py-3 px-6 text-left whitespace-normal">Khai phá dữ liệu và trực quan hóa dữ liệu (Data Mining and Visualization)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">3</td>
+                    </tr>
+                    <!-- Row 39 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF770</td>
+                        <td data-label="Nội dung kiến thức (Tên môn học)" class="py-3 px-6 text-left whitespace-normal">Học máy (Machine Learning)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">3</td>
+                    </tr>
+                    <!-- Row 40 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF771</td>
+                        <td data-label="Nội dung kiến thức (Tên môn học)" class="py-3 px-6 text-left whitespace-normal">Hệ thống khuyến nghị (Recommendation Systems)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">2</td>
+                    </tr>
+                    <!-- Row 41 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF772</td>
+                        <td data-label="Nội dung kiến thức (Tên môn học)" class="py-3 px-6 text-left whitespace-normal">Xử lý ngôn ngữ tự nhiên (Natural Language Processing)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">3</td>
+                    </tr>
+                    <!-- Row 42 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF773</td>
+                        <td data-label="Nội dung kiến thức (Tên môn học)" class="py-3 px-6 text-left whitespace-normal">Quản lý dữ liệu lớn (Big Data Management)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">3</td>
+                    </tr>
+                    <!-- Row 43 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF774</td>
+                        <td data-label="Nội dung kiến thức (Tên môn học)" class="py-3 px-6 text-left whitespace-normal">Học sâu và ứng dụng (Deep Learning and Applications)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">3</td>
+                    </tr>
+                    <!-- Row 44 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF775</td>
+                        <td data-label="Nội dung kiến thức (Tên môn học)" class="py-3 px-6 text-left whitespace-normal">Các vấn đề hiện đại trong Trí tuệ nhân tạo và Khoa học dữ liệu (Contemporary Issues in Artificial Intelligence and Data Science)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">2</td>
+                    </tr>
+                    <!-- Row 45 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF776</td>
+                        <td data-label="Nội dung kiến thức (Tên môn học)" class="py-3 px-6 text-left whitespace-normal">Thực hành dự án Trí tuệ nhân tạo và Khoa học dữ liệu (Artificial Intelligence and Data Science Project Practice)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">3</td>
+                    </tr>
+                    <!-- Row 46 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF777</td>
+                        <td data-label="Nội dung kiến thức (Tên môn học)" class="py-3 px-6 text-left whitespace-normal">Tương tác người máy (Human-Machine Interaction)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">2</td>
+                    </tr>
+                    <!-- Row 47 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF778</td>
+                        <td data-label="Nội dung kiến thức (Tên môn học)" class="py-3 px-6 text-left whitespace-normal">Phân tích chuỗi thời gian (Time Series Analysis)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">2</td>
+                    </tr>
+                    <!-- Row 48 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF779</td>
+                        <td data-label="Nội dung kiến thức (Tên môn học)" class="py-3 px-6 text-left whitespace-normal">Ứng dụng của Trí tuệ nhân tạo</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">2</td>
+                    </tr>
+                    <!-- Row 49 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF780</td>
+                        <td data-label="Nội dung kiến thức (Tên môn học)" class="py-3 px-6 text-left whitespace-normal">Hệ hỗ trợ hướng dữ liệu (Data Driven Decision Making)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">2</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</body>
+</html>

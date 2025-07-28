@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Danh sách Học phần và Giáo trình K26</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for better table appearance and responsiveness */
+        body {
+            font-family: "Inter", sans-serif;
+            background-color: #f3f4f6; /* Light gray background */
+        }
+        /* Ensure table cells wrap content and are readable */
+        td, th {
+            word-wrap: break-word; /* Allow long words to break */
+            white-space: normal; /* Allow text to wrap naturally */
+            border: 1px solid #d1d5db; /* Clearer borders for cells */
+        }
+        /* Table and header specific styles */
+        table {
+            border-collapse: collapse; /* Collapse borders for a clean look */
+        }
+        thead th {
+            border-bottom: 2px solid #60a5fa; /* Thicker bottom border for header */
+        }
+        /* Responsive table behavior for smaller screens */
+        @media (max-width: 768px) {
+            table, thead, tbody, th, td, tr {
+                display: block;
+            }
+            thead tr {
+                position: absolute;
+                top: -9999px;
+                left: -9999px;
+            }
+            tr {
+                border: 1px solid #e5e7eb; /* Light border for rows */
+                margin-bottom: 1rem;
+                border-radius: 0.5rem; /* Rounded corners for rows */
+                overflow: hidden; /* Hide overflow for rounded corners */
+            }
+            td {
+                border: none;
+                border-bottom: 1px solid #e5e7eb;
+                position: relative;
+                padding-left: 50%; /* Space for the pseudo-element label */
+                text-align: right;
+            }
+            td:last-child {
+                border-bottom: 0;
+            }
+            td:before {
+                /* Create a pseudo-element for the label */
+                content: attr(data-label);
+                position: absolute;
+                left: 0;
+                width: 45%;
+                padding-left: 10px;
+                font-weight: bold;
+                text-align: left;
+                color: #4b5563; /* Darker gray for labels */
+            }
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8 bg-gray-100 text-gray-800">
+
+    <div class="max-w-7xl mx-auto bg-white shadow-lg rounded-xl p-6 md:p-10">
+        <h1 class="text-3xl md:text-4xl font-extrabold text-center text-blue-700 mb-4">
+            DANH SÁCH HỌC PHẦN VÀ GIÁO TRÌNH CHÍNH TRONG CHƯƠNG TRÌNH ĐÀO TẠO K26
+        </h1>
+        <h2 class="text-xl md:text-2xl font-semibold text-center text-blue-600 mb-8">
+            KHOA CÔNG NGHỆ THÔNG TIN - Năm học 2024 - 2025
+        </h2>
+
+        <div class="overflow-x-auto rounded-lg shadow-md">
+            <table class="min-w-full bg-white border border-gray-200">
+                <thead class="bg-blue-100 text-blue-800 uppercase text-sm leading-normal">
+                    <tr>
+                        <th class="py-3 px-6 text-left">TT</th>
+                        <th class="py-3 px-6 text-left">Mã học phần</th>
+                        <th class="py-3 px-6 text-left">Nội dung kiến thức</th>
+                        <th class="py-3 px-6 text-left">Số TC</th>
+                        <th class="py-3 px-6 text-left">LT</th>
+                        <th class="py-3 px-6 text-left">Thảo luận</th>
+                        <th class="py-3 px-6 text-left">TH,TN</th>
+                        <th class="py-3 px-6 text-left">Học kỳ dự kiến</th>
+                        <th class="py-3 px-6 text-left">Giáo trình</th>
+                        <th class="py-3 px-6 text-left">Tài liệu tham khảo</th>
+                        <th class="py-3 px-6 text-left">Giảng viên</th>
+                    </tr>
+                </thead>
+                <tbody class="text-gray-700 text-sm font-light">
+                    <!-- Row 1 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="TT" class="py-3 px-6 text-left whitespace-normal">1</td>
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF762</td>
+                        <td data-label="Nội dung kiến thức" class="py-3 px-6 text-left whitespace-normal">Công nghệ số (Digital Technology)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">3</td>
+                        <td data-label="LT" class="py-3 px-6 text-left whitespace-normal">15</td>
+                        <td data-label="Thảo luận" class="py-3 px-6 text-left whitespace-normal">9</td>
+                        <td data-label="TH,TN" class="py-3 px-6 text-left whitespace-normal">21</td>
+                        <td data-label="Học kỳ dự kiến" class="py-3 px-6 text-left whitespace-normal">1</td>
+                        <td data-label="Giáo trình" class="py-3 px-6 text-left whitespace-normal">Lê Thị Hồng, Phạm Thế Anh, Nguyễn Thế Cường, Phạm Thị Hồng (2020), Tin học căn bản, NXB Khoa học và Kỹ thuật.</td>
+                        <td data-label="Tài liệu tham khảo" class="py-3 px-6 text-left whitespace-normal"></td>
+                        <td data-label="Giảng viên" class="py-3 px-6 text-left whitespace-normal">Hoàng Văn Lâm</td>
+                    </tr>
+                    <!-- Row 2 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="TT" class="py-3 px-6 text-left whitespace-normal">2</td>
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF718</td>
+                        <td data-label="Nội dung kiến thức" class="py-3 px-6 text-left whitespace-normal">Nhập môn Trí tuệ nhân tạo (Introduction to Artificial Intelligence)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">2</td>
+                        <td data-label="LT" class="py-3 px-6 text-left whitespace-normal">12</td>
+                        <td data-label="Thảo luận" class="py-3 px-6 text-left whitespace-normal">8</td>
+                        <td data-label="TH,TN" class="py-3 px-6 text-left whitespace-normal">10</td>
+                        <td data-label="Học kỳ dự kiến" class="py-3 px-6 text-left whitespace-normal">2</td>
+                        <td data-label="Giáo trình" class="py-3 px-6 text-left whitespace-normal">Từ Minh Phương (2016), Nhập môn Trí tuệ nhân tạo, Nhà xuất bản Thông tin và Truyền thông</td>
+                        <td data-label="Tài liệu tham khảo" class="py-3 px-6 text-left whitespace-normal"></td>
+                        <td data-label="Giảng viên" class="py-3 px-6 text-left whitespace-normal">Nguyễn Hà An</td>
+                    </tr>
+                    <!-- Row 3 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="TT" class="py-3 px-6 text-left whitespace-normal">3</td>
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF705</td>
+                        <td data-label="Nội dung kiến thức" class="py-3 px-6 text-left whitespace-normal">Tổng quan về Công nghệ thông tin và định hướng nghề nghiệp (Overview of Information Technology and Career Orientation)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">2</td>
+                        <td data-label="LT" class="py-3 px-6 text-left whitespace-normal">10</td>
+                        <td data-label="Thảo luận" class="py-3 px-6 text-left whitespace-normal">10</td>
+                        <td data-label="TH,TN" class="py-3 px-6 text-left whitespace-normal">10</td>
+                        <td data-label="Học kỳ dự kiến" class="py-3 px-6 text-left whitespace-normal">1</td>
+                        <td data-label="Giáo trình" class="py-3 px-6 text-left whitespace-normal">Bộ thông tin và truyền thông (2020), Tài liệu những điều cần biết về nghề Công nghệ thông tin, NXB Thông tin và truyền thông</td>
+                        <td data-label="Tài liệu tham khảo" class="py-3 px-6 text-left whitespace-normal"></td>
+                        <td data-label="Giảng viên" class="py-3 px-6 text-left whitespace-normal">Vũ Thị Sơn</td>
+                    </tr>
+                    <!-- Row 4 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="TT" class="py-3 px-6 text-left whitespace-normal">4</td>
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF706</td>
+                        <td data-label="Nội dung kiến thức" class="py-3 px-6 text-left whitespace-normal">Nhập môn thuật toán (Introduction to Algorithms)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">2</td>
+                        <td data-label="LT" class="py-3 px-6 text-left whitespace-normal">12</td>
+                        <td data-label="Thảo luận" class="py-3 px-6 text-left whitespace-normal">12</td>
+                        <td data-label="TH,TN" class="py-3 px-6 text-left whitespace-normal">6</td>
+                        <td data-label="Học kỳ dự kiến" class="py-3 px-6 text-left whitespace-normal">1</td>
+                        <td data-label="Giáo trình" class="py-3 px-6 text-left whitespace-normal">Lê Đắc Nhường - Chủ biên (2020), Nhập môn thuật toán, NXB Hàng Hải (Bản cứng)</td>
+                        <td data-label="Tài liệu tham khảo" class="py-3 px-6 text-left whitespace-normal">2. Cormen, Leiserson, Revest (2002 ), Giáo trình thuật toán (Lý thuyết & Bài tập) , Người dịch: Nhóm Ngọc Anh Thư Press, NXB Thống kê; 3. Nguyễn Hữu Điển (2006), Một số vấn đề về Thuật toán . NXB Giáo dục; 4. Bùi Việt Hà (2022), Nhập môn thuật toán. Nxb ĐHQG Hà Nội.</td>
+                        <td data-label="Giảng viên" class="py-3 px-6 text-left whitespace-normal">Lê Đắc Nhường</td>
+                    </tr>
+                    <!-- Row 5 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="TT" class="py-3 px-6 text-left whitespace-normal">5</td>
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF707</td>
+                        <td data-label="Nội dung kiến thức" class="py-3 px-6 text-left whitespace-normal">Tổ chức và kiến trúc máy tính (Computer Organization and Architecture)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">3</td>
+                        <td data-label="LT" class="py-3 px-6 text-left whitespace-normal">21</td>
+                        <td data-label="Thảo luận" class="py-3 px-6 text-left whitespace-normal">6</td>
+                        <td data-label="TH,TN" class="py-3 px-6 text-left whitespace-normal">18</td>
+                        <td data-label="Học kỳ dự kiến" class="py-3 px-6 text-left whitespace-normal">2</td>
+                        <td data-label="Giáo trình" class="py-3 px-6 text-left whitespace-normal">Trần Quang Vinh (2008), “Nguyên lý phần cứng và kỹ thuật ghép nối máy tính”, NXB Giáo dục</td>
+                        <td data-label="Tài liệu tham khảo" class="py-3 px-6 text-left whitespace-normal"></td>
+                        <td data-label="Giảng viên" class="py-3 px-6 text-left whitespace-normal">Đào Ngọc Tú</td>
+                    </tr>
+                    <!-- Row 6 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="TT" class="py-3 px-6 text-left whitespace-normal">6</td>
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF710</td>
+                        <td data-label="Nội dung kiến thức" class="py-3 px-6 text-left whitespace-normal">Lập trình cơ sở (Basic Programming)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">3</td>
+                        <td data-label="LT" class="py-3 px-6 text-left whitespace-normal">23</td>
+                        <td data-label="Thảo luận" class="py-3 px-6 text-left whitespace-normal">11</td>
+                        <td data-label="TH,TN" class="py-3 px-6 text-left whitespace-normal">11</td>
+                        <td data-label="Học kỳ dự kiến" class="py-3 px-6 text-left whitespace-normal">2</td>
+                        <td data-label="Giáo trình" class="py-3 px-6 text-left whitespace-normal">Lê Đắc Nhường -Nguyễn Gia Như (2020), Lập trình cơ sở, NXB Xây dựng (Bản cứng)</td>
+                        <td data-label="Tài liệu tham khảo" class="py-3 px-6 text-left whitespace-normal">1. Cormen, Leiserson, Revest (2002 ), Giáo trình Lập trình C (Lý thuyết & Bài tập) , Người dịch: Nhóm Ngọc Anh Thư Press, NXB Thống kê; 2. Phạm Văn Ất, Đỗ Văn Tuấn, Nguyễn Hiếu Cường, Lê Trường Thông (2023), Giáo trình kỹ thuật lập trình C căn bản và nâng cao. Nxb Bách Khoa Hà Nội</td>
+                        <td data-label="Giảng viên" class="py-3 px-6 text-left whitespace-normal">Nguyễn Văn Quang</td>
+                    </tr>
+                    <!-- Row 7 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="TT" class="py-3 px-6 text-left whitespace-normal">7</td>
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF710</td>
+                        <td data-label="Nội dung kiến thức" class="py-3 px-6 text-left whitespace-normal">Mạng máy tính và các hệ thống mở (Computer Networks and Open Systems)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">3</td>
+                        <td data-label="LT" class="py-3 px-6 text-left whitespace-normal">21</td>
+                        <td data-label="Thảo luận" class="py-3 px-6 text-left whitespace-normal">6</td>
+                        <td data-label="TH,TN" class="py-3 px-6 text-left whitespace-normal">18</td>
+                        <td data-label="Học kỳ dự kiến" class="py-3 px-6 text-left whitespace-normal">3</td>
+                        <td data-label="Giáo trình" class="py-3 px-6 text-left whitespace-normal">Nguyễn Thúc Hải (2009), Mạng máy tính và các hệ thống mở, NXB Giáo dục.</td>
+                        <td data-label="Tài liệu tham khảo" class="py-3 px-6 text-left whitespace-normal"></td>
+                        <td data-label="Giảng viên" class="py-3 px-6 text-left whitespace-normal">Đào Ngọc Tú</td>
+                    </tr>
+                    <!-- Row 8 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="TT" class="py-3 px-6 text-left whitespace-normal">8</td>
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF715</td>
+                        <td data-label="Nội dung kiến thức" class="py-3 px-6 text-left whitespace-normal">Cấu trúc dữ liệu và giải thuật (Data Structures and Algorithms)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">3</td>
+                        <td data-label="LT" class="py-3 px-6 text-left whitespace-normal">15</td>
+                        <td data-label="Thảo luận" class="py-3 px-6 text-left whitespace-normal">9</td>
+                        <td data-label="TH,TN" class="py-3 px-6 text-left whitespace-normal">21</td>
+                        <td data-label="Học kỳ dự kiến" class="py-3 px-6 text-left whitespace-normal">3</td>
+                        <td data-label="Giáo trình" class="py-3 px-6 text-left whitespace-normal">TS. Đào Thị Hường (chủ biên), Vũ Thị Sơn, Nguyễn Văn Quang, Hoàng Văn Lâm (2023), Giáo trình Cấu trúc dữ liệu và giải thuật, Tài liệu đã nghiệm thu cấp Trường Đại học Hải Phòng</td>
+                        <td data-label="Tài liệu tham khảo" class="py-3 px-6 text-left whitespace-normal"></td>
+                        <td data-label="Giảng viên" class="py-3 px-6 text-left whitespace-normal">Vũ Thị Sơn</td>
+                    </tr>
+                    <!-- Row 9 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="TT" class="py-3 px-6 text-left whitespace-normal">9</td>
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF716</td>
+                        <td data-label="Nội dung kiến thức" class="py-3 px-6 text-left whitespace-normal">Lập trình hướng đối tượng (Object-oriented Programming)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">3</td>
+                        <td data-label="LT" class="py-3 px-6 text-left whitespace-normal">15</td>
+                        <td data-label="Thảo luận" class="py-3 px-6 text-left whitespace-normal">7</td>
+                        <td data-label="TH,TN" class="py-3 px-6 text-left whitespace-normal">23</td>
+                        <td data-label="Học kỳ dự kiến" class="py-3 px-6 text-left whitespace-normal">3</td>
+                        <td data-label="Giáo trình" class="py-3 px-6 text-left whitespace-normal">Vũ Duy Linh, Nguyễn Nhị Gia Vinh(2016), Giáo trình lập trình hướng đối tượng, NXB Đại học Cần Thơ.</td>
+                        <td data-label="Tài liệu tham khảo" class="py-3 px-6 text-left whitespace-normal"></td>
+                        <td data-label="Giảng viên" class="py-3 px-6 text-left whitespace-normal">Hoàng Văn Lâm</td>
+                    </tr>
+                    <!-- Row 10 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="TT" class="py-3 px-6 text-left whitespace-normal">10</td>
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF717</td>
+                        <td data-label="Nội dung kiến thức" class="py-3 px-6 text-left whitespace-normal">Nhập môn hệ cơ sở dữ liệu (Introduction to Database System)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">3</td>
+                        <td data-label="LT" class="py-3 px-6 text-left whitespace-normal">21</td>
+                        <td data-label="Thảo luận" class="py-3 px-6 text-left whitespace-normal">6</td>
+                        <td data-label="TH,TN" class="py-3 px-6 text-left whitespace-normal">18</td>
+                        <td data-label="Học kỳ dự kiến" class="py-3 px-6 text-left whitespace-normal">4</td>
+                        <td data-label="Giáo trình" class="py-3 px-6 text-left whitespace-normal">Lê Đăng Nguyên – Lê Thị Phương Anh – Hoàng Trần Hiếu. Giáo trình nhập môn hệ cơ sở dữ liệu : Sách dùng cho sinh viên trường Đại học Hải Phòng, 2023</td>
+                        <td data-label="Tài liệu tham khảo" class="py-3 px-6 text-left whitespace-normal"></td>
+                        <td data-label="Giảng viên" class="py-3 px-6 text-left whitespace-normal">Lê Thị Phương Anh</td>
+                    </tr>
+                    <!-- Row 11 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="TT" class="py-3 px-6 text-left whitespace-normal">11</td>
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF720</td>
+                        <td data-label="Nội dung kiến thức" class="py-3 px-6 text-left whitespace-normal">An toàn và bảo mật thông tin (Information Safety and Security)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">3</td>
+                        <td data-label="LT" class="py-3 px-6 text-left whitespace-normal">21</td>
+                        <td data-label="Thảo luận" class="py-3 px-6 text-left whitespace-normal">12</td>
+                        <td data-label="TH,TN" class="py-3 px-6 text-left whitespace-normal">12</td>
+                        <td data-label="Học kỳ dự kiến" class="py-3 px-6 text-left whitespace-normal">4</td>
+                        <td data-label="Giáo trình" class="py-3 px-6 text-left whitespace-normal">Lê Đắc Nhường (2018), An toàn dữ liệu, Nxb ĐHQG Hà Nội (Bản cứng)</td>
+                        <td data-label="Tài liệu tham khảo" class="py-3 px-6 text-left whitespace-normal"></td>
+                        <td data-label="Giảng viên" class="py-3 px-6 text-left whitespace-normal">Nguyễn Thị Hồng Mai</td>
+                    </tr>
+                    <!-- Row 12 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="TT" class="py-3 px-6 text-left whitespace-normal">12</td>
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF763</td>
+                        <td data-label="Nội dung kiến thức" class="py-3 px-6 text-left whitespace-normal">Kỹ thuật xử lý ảnh và Thị giác máy tính (Image Processing and Computer Vision)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">3</td>
+                        <td data-label="LT" class="py-3 px-6 text-left whitespace-normal">21</td>
+                        <td data-label="Thảo luận" class="py-3 px-6 text-left whitespace-normal">12</td>
+                        <td data-label="TH,TN" class="py-3 px-6 text-left whitespace-normal">12</td>
+                        <td data-label="Học kỳ dự kiến" class="py-3 px-6 text-left whitespace-normal">4</td>
+                        <td data-label="Giáo trình" class="py-3 px-6 text-left whitespace-normal">Richard Szeliski, (2022), Computer Vision: Algorithms and Applications 2nd Edition, Springer</td>
+                        <td data-label="Tài liệu tham khảo" class="py-3 px-6 text-left whitespace-normal">2. E.R. Davies, (2018) Computer vision: principles, algorithms, application, and learning, AP Academic press</td>
+                        <td data-label="Giảng viên" class="py-3 px-6 text-left whitespace-normal">Nguyễn Thị Lanh</td>
+                    </tr>
+                    <!-- Row 13 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="TT" class="py-3 px-6 text-left whitespace-normal">13</td>
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF727</td>
+                        <td data-label="Nội dung kiến thức" class="py-3 px-6 text-left whitespace-normal">Điện toán đám mây (Cloud Computing)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">2</td>
+                        <td data-label="LT" class="py-3 px-6 text-left whitespace-normal">14</td>
+                        <td data-label="Thảo luận" class="py-3 px-6 text-left whitespace-normal">6</td>
+                        <td data-label="TH,TN" class="py-3 px-6 text-left whitespace-normal">10</td>
+                        <td data-label="Học kỳ dự kiến" class="py-3 px-6 text-left whitespace-normal">5</td>
+                        <td data-label="Giáo trình" class="py-3 px-6 text-left whitespace-normal">Dac-Nhuong Le, Raghvendra Kumar, Gia Nhu Nguyen, Jyotir Moy Chatterjee (2018), Cloud Computing and Virtualization, Wiley. ISBN: 978-1-119-48790-6</td>
+                        <td data-label="Tài liệu tham khảo" class="py-3 px-6 text-left whitespace-normal"></td>
+                        <td data-label="Giảng viên" class="py-3 px-6 text-left whitespace-normal">Đào Việt Anh</td>
+                    </tr>
+                    <!-- Row 14 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="TT" class="py-3 px-6 text-left whitespace-normal">14</td>
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF724</td>
+                        <td data-label="Nội dung kiến thức" class="py-3 px-6 text-left whitespace-normal">Phát triển ứng dụng với Python (Application Development with Python)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">3</td>
+                        <td data-label="LT" class="py-3 px-6 text-left whitespace-normal">15</td>
+                        <td data-label="Thảo luận" class="py-3 px-6 text-left whitespace-normal">15</td>
+                        <td data-label="TH,TN" class="py-3 px-6 text-left whitespace-normal">15</td>
+                        <td data-label="Học kỳ dự kiến" class="py-3 px-6 text-left whitespace-normal">5</td>
+                        <td data-label="Giáo trình" class="py-3 px-6 text-left whitespace-normal">Bùi Việt Hà (2020), Python cơ bản, Nxb Đại học Quốc gia HN</td>
+                        <td data-label="Tài liệu tham khảo" class="py-3 px-6 text-left whitespace-normal"></td>
+                        <td data-label="Giảng viên" class="py-3 px-6 text-left whitespace-normal">Nguyễn Thị Thúy</td>
+                    </tr>
+                    <!-- Row 15 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="TT" class="py-3 px-6 text-left whitespace-normal">15</td>
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF7914</td>
+                        <td data-label="Nội dung kiến thức" class="py-3 px-6 text-left whitespace-normal">Kỹ nghệ phần mềm (Software Engineering)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">3</td>
+                        <td data-label="LT" class="py-3 px-6 text-left whitespace-normal">22</td>
+                        <td data-label="Thảo luận" class="py-3 px-6 text-left whitespace-normal">15</td>
+                        <td data-label="TH,TN" class="py-3 px-6 text-left whitespace-normal">8</td>
+                        <td data-label="Học kỳ dự kiến" class="py-3 px-6 text-left whitespace-normal">6</td>
+                        <td data-label="Giáo trình" class="py-3 px-6 text-left whitespace-normal">Ian Sommerville (2015), Software Engineering, 10th Edition Addison Wesley, Pearson.</td>
+                        <td data-label="Tài liệu tham khảo" class="py-3 px-6 text-left whitespace-normal"></td>
+                        <td data-label="Giảng viên" class="py-3 px-6 text-left whitespace-normal">Đào Thị Hường</td>
+                    </tr>
+                    <!-- Row 16 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="TT" class="py-3 px-6 text-left whitespace-normal">16</td>
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF745</td>
+                        <td data-label="Nội dung kiến thức" class="py-3 px-6 text-left whitespace-normal">Công nghệ Blockchain (Blockchain Technology)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">2</td>
+                        <td data-label="LT" class="py-3 px-6 text-left whitespace-normal">14</td>
+                        <td data-label="Thảo luận" class="py-3 px-6 text-left whitespace-normal">6</td>
+                        <td data-label="TH,TN" class="py-3 px-6 text-left whitespace-normal">10</td>
+                        <td data-label="Học kỳ dự kiến" class="py-3 px-6 text-left whitespace-normal">6</td>
+                        <td data-label="Giáo trình" class="py-3 px-6 text-left whitespace-normal">A M Viswa Bharathy, Dac-Nhuong Le, P. Karthikeyan (2024), Applications of Blockchain and Artificial Intelligence in Finance and Governance, Nxb Wiley. ISBN: 9781032605975.</td>
+                        <td data-label="Tài liệu tham khảo" class="py-3 px-6 text-left whitespace-normal">2. Gulshan Shrivastava, Dac-Nhuong Le, Kavita Sharma (2020), Cryptocurrencies and Blockchain Technology Applications, Nxb Wiley. ISBN: 978-1-119-62116-4.2; 3. Mark Gates (2017), Bản chất của Blockchain, bitcoin, tiền điện tử, hợp đồng thông minh và tương lai của tiền tệ, Thành Dương dịch. Nxb Lao động; 4. Daniel Drescher (2023), Blockchain cơ bản. Nxb Dân trí.</td>
+                        <td data-label="Giảng viên" class="py-3 px-6 text-left whitespace-normal">Lê Đắc Nhường</td>
+                    </tr>
+                    <!-- Row 17 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="TT" class="py-3 px-6 text-left whitespace-normal">17</td>
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF708</td>
+                        <td data-label="Nội dung kiến thức" class="py-3 px-6 text-left whitespace-normal">Lắp ráp và cài đặt máy tính (Assembling and Setting up the Computer)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">2</td>
+                        <td data-label="LT" class="py-3 px-6 text-left whitespace-normal">14</td>
+                        <td data-label="Thảo luận" class="py-3 px-6 text-left whitespace-normal">6</td>
+                        <td data-label="TH,TN" class="py-3 px-6 text-left whitespace-normal">10</td>
+                        <td data-label="Học kỳ dự kiến" class="py-3 px-6 text-left whitespace-normal">3</td>
+                        <td data-label="Giáo trình" class="py-3 px-6 text-left whitespace-normal">Nguyễn Xuân Diệu, “Lắp ráp và cài đặt máy tính”, Bộ lao động và thương binh và xã hội - Tổng cục dạy nghề, 2013 (Ebook).</td>
+                        <td data-label="Tài liệu tham khảo" class="py-3 px-6 text-left whitespace-normal"></td>
+                        <td data-label="Giảng viên" class="py-3 px-6 text-left whitespace-normal"></td>
+                    </tr>
+                    <!-- Row 18 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="TT" class="py-3 px-6 text-left whitespace-normal">18</td>
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF714</td>
+                        <td data-label="Nội dung kiến thức" class="py-3 px-6 text-left whitespace-normal">Nguyên lý hệ điều hành (Principles of Operating Systems)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">2</td>
+                        <td data-label="LT" class="py-3 px-6 text-left whitespace-normal">10</td>
+                        <td data-label="Thảo luận" class="py-3 px-6 text-left whitespace-normal">8</td>
+                        <td data-label="TH,TN" class="py-3 px-6 text-left whitespace-normal">12</td>
+                        <td data-label="Học kỳ dự kiến" class="py-3 px-6 text-left whitespace-normal">3</td>
+                        <td data-label="Giáo trình" class="py-3 px-6 text-left whitespace-normal">"Giáo trình nguyên lý các hệ điều hành", Hà Quang Thụy, NXB ĐHQG Hà Nội,</td>
+                        <td data-label="Tài liệu tham khảo" class="py-3 px-6 text-left whitespace-normal"></td>
+                        <td data-label="Giảng viên" class="py-3 px-6 text-left whitespace-normal"></td>
+                    </tr>
+                    <!-- Row 19 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="TT" class="py-3 px-6 text-left whitespace-normal">19</td>
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF712</td>
+                        <td data-label="Nội dung kiến thức" class="py-3 px-6 text-left whitespace-normal">Các hệ thống thông minh (Intelligent Systems)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">2</td>
+                        <td data-label="LT" class="py-3 px-6 text-left whitespace-normal">10</td>
+                        <td data-label="Thảo luận" class="py-3 px-6 text-left whitespace-normal">4</td>
+                        <td data-label="TH,TN" class="py-3 px-6 text-left whitespace-normal">16</td>
+                        <td data-label="Học kỳ dự kiến" class="py-3 px-6 text-left whitespace-normal">4</td>
+                        <td data-label="Giáo trình" class="py-3 px-6 text-left whitespace-normal">Hồ Cẩm Hà (2012), Các hệ thống thông minh, Nhà xuất bản Đại học Sư phạm.</td>
+                        <td data-label="Tài liệu tham khảo" class="py-3 px-6 text-left whitespace-normal"></td>
+                        <td data-label="Giảng viên" class="py-3 px-6 text-left whitespace-normal"></td>
+                    </tr>
+                    <!-- Row 20 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="TT" class="py-3 px-6 text-left whitespace-normal">20</td>
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF726</td>
+                        <td data-label="Nội dung kiến thức" class="py-3 px-6 text-left whitespace-normal">Lập trình nhúng (Embedded Programming)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">2</td>
+                        <td data-label="LT" class="py-3 px-6 text-left whitespace-normal">14</td>
+                        <td data-label="Thảo luận" class="py-3 px-6 text-left whitespace-normal">6</td>
+                        <td data-label="TH,TN" class="py-3 px-6 text-left whitespace-normal">10</td>
+                        <td data-label="Học kỳ dự kiến" class="py-3 px-6 text-left whitespace-normal">4</td>
+                        <td data-label="Giáo trình" class="py-3 px-6 text-left whitespace-normal">Đặng Hoài Bắc, Nguyễn Ngọc Minh (2013), Thiết kế hệ thống nhúng, NXB Thông tin và truyền thông</td>
+                        <td data-label="Tài liệu tham khảo" class="py-3 px-6 text-left whitespace-normal"></td>
+                        <td data-label="Giảng viên" class="py-3 px-6 text-left whitespace-normal"></td>
+                    </tr>
+                    <!-- Row 21 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="TT" class="py-3 px-6 text-left whitespace-normal">21</td>
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF729</td>
+                        <td data-label="Nội dung kiến thức" class="py-3 px-6 text-left whitespace-normal">Phần mềm mã nguồn mở (Open Source Software)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">2</td>
+                        <td data-label="LT" class="py-3 px-6 text-left whitespace-normal">14</td>
+                        <td data-label="Thảo luận" class="py-3 px-6 text-left whitespace-normal">6</td>
+                        <td data-label="TH,TN" class="py-3 px-6 text-left whitespace-normal">10</td>
+                        <td data-label="Học kỳ dự kiến" class="py-3 px-6 text-left whitespace-normal">4</td>
+                        <td data-label="Giáo trình" class="py-3 px-6 text-left whitespace-normal">Trần Quang Yên, Phùng Tiến Hải (2023), Giáo trình Phát triển phần mềm mã nguồn mở, Nhà xuất bản Đại học Kinh tế quốc dân</td>
+                        <td data-label="Tài liệu tham khảo" class="py-3 px-6 text-left whitespace-normal"></td>
+                        <td data-label="Giảng viên" class="py-3 px-6 text-left whitespace-normal"></td>
+                    </tr>
+                    <!-- Row 22 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="TT" class="py-3 px-6 text-left whitespace-normal">22</td>
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF764</td>
+                        <td data-label="Nội dung kiến thức" class="py-3 px-6 text-left whitespace-normal">Đạo đức AI và Quy định Pháp lý (AI Ethics and Legal Regulation)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">2</td>
+                        <td data-label="LT" class="py-3 px-6 text-left whitespace-normal">14</td>
+                        <td data-label="Thảo luận" class="py-3 px-6 text-left whitespace-normal">6</td>
+                        <td data-label="TH,TN" class="py-3 px-6 text-left whitespace-normal">10</td>
+                        <td data-label="Học kỳ dự kiến" class="py-3 px-6 text-left whitespace-normal">4</td>
+                        <td data-label="Giáo trình" class="py-3 px-6 text-left whitespace-normal">Luciano Floridi, Lê Thị Thuỳ Linh, Vũ Thanh Vân (dịch) (2024), Đạo đức Trí tuệ nhân tạo nguyên tắc, thách thức và cơ hội, Nhà xuất bản Chính trị Quốc gia sự thật.</td>
+                        <td data-label="Tài liệu tham khảo" class="py-3 px-6 text-left whitespace-normal"></td>
+                        <td data-label="Giảng viên" class="py-3 px-6 text-left whitespace-normal"></td>
+                    </tr>
+                    <!-- Row 23 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="TT" class="py-3 px-6 text-left whitespace-normal">23</td>
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF734</td>
+                        <td data-label="Nội dung kiến thức" class="py-3 px-6 text-left whitespace-normal">Quản trị mạng (Network Administration)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">3</td>
+                        <td data-label="LT" class="py-3 px-6 text-left whitespace-normal">18</td>
+                        <td data-label="Thảo luận" class="py-3 px-6 text-left whitespace-normal">6</td>
+                        <td data-label="TH,TN" class="py-3 px-6 text-left whitespace-normal">21</td>
+                        <td data-label="Học kỳ dự kiến" class="py-3 px-6 text-left whitespace-normal">5</td>
+                        <td data-label="Giáo trình" class="py-3 px-6 text-left whitespace-normal">Jordan Krause, Mastering Windows Server 2019 Third Edition, 2020;</td>
+                        <td data-label="Tài liệu tham khảo" class="py-3 px-6 text-left whitespace-normal"></td>
+                        <td data-label="Giảng viên" class="py-3 px-6 text-left whitespace-normal"></td>
+                    </tr>
+                    <!-- Row 24 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="TT" class="py-3 px-6 text-left whitespace-normal">24</td>
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF723</td>
+                        <td data-label="Nội dung kiến thức" class="py-3 px-6 text-left whitespace-normal">Thiết kế và phát triển ứng dụng Web (Web Application Design and Development)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">3</td>
+                        <td data-label="LT" class="py-3 px-6 text-left whitespace-normal">18</td>
+                        <td data-label="Thảo luận" class="py-3 px-6 text-left whitespace-normal">7</td>
+                        <td data-label="TH,TN" class="py-3 px-6 text-left whitespace-normal">20</td>
+                        <td data-label="Học kỳ dự kiến" class="py-3 px-6 text-left whitespace-normal">6</td>
+                        <td data-label="Giáo trình" class="py-3 px-6 text-left whitespace-normal">Giáo trình phát triển ứng dụng web, Nguyễn, Đình Thuân, NXB Đại học Quốc Gia TP Hồ Chí Minh 2015</td>
+                        <td data-label="Tài liệu tham khảo" class="py-3 px-6 text-left whitespace-normal"></td>
+                        <td data-label="Giảng viên" class="py-3 px-6 text-left whitespace-normal"></td>
+                    </tr>
+                    <!-- Row 25 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="TT" class="py-3 px-6 text-left whitespace-normal">25</td>
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF744</td>
+                        <td data-label="Nội dung kiến thức" class="py-3 px-6 text-left whitespace-normal">Internet vạn vật (Internet of Things)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">2</td>
+                        <td data-label="LT" class="py-3 px-6 text-left whitespace-normal">14</td>
+                        <td data-label="Thảo luận" class="py-3 px-6 text-left whitespace-normal">6</td>
+                        <td data-label="TH,TN" class="py-3 px-6 text-left whitespace-normal">10</td>
+                        <td data-label="Học kỳ dự kiến" class="py-3 px-6 text-left whitespace-normal">6</td>
+                        <td data-label="Giáo trình" class="py-3 px-6 text-left whitespace-normal">Phạm Minh Tuấn (2015), Internet of thing, NXB Thông tin và truyền thông</td>
+                        <td data-label="Tài liệu tham khảo" class="py-3 px-6 text-left whitespace-normal"></td>
+                        <td data-label="Giảng viên" class="py-3 px-6 text-left whitespace-normal"></td>
+                    </tr>
+                    <!-- Row 26 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="TT" class="py-3 px-6 text-left whitespace-normal">26</td>
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF765</td>
+                        <td data-label="Nội dung kiến thức" class="py-3 px-6 text-left whitespace-normal">Học máy (Machine Learning)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">3</td>
+                        <td data-label="LT" class="py-3 px-6 text-left whitespace-normal">21</td>
+                        <td data-label="Thảo luận" class="py-3 px-6 text-left whitespace-normal">6</td>
+                        <td data-label="TH,TN" class="py-3 px-6 text-left whitespace-normal">18</td>
+                        <td data-label="Học kỳ dự kiến" class="py-3 px-6 text-left whitespace-normal">6</td>
+                        <td data-label="Giáo trình" class="py-3 px-6 text-left whitespace-normal">T V Geetha, S Sendhilkumar (2023), Machine Learning: Concepts, Techniques and Applications, Chapman and Hall/CRC</td>
+                        <td data-label="Tài liệu tham khảo" class="py-3 px-6 text-left whitespace-normal"></td>
+                        <td data-label="Giảng viên" class="py-3 px-6 text-left whitespace-normal"></td>
+                    </tr>
+                    <!-- Row 27 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="TT" class="py-3 px-6 text-left whitespace-normal">27</td>
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF737</td>
+                        <td data-label="Nội dung kiến thức" class="py-3 px-6 text-left whitespace-normal">Hệ quản trị cơ sở dữ liệu (Database Management System)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">3</td>
+                        <td data-label="LT" class="py-3 px-6 text-left whitespace-normal">15</td>
+                        <td data-label="Thảo luận" class="py-3 px-6 text-left whitespace-normal">15</td>
+                        <td data-label="TH,TN" class="py-3 px-6 text-left whitespace-normal">15</td>
+                        <td data-label="Học kỳ dự kiến" class="py-3 px-6 text-left whitespace-normal">6</td>
+                        <td data-label="Giáo trình" class="py-3 px-6 text-left whitespace-normal">Itziks Ben Gan, SQL Server 2012 T-SQL fundamentals, O’Reilly Media, 2015.</td>
+                        <td data-label="Tài liệu tham khảo" class="py-3 px-6 text-left whitespace-normal"></td>
+                        <td data-label="Giảng viên" class="py-3 px-6 text-left whitespace-normal"></td>
+                    </tr>
+                    <!-- Row 28 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="TT" class="py-3 px-6 text-left whitespace-normal">28</td>
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF735</td>
+                        <td data-label="Nội dung kiến thức" class="py-3 px-6 text-left whitespace-normal">Các vấn đề hiện đại trong Công nghệ thông tin (Contemporary Issues in Information Technology)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">2</td>
+                        <td data-label="LT" class="py-3 px-6 text-left whitespace-normal">14</td>
+                        <td data-label="Thảo luận" class="py-3 px-6 text-left whitespace-normal">9</td>
+                        <td data-label="TH,TN" class="py-3 px-6 text-left whitespace-normal">7</td>
+                        <td data-label="Học kỳ dự kiến" class="py-3 px-6 text-left whitespace-normal">7</td>
+                        <td data-label="Giáo trình" class="py-3 px-6 text-left whitespace-normal">Kutub Thakur, Al-Sakib Khan Pathan, Sadia Ismat (2023). Emerging ICT Technologies and Cybersecurity_ From Al and ML to Other Futuristic Technologies-Springer. 291p.</td>
+                        <td data-label="Tài liệu tham khảo" class="py-3 px-6 text-left whitespace-normal"></td>
+                        <td data-label="Giảng viên" class="py-3 px-6 text-left whitespace-normal"></td>
+                    </tr>
+                    <!-- Row 29 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="TT" class="py-3 px-6 text-left whitespace-normal">29</td>
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF733</td>
+                        <td data-label="Nội dung kiến thức" class="py-3 px-6 text-left whitespace-normal">Phát triển ứng dụng trên thiết bị di động (Mobile Application Development)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">3</td>
+                        <td data-label="LT" class="py-3 px-6 text-left whitespace-normal">21</td>
+                        <td data-label="Thảo luận" class="py-3 px-6 text-left whitespace-normal">9</td>
+                        <td data-label="TH,TN" class="py-3 px-6 text-left whitespace-normal">15</td>
+                        <td data-label="Học kỳ dự kiến" class="py-3 px-6 text-left whitespace-normal">7</td>
+                        <td data-label="Giáo trình" class="py-3 px-6 text-left whitespace-normal">Lê Hoàng Sơn, Nguyễn Thọ Thông (2015), Giáo trình lập trình Android, NXB Xây dựng</td>
+                        <td data-label="Tài liệu tham khảo" class="py-3 px-6 text-left whitespace-normal"></td>
+                        <td data-label="Giảng viên" class="py-3 px-6 text-left whitespace-normal"></td>
+                    </tr>
+                    <!-- Row 30 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="TT" class="py-3 px-6 text-left whitespace-normal">30</td>
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF766</td>
+                        <td data-label="Nội dung kiến thức" class="py-3 px-6 text-left whitespace-normal">Thực hành dự án Công nghệ thông tin (Information Technology Project Practice)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">3</td>
+                        <td data-label="LT" class="py-3 px-6 text-left whitespace-normal">6</td>
+                        <td data-label="Thảo luận" class="py-3 px-6 text-left whitespace-normal">6</td>
+                        <td data-label="TH,TN" class="py-3 px-6 text-left whitespace-normal">33</td>
+                        <td data-label="Học kỳ dự kiến" class="py-3 px-6 text-left whitespace-normal">7</td>
+                        <td data-label="Giáo trình" class="py-3 px-6 text-left whitespace-normal">Arif Ali Khan, Dac-Nhuong Le (2022), “Evolving Software Processes: Trends and Future Directions”, Wiley. ISBN: 978-1-119-82126-7. 320 page</td>
+                        <td data-label="Tài liệu tham khảo" class="py-3 px-6 text-left whitespace-normal">2. Macapagal, M. J. R., & Macasio, J. J. (2011). ICT project management in theory and practice; 3. Harold Kerzner (2022), Project Management Metrics, KPIs, and Dashboards: A Guide to Measuring and Monitoring Project Performance . 4th Edition, Wiley. ISBN-13: 9781119851554. 448 pages.</td>
+                        <td data-label="Giảng viên" class="py-3 px-6 text-left whitespace-normal">Lê Đắc Nhường</td>
+                    </tr>
+                    <!-- Row 31 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="TT" class="py-3 px-6 text-left whitespace-normal">31</td>
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF736</td>
+                        <td data-label="Nội dung kiến thức" class="py-3 px-6 text-left whitespace-normal">Lập trình nâng cao (Advanced Programming)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">2</td>
+                        <td data-label="LT" class="py-3 px-6 text-left whitespace-normal">16</td>
+                        <td data-label="Thảo luận" class="py-3 px-6 text-left whitespace-normal">8</td>
+                        <td data-label="TH,TN" class="py-3 px-6 text-left whitespace-normal">8</td>
+                        <td data-label="Học kỳ dự kiến" class="py-3 px-6 text-left whitespace-normal">5</td>
+                        <td data-label="Giáo trình" class="py-3 px-6 text-left whitespace-normal">Nguyễn Văn Vinh, Phạm Hồng Thái, Trần Quốc Long, "Giáo trình lập trình nâng cao" , NXB Đại học Quốc Gia Hà Nội, 2012</td>
+                        <td data-label="Tài liệu tham khảo" class="py-3 px-6 text-left whitespace-normal"></td>
+                        <td data-label="Giảng viên" class="py-3 px-6 text-left whitespace-normal"></td>
+                    </tr>
+                    <!-- Row 32 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="TT" class="py-3 px-6 text-left whitespace-normal">32</td>
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF739</td>
+                        <td data-label="Nội dung kiến thức" class="py-3 px-6 text-left whitespace-normal">Lập trình cơ sở dữ liệu (Database Programming)</td>
+                        <td data-label="TT" class="py-3 px-6 text-left whitespace-normal">2</td>
+                        <td data-label="LT" class="py-3 px-6 text-left whitespace-normal">16</td>
+                        <td data-label="Thảo luận" class="py-3 px-6 text-left whitespace-normal">8</td>
+                        <td data-label="TH,TN" class="py-3 px-6 text-left whitespace-normal">8</td>
+                        <td data-label="Học kỳ dự kiến" class="py-3 px-6 text-left whitespace-normal">5</td>
+                        <td data-label="Giáo trình" class="py-3 px-6 text-left whitespace-normal">Jason Brimhall, SQL Server 2012 T-SQL recipes, Apress, 2016.</td>
+                        <td data-label="Tài liệu tham khảo" class="py-3 px-6 text-left whitespace-normal"></td>
+                        <td data-label="Giảng viên" class="py-3 px-6 text-left whitespace-normal"></td>
+                    </tr>
+                    <!-- Row 33 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="TT" class="py-3 px-6 text-left whitespace-normal">33</td>
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF741</td>
+                        <td data-label="Nội dung kiến thức" class="py-3 px-6 text-left whitespace-normal">Quản trị hệ cơ sở dữ liệu (SQLite/NoSQL)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">2</td>
+                        <td data-label="LT" class="py-3 px-6 text-left whitespace-normal">10</td>
+                        <td data-label="Thảo luận" class="py-3 px-6 text-left whitespace-normal">5</td>
+                        <td data-label="TH,TN" class="py-3 px-6 text-left whitespace-normal">15</td>
+                        <td data-label="Học kỳ dự kiến" class="py-3 px-6 text-left whitespace-normal">5</td>
+                        <td data-label="Giáo trình" class="py-3 px-6 text-left whitespace-normal">Jason Brimhall, SQL Server 2012 T-SQL recipes, Apress, 2016.</td>
+                        <td data-label="Tài liệu tham khảo" class="py-3 px-6 text-left whitespace-normal"></td>
+                        <td data-label="Giảng viên" class="py-3 px-6 text-left whitespace-normal"></td>
+                    </tr>
+                    <!-- Row 34 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="TT" class="py-3 px-6 text-left whitespace-normal">34</td>
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF767</td>
+                        <td data-label="Nội dung kiến thức" class="py-3 px-6 text-left whitespace-normal">Tương tác người máy (Human-Machine Interaction)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">2</td>
+                        <td data-label="LT" class="py-3 px-6 text-left whitespace-normal">15</td>
+                        <td data-label="Thảo luận" class="py-3 px-6 text-left whitespace-normal">7</td>
+                        <td data-label="TH,TN" class="py-3 px-6 text-left whitespace-normal">8</td>
+                        <td data-label="Học kỳ dự kiến" class="py-3 px-6 text-left whitespace-normal">5</td>
+                        <td data-label="Giáo trình" class="py-3 px-6 text-left whitespace-normal">Lương Mạnh Bá (2023) Tương tác người máy (Human - Computer Interaction)</td>
+                        <td data-label="Tài liệu tham khảo" class="py-3 px-6 text-left whitespace-normal"></td>
+                        <td data-label="Giảng viên" class="py-3 px-6 text-left whitespace-normal"></td>
+                    </tr>
+                    <!-- Row 35 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="TT" class="py-3 px-6 text-left whitespace-normal">35</td>
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF732</td>
+                        <td data-label="Nội dung kiến thức" class="py-3 px-6 text-left whitespace-normal">Phát triển ứng dụng thương mại điện tử (E-commerce Application Development)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">2</td>
+                        <td data-label="LT" class="py-3 px-6 text-left whitespace-normal">14</td>
+                        <td data-label="Thảo luận" class="py-3 px-6 text-left whitespace-normal">6</td>
+                        <td data-label="TH,TN" class="py-3 px-6 text-left whitespace-normal">10</td>
+                        <td data-label="Học kỳ dự kiến" class="py-3 px-6 text-left whitespace-normal">6</td>
+                        <td data-label="Giáo trình" class="py-3 px-6 text-left whitespace-normal">Nguyễn Văn Minh, Nguyễn Bình Minh, Trần Hoài Nam, Chử Bá Quyết, Giáo trình phát triển hệ thống thương mại điện tử, NXB Thống kê (2014)</td>
+                        <td data-label="Tài liệu tham khảo" class="py-3 px-6 text-left whitespace-normal"></td>
+                        <td data-label="Giảng viên" class="py-3 px-6 text-left whitespace-normal"></td>
+                    </tr>
+                    <!-- Row 36 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="TT" class="py-3 px-6 text-left whitespace-normal">36</td>
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF768</td>
+                        <td data-label="Nội dung kiến thức" class="py-3 px-6 text-left whitespace-normal">Nhận dạng mẫu (Pattern Recognition)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">2</td>
+                        <td data-label="LT" class="py-3 px-6 text-left whitespace-normal">14</td>
+                        <td data-label="Thảo luận" class="py-3 px-6 text-left whitespace-normal">6</td>
+                        <td data-label="TH,TN" class="py-3 px-6 text-left whitespace-normal">10</td>
+                        <td data-label="Học kỳ dự kiến" class="py-3 px-6 text-left whitespace-normal">6</td>
+                        <td data-label="Giáo trình" class="py-3 px-6 text-left whitespace-normal">Nguyễn Mạnh Cường (chủ biên), Trần Hùng Cường (2020). Giáo trình Nhập môn lý thuyết nhận dạng. NXB Thống kê</td>
+                        <td data-label="Tài liệu tham khảo" class="py-3 px-6 text-left whitespace-normal"></td>
+                        <td data-label="Giảng viên" class="py-3 px-6 text-left whitespace-normal"></td>
+                    </tr>
+                    <!-- Row 37 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="TT" class="py-3 px-6 text-left whitespace-normal">37</td>
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF731</td>
+                        <td data-label="Nội dung kiến thức" class="py-3 px-6 text-left whitespace-normal">Phân tích và thiết kế hướng đối tượng (Object-Oriented Analysis and Design)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">3</td>
+                        <td data-label="LT" class="py-3 px-6 text-left whitespace-normal">30</td>
+                        <td data-label="Thảo luận" class="py-3 px-6 text-left whitespace-normal">6</td>
+                        <td data-label="TH,TN" class="py-3 px-6 text-left whitespace-normal">9</td>
+                        <td data-label="Học kỳ dự kiến" class="py-3 px-6 text-left whitespace-normal">5</td>
+                        <td data-label="Giáo trình" class="py-3 px-6 text-left whitespace-normal">Trương Ninh Thuận, Đặng Đức Hạnh, “Phân tích và thiết kế hướng đối tượng”, Nhà xuất bản Đại học Quốc Gia Hà Nội, 2014.</td>
+                        <td data-label="Tài liệu tham khảo" class="py-3 px-6 text-left whitespace-normal"></td>
+                        <td data-label="Giảng viên" class="py-3 px-6 text-left whitespace-normal"></td>
+                    </tr>
+                    <!-- Row 38 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="TT" class="py-3 px-6 text-left whitespace-normal">38</td>
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF769</td>
+                        <td data-label="Nội dung kiến thức" class="py-3 px-6 text-left whitespace-normal">Khai phá dữ liệu và trực quan hóa dữ liệu (Data Mining and Visualization)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">3</td>
+                        <td data-label="LT" class="py-3 px-6 text-left whitespace-normal">15</td>
+                        <td data-label="Thảo luận" class="py-3 px-6 text-left whitespace-normal">10</td>
+                        <td data-label="TH,TN" class="py-3 px-6 text-left whitespace-normal">20</td>
+                        <td data-label="Học kỳ dự kiến" class="py-3 px-6 text-left whitespace-normal">5</td>
+                        <td data-label="Giáo trình" class="py-3 px-6 text-left whitespace-normal">Nguyễn Mạnh Cường (chủ biên), Trần Hùng Cường (2020). Giáo trình Nhập môn lý thuyết nhận dạng. NXB Thống kê</td>
+                        <td data-label="Tài liệu tham khảo" class="py-3 px-6 text-left whitespace-normal"></td>
+                        <td data-label="Giảng viên" class="py-3 px-6 text-left whitespace-normal"></td>
+                    </tr>
+                    <!-- Row 39 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="TT" class="py-3 px-6 text-left whitespace-normal">39</td>
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF770</td>
+                        <td data-label="Nội dung kiến thức" class="py-3 px-6 text-left whitespace-normal">Học máy (Machine Learning)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">3</td>
+                        <td data-label="LT" class="py-3 px-6 text-left whitespace-normal">21</td>
+                        <td data-label="Thảo luận" class="py-3 px-6 text-left whitespace-normal">6</td>
+                        <td data-label="TH,TN" class="py-3 px-6 text-left whitespace-normal">18</td>
+                        <td data-label="Học kỳ dự kiến" class="py-3 px-6 text-left whitespace-normal">6</td>
+                        <td data-label="Giáo trình" class="py-3 px-6 text-left whitespace-normal">T V Geetha, S Sendhilkumar (2023), Machine Learning: Concepts, Techniques and Applications, ChapmanandHall/CRC</td>
+                        <td data-label="Tài liệu tham khảo" class="py-3 px-6 text-left whitespace-normal"></td>
+                        <td data-label="Giảng viên" class="py-3 px-6 text-left whitespace-normal"></td>
+                    </tr>
+                    <!-- Row 40 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="TT" class="py-3 px-6 text-left whitespace-normal">40</td>
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF771</td>
+                        <td data-label="Nội dung kiến thức" class="py-3 px-6 text-left whitespace-normal">Hệ thống khuyến nghị (Recommendation Systems)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">2</td>
+                        <td data-label="LT" class="py-3 px-6 text-left whitespace-normal">10</td>
+                        <td data-label="Thảo luận" class="py-3 px-6 text-left whitespace-normal">15</td>
+                        <td data-label="TH,TN" class="py-3 px-6 text-left whitespace-normal">5</td>
+                        <td data-label="Học kỳ dự kiến" class="py-3 px-6 text-left whitespace-normal">6</td>
+                        <td data-label="Giáo trình" class="py-3 px-6 text-left whitespace-normal">Jannach, D., Zanker, M., Felfernig, A., & Friedrich, G. (2011). An introduction to recommender systems. New York: Cambridge, 10, 1941904.</td>
+                        <td data-label="Tài liệu tham khảo" class="py-3 px-6 text-left whitespace-normal"></td>
+                        <td data-label="Giảng viên" class="py-3 px-6 text-left whitespace-normal"></td>
+                    </tr>
+                    <!-- Row 41 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="TT" class="py-3 px-6 text-left whitespace-normal">41</td>
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF772</td>
+                        <td data-label="Nội dung kiến thức" class="py-3 px-6 text-left whitespace-normal">Xử lý ngôn ngữ tự nhiên (Natural Language Processing)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">3</td>
+                        <td data-label="LT" class="py-3 px-6 text-left whitespace-normal">20</td>
+                        <td data-label="Thảo luận" class="py-3 px-6 text-left whitespace-normal">5</td>
+                        <td data-label="TH,TN" class="py-3 px-6 text-left whitespace-normal">20</td>
+                        <td data-label="Học kỳ dự kiến" class="py-3 px-6 text-left whitespace-normal">6</td>
+                        <td data-label="Giáo trình" class="py-3 px-6 text-left whitespace-normal">Natural language understanding / James Allen, 9780805303346.- 006.35/ A425</td>
+                        <td data-label="Tài liệu tham khảo" class="py-3 px-6 text-left whitespace-normal"></td>
+                        <td data-label="Giảng viên" class="py-3 px-6 text-left whitespace-normal"></td>
+                    </tr>
+                    <!-- Row 42 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="TT" class="py-3 px-6 text-left whitespace-normal">42</td>
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF773</td>
+                        <td data-label="Nội dung kiến thức" class="py-3 px-6 text-left whitespace-normal">Quản lý dữ liệu lớn (Big Data Management)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">3</td>
+                        <td data-label="LT" class="py-3 px-6 text-left whitespace-normal">21</td>
+                        <td data-label="Thảo luận" class="py-3 px-6 text-left whitespace-normal">6</td>
+                        <td data-label="TH,TN" class="py-3 px-6 text-left whitespace-normal">18</td>
+                        <td data-label="Học kỳ dự kiến" class="py-3 px-6 text-left whitespace-normal">6</td>
+                        <td data-label="Giáo trình" class="py-3 px-6 text-left whitespace-normal">Đỗ Phúc (2019), Giáo trình phân tích dữ liệu lớn, Nxb Đại học quốc gia TPHCM</td>
+                        <td data-label="Tài liệu tham khảo" class="py-3 px-6 text-left whitespace-normal"></td>
+                        <td data-label="Giảng viên" class="py-3 px-6 text-left whitespace-normal"></td>
+                    </tr>
+                    <!-- Row 43 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="TT" class="py-3 px-6 text-left whitespace-normal">43</td>
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF774</td>
+                        <td data-label="Nội dung kiến thức" class="py-3 px-6 text-left whitespace-normal">Học sâu và ứng dụng (Deep Learning and Applications)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">3</td>
+                        <td data-label="LT" class="py-3 px-6 text-left whitespace-normal">15</td>
+                        <td data-label="Thảo luận" class="py-3 px-6 text-left whitespace-normal">6</td>
+                        <td data-label="TH,TN" class="py-3 px-6 text-left whitespace-normal">24</td>
+                        <td data-label="Học kỳ dự kiến" class="py-3 px-6 text-left whitespace-normal">7</td>
+                        <td data-label="Giáo trình" class="py-3 px-6 text-left whitespace-normal">Ian Goodfellow, Yoshua Bengio and Aaron Courville</td>
+                        <td data-label="Tài liệu tham khảo" class="py-3 px-6 text-left whitespace-normal"></td>
+                        <td data-label="Giảng viên" class="py-3 px-6 text-left whitespace-normal"></td>
+                    </tr>
+                    <!-- Row 44 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="TT" class="py-3 px-6 text-left whitespace-normal">44</td>
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF775</td>
+                        <td data-label="Nội dung kiến thức" class="py-3 px-6 text-left whitespace-normal">Các vấn đề hiện đại trong Trí tuệ nhân tạo và Khoa học dữ liệu (Contemporary Issues in Artificial Intelligence and Data Science)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">2</td>
+                        <td data-label="LT" class="py-3 px-6 text-left whitespace-normal">5</td>
+                        <td data-label="Thảo luận" class="py-3 px-6 text-left whitespace-normal">15</td>
+                        <td data-label="TH,TN" class="py-3 px-6 text-left whitespace-normal">10</td>
+                        <td data-label="Học kỳ dự kiến" class="py-3 px-6 text-left whitespace-normal">7</td>
+                        <td data-label="Giáo trình" class="py-3 px-6 text-left whitespace-normal">Shikha Agarwal, Manish Gupta, Jitendra Agrawal, Dac-Nhuong Le, Kamlesh Kumar Gupta (2024), Swarm Intelligence and Machine Learning. Nxb Taylor Francis. ISBN 9781032145822</td>
+                        <td data-label="Tài liệu tham khảo" class="py-3 px-6 text-left whitespace-normal"></td>
+                        <td data-label="Giảng viên" class="py-3 px-6 text-left whitespace-normal"></td>
+                    </tr>
+                    <!-- Row 45 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="TT" class="py-3 px-6 text-left whitespace-normal">45</td>
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF776</td>
+                        <td data-label="Nội dung kiến thức" class="py-3 px-6 text-left whitespace-normal">Thực hành dự án Trí tuệ nhân tạo và Khoa học dữ liệu (Artificial Intelligence and Data Science Project Practice)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">3</td>
+                        <td data-label="LT" class="py-3 px-6 text-left whitespace-normal">6</td>
+                        <td data-label="Thảo luận" class="py-3 px-6 text-left whitespace-normal">6</td>
+                        <td data-label="TH,TN" class="py-3 px-6 text-left whitespace-normal">33</td>
+                        <td data-label="Học kỳ dự kiến" class="py-3 px-6 text-left whitespace-normal">7</td>
+                        <td data-label="Giáo trình" class="py-3 px-6 text-left whitespace-normal">Arif Ali Khan, Dac-Nhuong Le (2022), “Evolving Software Processes: Trends and Future Directions”, Wiley. ISBN: 978-1-119-82126-7. 320 pages.</td>
+                        <td data-label="Tài liệu tham khảo" class="py-3 px-6 text-left whitespace-normal">2. Mohamed Alloghani, Christopher Thron, Saad Subair (2023), Artificial Intelligence for Data Science in Theory and Practice, ISBN 978-3-030-92244-3. Springer.; 3. George F. Luger (2024), Artificial Intelligence: Principles and Practice, ISBN 978-3031574368. Springer.; 4. Harold Kerzner (2022), Project Management Metrics, KPIs, and Dashboards: A Guide to Measuring and Monitoring Project Performance . 4th Edition, Wiley. ISBN-13: 9781119851554. 448 pages.</td>
+                        <td data-label="Giảng viên" class="py-3 px-6 text-left whitespace-normal">Lê Đắc Nhường</td>
+                    </tr>
+                    <!-- Row 46 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="TT" class="py-3 px-6 text-left whitespace-normal">46</td>
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF777</td>
+                        <td data-label="Nội dung kiến thức" class="py-3 px-6 text-left whitespace-normal">Tương tác người máy (Human-Machine Interaction)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">2</td>
+                        <td data-label="LT" class="py-3 px-6 text-left whitespace-normal">14</td>
+                        <td data-label="Thảo luận" class="py-3 px-6 text-left whitespace-normal">6</td>
+                        <td data-label="TH,TN" class="py-3 px-6 text-left whitespace-normal">10</td>
+                        <td data-label="Học kỳ dự kiến" class="py-3 px-6 text-left whitespace-normal">5</td>
+                        <td data-label="Giáo trình" class="py-3 px-6 text-left whitespace-normal">Lương Mạnh Bá (2023) Tương tác người máy (Human - Computer Interaction)</td>
+                        <td data-label="Tài liệu tham khảo" class="py-3 px-6 text-left whitespace-normal"></td>
+                        <td data-label="Giảng viên" class="py-3 px-6 text-left whitespace-normal"></td>
+                    </tr>
+                    <!-- Row 47 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="TT" class="py-3 px-6 text-left whitespace-normal">47</td>
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF778</td>
+                        <td data-label="Nội dung kiến thức" class="py-3 px-6 text-left whitespace-normal">Phân tích chuỗi thời gian (Time Series Analysis)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">2</td>
+                        <td data-label="LT" class="py-3 px-6 text-left whitespace-normal">14</td>
+                        <td data-label="Thảo luận" class="py-3 px-6 text-left whitespace-normal">16</td>
+                        <td data-label="TH,TN" class="py-3 px-6 text-left whitespace-normal">0</td>
+                        <td data-label="Học kỳ dự kiến" class="py-3 px-6 text-left whitespace-normal">5</td>
+                        <td data-label="Giáo trình" class="py-3 px-6 text-left whitespace-normal">Nguyễn Quang Dong (2024), Giáo trình Phân tích chuỗi thời gian và dự báo, NXB</td>
+                        <td data-label="Tài liệu tham khảo" class="py-3 px-6 text-left whitespace-normal">ĐHKTQD.</td>
+                        <td data-label="Giảng viên" class="py-3 px-6 text-left whitespace-normal"></td>
+                    </tr>
+                    <!-- Row 48 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="TT" class="py-3 px-6 text-left whitespace-normal">48</td>
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF779</td>
+                        <td data-label="Nội dung kiến thức" class="py-3 px-6 text-left whitespace-normal">Ứng dụng của Trí tuệ nhân tạo</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">2</td>
+                        <td data-label="LT" class="py-3 px-6 text-left whitespace-normal">14</td>
+                        <td data-label="Thảo luận" class="py-3 px-6 text-left whitespace-normal">6</td>
+                        <td data-label="TH,TN" class="py-3 px-6 text-left whitespace-normal">10</td>
+                        <td data-label="Học kỳ dự kiến" class="py-3 px-6 text-left whitespace-normal">6</td>
+                        <td data-label="Giáo trình" class="py-3 px-6 text-left whitespace-normal">Somogyi, Z. (2021). The Application of Artificial Intelligence. Machine Learning Algorithm, 17-86.</td>
+                        <td data-label="Tài liệu tham khảo" class="py-3 px-6 text-left whitespace-normal"></td>
+                        <td data-label="Giảng viên" class="py-3 px-6 text-left whitespace-normal"></td>
+                    </tr>
+                    <!-- Row 49 -->
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td data-label="TT" class="py-3 px-6 text-left whitespace-normal">49</td>
+                        <td data-label="Mã học phần" class="py-3 px-6 text-left whitespace-normal">INF780</td>
+                        <td data-label="Nội dung kiến thức" class="py-3 px-6 text-left whitespace-normal">Hệ hỗ trợ hướng dữ liệu (Data Driven Decision Making)</td>
+                        <td data-label="Số TC" class="py-3 px-6 text-left whitespace-normal">2</td>
+                        <td data-label="LT" class="py-3 px-6 text-left whitespace-normal">14</td>
+                        <td data-label="Thảo luận" class="py-3 px-6 text-left whitespace-normal">12</td>
+                        <td data-label="TH,TN" class="py-3 px-6 text-left whitespace-normal">4</td>
+                        <td data-label="Học kỳ dự kiến" class="py-3 px-6 text-left whitespace-normal">6</td>
+                        <td data-label="Giáo trình" class="py-3 px-6 text-left whitespace-normal">Trần Đình Khang, (2016) Hệ trợ giúp quyết định, NXB Đại học Bách Khoa Hà Nội.</td>
+                        <td data-label="Tài liệu tham khảo" class="py-3 px-6 text-left whitespace-normal">2. Trần Thị Thu Hà (2020), Hệ thống thông tin Hỗ trợ ra quyết định, NXB Đại học kinh tế quốc dân. 3. James Bell Associates. (2018). Guide to Data-Driven Decision Making: Using Data to Inform Practice and Policy Decisions in Child Welfare Organizations. Washington, DC: Children’s Bureau, Administration for Children and Families, U.S. Department of Health and Human Services.</td>
+                        <td data-label="Giảng viên" class="py-3 px-6 text-left whitespace-normal">Nguyễn Thị Lanh</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</body>
+</html>
