@@ -193,7 +193,7 @@ Lập trình web | LT002      | Khoa Công nghệ Thông tin</pre>
                 </div>
 
 
-                <!-- Main Content: Documents List -->
+                <!-- Main Content: Documents List for selected subject -->
                 <div>
                     <h2 id="documents-title" class="text-2xl font-bold text-gray-800 mb-4">Danh sách tài liệu</h2>
                     <div id="documents-list" class="space-y-3">
@@ -201,6 +201,21 @@ Lập trình web | LT002      | Khoa Công nghệ Thông tin</pre>
                         <p id="no-documents-message" class="text-center text-gray-500 py-8">Vui lòng chọn một môn học để xem tài liệu.</p>
                     </div>
                 </div>
+                
+                <!-- NEW: All Documents Accordion -->
+                <div class="mt-8 border-t pt-6">
+                    <button id="toggle-all-docs-panel" class="w-full flex justify-between items-center p-3 bg-gray-200 hover:bg-gray-300 rounded-lg focus:outline-none transition-colors">
+                        <h3 class="text-xl font-bold text-gray-700">
+                            <i class="fas fa-archive mr-2"></i>
+                            Xem tất cả tài liệu đã tải lên
+                        </h3>
+                        <i id="toggle-all-docs-icon" class="fas fa-chevron-down transition-transform"></i>
+                    </button>
+                    <div id="all-documents-accordion" class="hidden mt-2 space-y-2">
+                        <!-- Accordion items will be populated by JS -->
+                    </div>
+                </div>
+
             </div>
         </div>
     </div>

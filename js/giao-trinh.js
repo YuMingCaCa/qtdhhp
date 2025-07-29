@@ -14,6 +14,7 @@
 // NEW FEATURE: Made subject management section collapsible and added a filter for its table.
 // NEW FEATURE: Implemented autocomplete search UI for subject selection.
 // NEW FEATURE: Added real-time storage usage display.
+// NEW FEATURE: Added a collapsible accordion view for ALL uploaded documents, grouped by subject.
 
 // Import Firebase modules
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
@@ -46,7 +47,7 @@ function injectStyles() {
         @keyframes slideIn { from {margin-top: -5%; opacity: 0} to {margin-top: 5%; opacity: 1} }
         @-webkit-keyframes fadeIn { from {opacity: 0} to {opacity: 1} }
         @keyframes fadeIn { from {opacity: 0} to {opacity: 1} }
-        #toggle-subject-icon.rotate-180 {
+        .rotate-180 {
             transform: rotate(180deg);
         }
     `;
@@ -56,11 +57,12 @@ function injectStyles() {
 // Global state
 let state = {
     currentUser: null,
-    faculties: [], // Still store faculties for internal linking
+    faculties: [],
     subjects: [],
     documents: [],
+    allDocuments: [], // NEW: To store all documents for the accordion view
     selectedSubjectId: null,
-    selectedSubjectIdsToDelete: new Set(), // New: Set to store IDs of subjects selected for deletion
+    selectedSubjectIdsToDelete: new Set(),
 };
 
 // Firebase variables
@@ -71,12 +73,12 @@ let subjectsUnsubscribe = null; // To detach listener for subjects table
 
 // --- Helper Functions ---
 function formatBytes(bytes, decimals = 2) {
-    if (bytes === 0) return '0 Bytes';
+    if (!+bytes) return '0 Bytes';
     const k = 1024;
     const dm = decimals < 0 ? 0 : decimals;
     const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
 }
 
 // --- Custom Modal Logic ---
@@ -319,13 +321,107 @@ function renderDocumentsList() {
     document.querySelectorAll('.delete-btn').forEach(button => button.addEventListener('click', handleDelete));
 }
 
+// NEW: Renders the accordion list of all documents
+function renderAllDocumentsAccordion() {
+    const accordionContainer = document.getElementById('all-documents-accordion');
+    if (!accordionContainer) return;
+
+    accordionContainer.innerHTML = '';
+
+    if (state.allDocuments.length === 0) {
+        accordionContainer.innerHTML = `<p class="text-center text-gray-500 py-4">Chưa có tài liệu nào được tải lên hệ thống.</p>`;
+        return;
+    }
+
+    // Group documents by subjectId
+    const docsBySubject = state.allDocuments.reduce((acc, doc) => {
+        const subjectId = doc.subjectId;
+        if (!acc[subjectId]) {
+            acc[subjectId] = [];
+        }
+        acc[subjectId].push(doc);
+        return acc;
+    }, {});
+
+    const isAdmin = state.currentUser?.role === 'admin';
+
+    // Sort subjects by name before rendering
+    const sortedSubjectIds = Object.keys(docsBySubject).sort((a, b) => {
+        const subjectA = state.subjects.find(s => s.id === a)?.subjectName || '';
+        const subjectB = state.subjects.find(s => s.id === b)?.subjectName || '';
+        return subjectA.localeCompare(subjectB);
+    });
+
+    for (const subjectId of sortedSubjectIds) {
+        const subject = state.subjects.find(s => s.id === subjectId);
+        if (!subject) continue; // Skip if subject info is not available yet
+
+        const documents = docsBySubject[subjectId];
+        const accordionItem = document.createElement('div');
+        accordionItem.className = 'border border-gray-200 rounded-lg overflow-hidden';
+
+        const headerButton = document.createElement('button');
+        headerButton.className = 'w-full flex justify-between items-center p-3 bg-gray-50 hover:bg-gray-100 focus:outline-none text-left transition-colors';
+        headerButton.innerHTML = `
+            <span class="font-semibold text-gray-700">${subject.subjectName} (${subject.subjectCode})</span>
+            <div class="flex items-center gap-4">
+                <span class="text-sm bg-blue-100 text-blue-800 font-medium me-2 px-2.5 py-0.5 rounded">${documents.length} file(s)</span>
+                <i class="fas fa-chevron-down transition-transform"></i>
+            </div>
+        `;
+
+        const contentPanel = document.createElement('div');
+        contentPanel.className = 'hidden p-3 bg-white';
+        contentPanel.innerHTML = '<div class="space-y-3"></div>';
+        const contentContainer = contentPanel.querySelector('.space-y-3');
+
+        documents.forEach(docData => {
+            const docElement = document.createElement('div');
+            docElement.className = 'p-3 bg-gray-50 rounded-md border flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2';
+            
+            const uploadedDate = docData.uploadedAt?.toDate();
+            const dateString = uploadedDate ? uploadedDate.toLocaleDateString('vi-VN') : 'Không rõ ngày';
+            let fileIcon = 'fa-file';
+            if (docData.fileType?.startsWith('image/')) fileIcon = 'fa-file-image';
+            if (docData.fileType === 'application/pdf') fileIcon = 'fa-file-pdf';
+            if (docData.fileType?.includes('word')) fileIcon = 'fa-file-word';
+            if (docData.fileType?.includes('excel')) fileIcon = 'fa-file-excel';
+
+            docElement.innerHTML = `
+                <div class="flex-grow">
+                    <p class="font-medium text-gray-800 flex items-center text-sm"><i class="fas ${fileIcon} mr-2 text-gray-500"></i>${docData.fileName}</p>
+                    <p class="text-xs text-gray-500 mt-1">Ngày tải lên: ${dateString} | Kích thước: ${formatBytes(docData.fileSize)}</p>
+                </div>
+                <div class="flex items-center gap-2 flex-shrink-0">
+                    <a href="${docData.downloadURL}" target="_blank" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-1 px-3 rounded-lg text-xs flex items-center gap-1.5"><i class="fas fa-download"></i> Tải về</a>
+                    ${isAdmin ? `<button data-doc-id="${docData.id}" data-file-path="${docData.filePath}" class="delete-btn bg-red-500 hover:bg-red-600 text-white font-bold py-1 px-3 rounded-lg text-xs flex items-center gap-1.5"><i class="fas fa-trash"></i> Xóa</button>` : ''}
+                </div>
+            `;
+            contentContainer.appendChild(docElement);
+        });
+
+        accordionItem.appendChild(headerButton);
+        accordionItem.appendChild(contentPanel);
+        accordionContainer.appendChild(accordionItem);
+
+        headerButton.addEventListener('click', () => {
+            contentPanel.classList.toggle('hidden');
+            headerButton.querySelector('i').classList.toggle('rotate-180');
+        });
+    }
+    
+    // Re-attach event listeners for the new delete buttons
+    accordionContainer.querySelectorAll('.delete-btn').forEach(button => button.addEventListener('click', handleDelete));
+}
+
+
 // --- Firebase Initialization and Auth State ---
 async function initializeFirebase() {
     const firebaseConfig = {
       apiKey: "AIzaSyCJcTMUwO-w7V0YsGUKWeaW-zl42Ww7fxo",
       authDomain: "qlylaodongbdhhp.firebaseapp.com",
       projectId: "qlylaodongbdhhp",
-      storageBucket: "qlylaodongbdhhp.firebasestorage.app",
+      storageBucket: "qlylaodongbdhhp.firebasestorage.app", // Corrected storage bucket
       messagingSenderId: "462439202995",
       appId: "1:462439202995:web:06bc11042efb9b99d4f0c6"
     };
@@ -379,6 +475,7 @@ function fetchInitialData() {
     });
     
     listenToStorageUsage();
+    fetchAllDocuments(); // NEW: Fetch all documents on initial load
 }
 
 function listenToStorageUsage() {
@@ -425,9 +522,21 @@ function fetchSubjects() {
     subjectsUnsubscribe = onSnapshot(curriculumSubjectsCol, (snapshot) => {
         state.subjects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         renderSubjectsTable(); 
+        renderAllDocumentsAccordion(); // Re-render accordion in case subject names were not ready before
     }, (error) => {
         console.error("Error fetching subjects: ", error);
         showAlert("Không thể tải danh sách môn học.");
+    });
+}
+
+// NEW: Fetches all documents from the syllabus collection
+function fetchAllDocuments() {
+    onSnapshot(syllabusCol, (snapshot) => {
+        state.allDocuments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        renderAllDocumentsAccordion();
+    }, (error) => {
+        console.error("Error fetching all documents: ", error);
+        showAlert("Không thể tải danh sách tất cả tài liệu.");
     });
 }
 
@@ -839,7 +948,13 @@ function addEventListeners() {
     
     document.getElementById('toggle-subject-management').addEventListener('click', () => {
         document.getElementById('subject-management-content').classList.toggle('hidden');
-        document.getElementById('toggle-subject-icon').classList.toggle('fa-chevron-up');
+        document.getElementById('toggle-subject-icon').classList.toggle('rotate-180');
+    });
+
+    // NEW: Event listener for the all-documents panel
+    document.getElementById('toggle-all-docs-panel').addEventListener('click', () => {
+        document.getElementById('all-documents-accordion').classList.toggle('hidden');
+        document.getElementById('toggle-all-docs-icon').classList.toggle('rotate-180');
     });
 
     document.getElementById('admin-search-subject-input').addEventListener('input', (e) => renderSubjectsTable(e.target.value));
