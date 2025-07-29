@@ -25,7 +25,7 @@
                 </a>
                 <div class="text-center">
                     <h1 class="text-xl md:text-3xl font-bold text-blue-800">Cổng thông tin Thực tập & Việc làm</h1>
-                    <p class="text-md text-gray-600">&copy; Khoa Công Nghệ Thông Tin - Trường Đại học Hải Phòng</p>
+                    <p class="text-md text-gray-600">Khoa Công Nghệ Thông Tin - Trường Đại học Hải Phòng</p>
                 </div>
                  <a href="https://fit.dhhp.edu.vn/" target="_blank" title="Website Khoa CNTT">
                     <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQpzh7trviplRC5G2r75APp6H3wcTnXVixU-Q&s" alt="Logo Khoa Công nghệ Thông tin" class="h-12 md:h-16">
@@ -35,6 +35,15 @@
             <div class="mt-4 border-t pt-2 flex justify-between items-center">
                 <a href="/" class="text-blue-700 hover:text-blue-900 text-sm font-medium"><i class="fas fa-arrow-left mr-2"></i>Về trang chọn Module</a>
                 <div class="flex items-center gap-4">
+                     <a href="/quan-ly-ho-so" id="my-profile-btn" class="hidden bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors text-sm">
+                        <i class="fas fa-user-circle mr-2"></i>Hồ sơ của tôi
+                    </a>
+                     <a href="/quan-ly-cong-ty" id="company-profile-btn" class="hidden bg-purple-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-purple-700 transition-colors text-sm">
+                        <i class="fas fa-building mr-2"></i>Hồ sơ Công ty
+                    </a>
+                     <a href="/quan-ly-tuyen-dung" id="recruitment-management-btn" class="hidden bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700 transition-colors text-sm">
+                        <i class="fas fa-tasks mr-2"></i>Quản lý Tuyển dụng
+                    </a>
                      <button id="post-job-btn" class="hidden bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition-colors text-sm">
                         <i class="fas fa-plus-circle mr-2"></i>Đăng tin
                     </button>
@@ -157,7 +166,7 @@
                         </div>
                         <!-- Column 2 -->
                         <div class="space-y-4">
-                            <div>
+                             <div>
                                 <label for="job-contact" class="block text-sm font-medium text-gray-700">Thông tin liên hệ (Email/SĐT)</label>
                                 <input type="text" id="job-contact" required placeholder="hr@company.com" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                             </div>
@@ -200,6 +209,21 @@
             </div>
             <div id="user-list-container" class="mt-5 max-h-[70vh] overflow-y-auto">
                 <!-- User list will be rendered here by JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- View Applicants Modal -->
+    <div id="view-applicants-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+        <div class="relative top-10 mx-auto p-5 border w-full max-w-4xl shadow-lg rounded-md bg-white">
+            <div class="flex justify-between items-center pb-3 border-b">
+                <p class="text-2xl font-bold">Danh sách ứng viên</p>
+                <button id="close-applicants-modal-btn" class="cursor-pointer z-50">
+                    <i class="fas fa-times text-2xl text-gray-500 hover:text-gray-800"></i>
+                </button>
+            </div>
+            <div id="applicant-list-container" class="mt-5 max-h-[70vh] overflow-y-auto">
+                <!-- Applicant list will be rendered here by JS -->
             </div>
         </div>
     </div>

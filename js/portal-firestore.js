@@ -7,7 +7,8 @@ import { db, appId } from './portal-config.js';
 const jobsColPath = `artifacts/${appId}/public/data/jobs`;
 const usersColPath = `artifacts/${appId}/public/data/users`;
 const applicationsColPath = `artifacts/${appId}/public/data/applications`;
-const profilesColPath = `artifacts/${appId}/public/data/profiles`; // Collection mới cho hồ sơ
+const profilesColPath = `artifacts/${appId}/public/data/profiles`;
+const companiesColPath = `artifacts/${appId}/public/data/companies`;
 
 /**
  * Lấy tất cả các tin tuyển dụng từ Firestore.
@@ -18,6 +19,34 @@ export async function fetchJobs() {
     const jobSnapshot = await getDocs(jobsCollection);
     return jobSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 }
+
+/**
+ * Lấy các tin tuyển dụng được đăng bởi một người dùng cụ thể.
+ * @param {string} userId - ID của người đăng tin.
+ * @returns {Promise<Array<Object>>} Danh sách các tin tuyển dụng.
+ */
+export async function fetchJobsByOwner(userId) {
+    if (!userId) return [];
+    const q = query(collection(db, jobsColPath), where("ownerId", "==", userId));
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+}
+
+/**
+ * Lấy thông tin chi tiết của các tin tuyển dụng dựa trên danh sách ID.
+ * @param {Array<string>} jobIds - Danh sách các ID của tin tuyển dụng.
+ * @returns {Promise<Array<Object>>} Danh sách chi tiết các tin tuyển dụng.
+ */
+export async function fetchJobsByIds(jobIds) {
+    if (!jobIds || jobIds.length === 0) {
+        return [];
+    }
+    const jobsRef = collection(db, jobsColPath);
+    const q = query(jobsRef, where('__name__', 'in', jobIds));
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+}
+
 
 /**
  * Lưu một tin tuyển dụng (mới hoặc cập nhật) vào Firestore.
@@ -73,7 +102,9 @@ export async function applyForJob(jobId, userId, userEmail) {
         jobId: jobId,
         userId: userId,
         userEmail: userEmail,
-        appliedAt: serverTimestamp()
+        appliedAt: serverTimestamp(),
+        status: 'Đã nộp', // Trạng thái mặc định
+        notes: '' // Thêm trường ghi chú
     });
 }
 
@@ -86,7 +117,7 @@ export async function fetchUserApplications(userId) {
     if (!userId) return [];
     const q = query(collection(db, applicationsColPath), where("userId", "==", userId));
     const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => doc.data());
+    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 }
 
 /**
@@ -99,4 +130,61 @@ export async function checkUserProfileExists(userId) {
     const profileDocRef = doc(db, profilesColPath, userId);
     const profileDoc = await getDoc(profileDocRef);
     return profileDoc.exists();
+}
+
+/**
+ * Lấy danh sách ứng viên cho một công việc cụ thể.
+ * @param {string} jobId - ID của công việc.
+ * @returns {Promise<Array<Object>>} Danh sách các ứng viên.
+ */
+export async function fetchApplicantsForJob(jobId) {
+    const q = query(collection(db, applicationsColPath), where("jobId", "==", jobId));
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+}
+
+/**
+ * Cập nhật trạng thái của một đơn ứng tuyển.
+ * @param {string} applicationId - ID của đơn ứng tuyển.
+ * @param {string} newStatus - Trạng thái mới.
+ */
+export async function updateApplicationStatus(applicationId, newStatus) {
+    const applicationDocRef = doc(db, applicationsColPath, applicationId);
+    await updateDoc(applicationDocRef, { status: newStatus });
+}
+
+/**
+ * Cập nhật ghi chú của một đơn ứng tuyển.
+ * @param {string} applicationId - ID của đơn ứng tuyển.
+ * @param {string} newNote - Ghi chú mới.
+ */
+export async function updateApplicationNote(applicationId, newNote) {
+    const applicationDocRef = doc(db, applicationsColPath, applicationId);
+    await updateDoc(applicationDocRef, { notes: newNote });
+}
+
+
+/**
+ * Lấy hồ sơ của một công ty dựa trên ID của người sở hữu.
+ * @param {string} userId - ID của người dùng (chủ công ty).
+ * @returns {Promise<Object|null>} Dữ liệu hồ sơ công ty hoặc null.
+ */
+export async function fetchCompanyProfile(userId) {
+    if (!userId) return null;
+    const docRef = doc(db, companiesColPath, userId);
+    const docSnap = await getDoc(docRef);
+    return docSnap.exists() ? { id: docSnap.id, ...docSnap.data() } : null;
+}
+
+/**
+ * Lấy tất cả hồ sơ công ty và trả về dưới dạng một map.
+ * @returns {Promise<Object>} Một map với key là ID người sở hữu và value là dữ liệu công ty.
+ */
+export async function fetchAllCompanies() {
+    const companySnapshot = await getDocs(collection(db, companiesColPath));
+    const companiesMap = {};
+    companySnapshot.forEach(doc => {
+        companiesMap[doc.id] = { id: doc.id, ...doc.data() };
+    });
+    return companiesMap;
 }

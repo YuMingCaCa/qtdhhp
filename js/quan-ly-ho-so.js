@@ -1,25 +1,14 @@
 // File: js/quan-ly-ho-so.js
 // Logic for the profile management page.
 
-import { db, auth } from './portal-config.js';
+import { db } from './portal-config.js';
 import { doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { fetchUserApplications, fetchJobsByIds } from './portal-firestore.js';
 
-// --- UI Elements ---
-const profileForm = document.getElementById('profile-form');
-const skillsContainer = document.getElementById('skills-container');
-const educationContainer = document.getElementById('education-container');
-const experienceContainer = document.getElementById('experience-container');
-const addSkillBtn = document.getElementById('add-skill-btn');
-const addEducationBtn = document.getElementById('add-education-btn');
-const addExperienceBtn = document.getElementById('add-experience-btn');
-
-const userId = sessionStorage.getItem('userUID');
-const profilesColPath = `artifacts/${db.app.options.projectId}/public/data/profiles`;
 
 // --- Dynamic Element Templates ---
 
 function createSkillElement(skill = { name: '', level: 'Cơ bản' }) {
-    const id = Date.now();
     const wrapper = document.createElement('div');
     wrapper.className = 'flex items-center gap-4';
     wrapper.innerHTML = `
@@ -87,7 +76,7 @@ function createExperienceElement(exp = { company: '', position: '', description:
 
 // --- Data Handling ---
 
-async function loadProfile() {
+async function loadProfile(userId, profilesColPath) {
     if (!userId) {
         alert("Không thể xác thực người dùng. Vui lòng đăng nhập lại.");
         window.location.href = '/';
@@ -98,6 +87,10 @@ async function loadProfile() {
 
     const docRef = doc(db, profilesColPath, userId);
     const docSnap = await getDoc(docRef);
+    
+    const skillsContainer = document.getElementById('skills-container');
+    const educationContainer = document.getElementById('education-container');
+    const experienceContainer = document.getElementById('experience-container');
 
     if (docSnap.exists()) {
         const data = docSnap.data();
@@ -117,24 +110,79 @@ async function loadProfile() {
     }
 }
 
+function getStatusBadge(status) {
+    status = status || 'Đã nộp';
+    switch (status) {
+        case 'Đã nộp':
+            return `<span class="text-sm font-semibold py-1 px-3 rounded-full bg-gray-200 text-gray-800">${status}</span>`;
+        case 'Đã xem':
+            return `<span class="text-sm font-semibold py-1 px-3 rounded-full bg-blue-200 text-blue-800">${status}</span>`;
+        case 'Mời phỏng vấn':
+            return `<span class="text-sm font-semibold py-1 px-3 rounded-full bg-yellow-200 text-yellow-800">${status}</span>`;
+        case 'Trúng tuyển':
+            return `<span class="text-sm font-semibold py-1 px-3 rounded-full bg-green-200 text-green-800">${status}</span>`;
+        case 'Không trúng tuyển':
+        case 'Từ chối':
+            return `<span class="text-sm font-semibold py-1 px-3 rounded-full bg-red-200 text-red-800">${status}</span>`;
+        default:
+            return `<span class="text-sm font-semibold py-1 px-3 rounded-full bg-gray-200 text-gray-800">${status}</span>`;
+    }
+}
+
+async function loadAppliedJobs(userId) {
+    const appliedJobsContainer = document.getElementById('applied-jobs-container');
+    appliedJobsContainer.innerHTML = `<p class="text-gray-500">Đang tải...</p>`;
+    const applications = await fetchUserApplications(userId);
+    
+    if (applications.length === 0) {
+        appliedJobsContainer.innerHTML = `<p class="text-gray-500">Bạn chưa ứng tuyển vào vị trí nào.</p>`;
+        return;
+    }
+
+    const jobIds = applications.map(app => app.jobId);
+    const jobs = await fetchJobsByIds(jobIds);
+
+    appliedJobsContainer.innerHTML = ''; // Clear loading text
+    applications.sort((a, b) => (b.appliedAt?.toMillis() || 0) - (a.appliedAt?.toMillis() || 0)); // Sắp xếp theo ngày ứng tuyển mới nhất
+    
+    applications.forEach(app => {
+        const job = jobs.find(j => j.id === app.jobId);
+        if (job) {
+            const jobElement = document.createElement('div');
+            jobElement.className = 'p-4 border rounded-lg flex justify-between items-center';
+            jobElement.innerHTML = `
+                <div>
+                    <p class="font-bold text-blue-700">${job.title}</p>
+                    <p class="text-sm text-gray-600">${job.company}</p>
+                </div>
+                ${getStatusBadge(app.status)}
+            `;
+            appliedJobsContainer.appendChild(jobElement);
+        }
+    });
+}
+
 async function saveProfile(e) {
     e.preventDefault();
     const saveBtn = document.getElementById('save-profile-btn');
     saveBtn.disabled = true;
     saveBtn.innerHTML = `<i class="fas fa-spinner fa-spin mr-2"></i>Đang lưu...`;
+    
+    const userId = sessionStorage.getItem('userUID');
+    const profilesColPath = `artifacts/${db.app.options.projectId}/public/data/profiles`;
 
-    const skills = Array.from(skillsContainer.children).map(el => ({
+    const skills = Array.from(document.getElementById('skills-container').children).map(el => ({
         name: el.querySelector('.skill-name').value,
         level: el.querySelector('.skill-level').value
     })).filter(s => s.name);
 
-    const education = Array.from(educationContainer.children).map(el => ({
+    const education = Array.from(document.getElementById('education-container').children).map(el => ({
         school: el.querySelector('.edu-school').value,
         major: el.querySelector('.edu-major').value,
         year: el.querySelector('.edu-year').value
     })).filter(e => e.school);
 
-    const experience = Array.from(experienceContainer.children).map(el => ({
+    const experience = Array.from(document.getElementById('experience-container').children).map(el => ({
         company: el.querySelector('.exp-company').value,
         position: el.querySelector('.exp-position').value,
         description: el.querySelector('.exp-description').value
@@ -167,8 +215,17 @@ async function saveProfile(e) {
 
 // --- Event Listeners ---
 
-document.addEventListener('DOMContentLoaded', loadProfile);
-profileForm.addEventListener('submit', saveProfile);
-addSkillBtn.addEventListener('click', () => skillsContainer.appendChild(createSkillElement()));
-addEducationBtn.addEventListener('click', () => educationContainer.appendChild(createEducationElement()));
-addExperienceBtn.addEventListener('click', () => experienceContainer.appendChild(createExperienceElement()));
+function initializeProfilePage() {
+    const userId = sessionStorage.getItem('userUID');
+    const profilesColPath = `artifacts/${db.app.options.projectId}/public/data/profiles`;
+    
+    loadProfile(userId, profilesColPath);
+    loadAppliedJobs(userId);
+    
+    document.getElementById('profile-form').addEventListener('submit', saveProfile);
+    document.getElementById('add-skill-btn').addEventListener('click', () => document.getElementById('skills-container').appendChild(createSkillElement()));
+    document.getElementById('add-education-btn').addEventListener('click', () => document.getElementById('education-container').appendChild(createEducationElement()));
+    document.getElementById('add-experience-btn').addEventListener('click', () => document.getElementById('experience-container').appendChild(createExperienceElement()));
+}
+
+document.addEventListener('DOMContentLoaded', initializeProfilePage);

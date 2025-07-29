@@ -8,22 +8,24 @@ import { signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth
 
 let allJobs = [];
 let userApplications = [];
+let allCompanies = {}; // Map để lưu trữ thông tin các công ty
 
 export async function refreshAndRenderJobs() {
     UI.showLoading(document.getElementById('job-listings'));
     UI.resetJobDetails();
     try {
         const userId = sessionStorage.getItem('userUID');
-        // Lấy danh sách việc làm và danh sách đã ứng tuyển cùng lúc
-        const [jobs, applications] = await Promise.all([
+        const [jobs, applications, companies] = await Promise.all([
             Firestore.fetchJobs(),
-            Firestore.fetchUserApplications(userId)
+            Firestore.fetchUserApplications(userId),
+            Firestore.fetchAllCompanies()
         ]);
         
         allJobs = jobs.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
         userApplications = applications;
+        allCompanies = companies;
 
-        UI.renderJobListings(allJobs, handleJobClick);
+        UI.renderJobListings(allJobs, allCompanies, handleJobClick);
     } catch (error) {
         console.error("Error refreshing jobs:", error);
         alert("Không thể tải danh sách việc làm.");
@@ -32,9 +34,9 @@ export async function refreshAndRenderJobs() {
 
 function handleJobClick(jobId) {
     const job = allJobs.find(j => j.id === jobId);
-    // Kiểm tra xem người dùng đã ứng tuyển vào công việc này chưa
+    const company = allCompanies[job.ownerId];
     const hasApplied = userApplications.some(app => app.jobId === jobId);
-    UI.renderJobDetails(job, hasApplied);
+    UI.renderJobDetails(job, company, hasApplied);
     document.querySelectorAll('.job-card').forEach(card => {
         card.classList.toggle('selected', card.dataset.jobId === jobId);
     });
@@ -58,6 +60,7 @@ async function handleJobFormSubmit(e) {
         contactInfo: document.getElementById('job-contact').value,
         expiryDate: document.getElementById('job-expiry').value,
         postedBy: sessionStorage.getItem('userEmail'),
+        ownerId: sessionStorage.getItem('userUID') // Thêm ID của người đăng
     };
     try {
         await Firestore.saveJob(jobData, editingId);
@@ -123,10 +126,10 @@ function handleFilter() {
              (job.tags || []).some(tag => tag.toLowerCase().includes(keyword)))
             : true;
         const matchesType = selectedTypes.length > 0 ? selectedTypes.includes(job.type) : true;
-        const matchesLocation = location !== 'Tất cả địa điểm' ? job.location === location : true;
+        const matchesLocation = location !== 'Tất cả địa điểm' ? (job.location || '').includes(location) : true;
         return matchesKeyword && matchesType && matchesLocation;
     });
-    UI.renderJobListings(filteredJobs, handleJobClick);
+    UI.renderJobListings(filteredJobs, allCompanies, handleJobClick);
     UI.resetJobDetails();
 }
 
@@ -138,27 +141,69 @@ async function handleApplyForJob(jobId) {
         return;
     }
 
-    // 1. Kiểm tra xem người dùng đã có hồ sơ chưa
     const profileExists = await Firestore.checkUserProfileExists(userId);
 
     if (!profileExists) {
         if (confirm("Bạn chưa có hồ sơ (CV). Bạn có muốn tạo hồ sơ ngay bây giờ không?")) {
-            // Chuyển hướng đến trang tạo hồ sơ
             window.location.href = '/quan-ly-ho-so';
         }
-        return; // Dừng việc ứng tuyển nếu chưa có hồ sơ
+        return;
     }
 
-    // 2. Nếu đã có hồ sơ, tiến hành ứng tuyển
     try {
         await Firestore.applyForJob(jobId, userId, userEmail);
         alert('Nộp hồ sơ thành công!');
-        // Cập nhật lại danh sách đã ứng tuyển và hiển thị lại chi tiết
         userApplications = await Firestore.fetchUserApplications(userId);
         handleJobClick(jobId);
     } catch (error) {
         console.error("Error applying for job:", error);
         alert('Đã xảy ra lỗi khi nộp hồ sơ.');
+    }
+}
+
+async function handleViewApplicants(jobId) {
+    UI.toggleApplicantsModal(true);
+    UI.showLoading(document.getElementById('applicant-list-container'));
+    try {
+        const applicants = await Firestore.fetchApplicantsForJob(jobId);
+        UI.displayApplicantsInModal(applicants);
+    } catch (error) {
+        console.error("Error fetching applicants:", error);
+        alert("Không thể tải danh sách ứng viên.");
+    }
+}
+
+function handleViewCv(userId) {
+    window.open(`/xem-ho-so?id=${userId}`, '_blank');
+}
+
+async function handleStatusChange(e) {
+    const selectElement = e.target;
+    if (!selectElement.classList.contains('status-select')) return;
+
+    const applicationId = selectElement.dataset.appid;
+    const newStatus = selectElement.value;
+
+    try {
+        await Firestore.updateApplicationStatus(applicationId, newStatus);
+    } catch (error) {
+        console.error("Error updating status:", error);
+        alert("Lỗi khi cập nhật trạng thái.");
+    }
+}
+
+async function handleNoteChange(e) {
+    const textarea = e.target;
+    if (!textarea.classList.contains('note-textarea')) return;
+
+    const applicationId = textarea.dataset.appid;
+    const newNote = textarea.value;
+
+    try {
+        await Firestore.updateApplicationNote(applicationId, newNote);
+    } catch (error) {
+        console.error("Error updating note:", error);
+        alert("Lỗi khi lưu ghi chú.");
     }
 }
 
@@ -169,19 +214,43 @@ export function initializeEventListeners(auth) {
             window.location.href = '/';
         }).catch(error => console.error('Sign out error', error));
     });
-    document.getElementById('post-job-btn').addEventListener('click', () => UI.openPostJobModal(null, allJobs));
+    document.getElementById('post-job-btn').addEventListener('click', async () => {
+        const userId = sessionStorage.getItem('userUID');
+        const companyProfile = await Firestore.fetchCompanyProfile(userId);
+        UI.openPostJobModal(null, allJobs, companyProfile);
+    });
     document.getElementById('close-modal-btn').addEventListener('click', UI.closePostJobModal);
     document.getElementById('job-form').addEventListener('submit', handleJobFormSubmit);
     document.getElementById('manage-users-btn').addEventListener('click', handleDisplayUsers);
     document.getElementById('close-user-modal-btn').addEventListener('click', () => UI.toggleUserManagementModal(false));
     document.getElementById('user-list-container').addEventListener('click', handleRoleChange);
+    
+    const applicantListContainer = document.getElementById('applicant-list-container');
+    applicantListContainer.addEventListener('click', (e) => {
+        if (e.target.classList.contains('view-cv-btn')) {
+            handleViewCv(e.target.dataset.userid);
+        }
+    });
+    applicantListContainer.addEventListener('change', handleStatusChange);
+    applicantListContainer.addEventListener('focusout', handleNoteChange); // Lưu ghi chú khi người dùng click ra ngoài
+
+    document.getElementById('close-applicants-modal-btn').addEventListener('click', () => UI.toggleApplicantsModal(false));
+
     document.getElementById('job-details').addEventListener('click', (e) => {
         const editBtn = e.target.closest('#edit-job-btn');
         const deleteBtn = e.target.closest('#delete-job-btn');
         const applyBtn = e.target.closest('#apply-btn');
-        if (editBtn) UI.openPostJobModal(editBtn.dataset.jobid, allJobs);
+        const viewApplicantsBtn = e.target.closest('#view-applicants-btn');
+
+        if (editBtn) {
+            const userId = sessionStorage.getItem('userUID');
+            Firestore.fetchCompanyProfile(userId).then(companyProfile => {
+                UI.openPostJobModal(editBtn.dataset.jobid, allJobs, companyProfile);
+            });
+        }
         if (deleteBtn) handleDeleteJob(deleteBtn.dataset.jobid);
         if (applyBtn) handleApplyForJob(applyBtn.dataset.jobid);
+        if (viewApplicantsBtn) handleViewApplicants(viewApplicantsBtn.dataset.jobid);
     });
     document.getElementById('filter-btn').addEventListener('click', handleFilter);
 }

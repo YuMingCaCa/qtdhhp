@@ -22,9 +22,14 @@ async function initializePage() {
     document.getElementById('user-email-display').textContent = userEmail;
     if (userRole === 'business' || userRole === 'admin') {
         document.getElementById('post-job-btn').classList.remove('hidden');
+        document.getElementById('company-profile-btn').classList.remove('hidden');
+        document.getElementById('recruitment-management-btn').classList.remove('hidden');
     }
     if (userRole === 'admin') {
         document.getElementById('admin-panel').classList.remove('hidden');
+    }
+    if (userRole === 'viewer') {
+        document.getElementById('my-profile-btn').classList.remove('hidden');
     }
 
     // Gắn tất cả các trình xử lý sự kiện
