@@ -188,3 +188,32 @@ export async function fetchAllCompanies() {
     });
     return companiesMap;
 }
+
+/**
+ * Lấy dữ liệu từ nhiều collection cùng lúc cho trang thống kê.
+ * @returns {Promise<Object>} Một object chứa dữ liệu từ các collection.
+ */
+export async function fetchAllDataForStats() {
+    const [jobsSnapshot, companiesSnapshot, profilesSnapshot, applicationsSnapshot] = await Promise.all([
+        getDocs(collection(db, jobsColPath)),
+        getDocs(collection(db, companiesColPath)),
+        getDocs(collection(db, profilesColPath)),
+        getDocs(collection(db, applicationsColPath))
+    ]);
+    return {
+        jobs: jobsSnapshot.docs.map(doc => doc.data()),
+        jobsCount: jobsSnapshot.size,
+        companiesCount: companiesSnapshot.size,
+        profilesCount: profilesSnapshot.size,
+        applicationsCount: applicationsSnapshot.size
+    };
+}
+
+/**
+ * Lấy tất cả hồ sơ sinh viên từ Firestore.
+ * @returns {Promise<Array<Object>>} Danh sách hồ sơ.
+ */
+export async function fetchAllProfiles() {
+    const profilesSnapshot = await getDocs(collection(db, profilesColPath));
+    return profilesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+}

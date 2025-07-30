@@ -8,7 +8,8 @@ import { signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth
 
 let allJobs = [];
 let userApplications = [];
-let allCompanies = {}; // Map để lưu trữ thông tin các công ty
+let allCompanies = {};
+let currentJobApplicants = []; // Biến lưu trữ ứng viên của tin đang xem
 
 export async function refreshAndRenderJobs() {
     UI.showLoading(document.getElementById('job-listings'));
@@ -161,12 +162,37 @@ async function handleApplyForJob(jobId) {
     }
 }
 
+function applyApplicantFilters() {
+    const statusFilter = document.getElementById('filter-status').value;
+    const dateSort = document.getElementById('sort-date').value;
+
+    let filtered = [...currentJobApplicants];
+
+    // Lọc theo trạng thái
+    if (statusFilter !== 'Tất cả trạng thái') {
+        filtered = filtered.filter(app => app.status === statusFilter);
+    }
+
+    // Sắp xếp theo ngày
+    filtered.sort((a, b) => {
+        const timeA = a.appliedAt?.toMillis() || 0;
+        const timeB = b.appliedAt?.toMillis() || 0;
+        return dateSort === 'newest' ? timeB - timeA : timeA - timeB;
+    });
+
+    UI.rerenderApplicantsTable(filtered);
+}
+
+
 async function handleViewApplicants(jobId) {
     UI.toggleApplicantsModal(true);
     UI.showLoading(document.getElementById('applicant-list-container'));
     try {
-        const applicants = await Firestore.fetchApplicantsForJob(jobId);
-        UI.displayApplicantsInModal(applicants);
+        currentJobApplicants = await Firestore.fetchApplicantsForJob(jobId);
+        UI.displayApplicantsInModal(currentJobApplicants);
+        // Gắn sự kiện cho các control mới được tạo
+        document.getElementById('filter-status').addEventListener('change', applyApplicantFilters);
+        document.getElementById('sort-date').addEventListener('change', applyApplicantFilters);
     } catch (error) {
         console.error("Error fetching applicants:", error);
         alert("Không thể tải danh sách ứng viên.");
@@ -186,6 +212,11 @@ async function handleStatusChange(e) {
 
     try {
         await Firestore.updateApplicationStatus(applicationId, newStatus);
+        // Cập nhật trạng thái trong danh sách local để bộ lọc hoạt động đúng
+        const applicant = currentJobApplicants.find(app => app.id === applicationId);
+        if (applicant) {
+            applicant.status = newStatus;
+        }
     } catch (error) {
         console.error("Error updating status:", error);
         alert("Lỗi khi cập nhật trạng thái.");
@@ -204,6 +235,17 @@ async function handleNoteChange(e) {
     } catch (error) {
         console.error("Error updating note:", error);
         alert("Lỗi khi lưu ghi chú.");
+    }
+}
+
+async function handleViewStats() {
+    UI.toggleDashboardView(true);
+    try {
+        const stats = await Firestore.fetchAllDataForStats();
+        UI.renderDashboard(stats);
+    } catch (error) {
+        console.error("Error loading stats:", error);
+        alert("Không thể tải dữ liệu thống kê.");
     }
 }
 
@@ -253,4 +295,8 @@ export function initializeEventListeners(auth) {
         if (viewApplicantsBtn) handleViewApplicants(viewApplicantsBtn.dataset.jobid);
     });
     document.getElementById('filter-btn').addEventListener('click', handleFilter);
+
+    // Admin-specific listeners
+    document.getElementById('view-stats-btn').addEventListener('click', handleViewStats);
+    document.getElementById('back-to-jobs-btn').addEventListener('click', () => UI.toggleDashboardView(false));
 }

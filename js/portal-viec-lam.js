@@ -24,6 +24,7 @@ async function initializePage() {
         document.getElementById('post-job-btn').classList.remove('hidden');
         document.getElementById('company-profile-btn').classList.remove('hidden');
         document.getElementById('recruitment-management-btn').classList.remove('hidden');
+        document.getElementById('cv-bank-btn').classList.remove('hidden');
     }
     if (userRole === 'admin') {
         document.getElementById('admin-panel').classList.remove('hidden');

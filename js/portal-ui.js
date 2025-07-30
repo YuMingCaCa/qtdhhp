@@ -201,6 +201,30 @@ export function toggleApplicantsModal(show) {
     document.getElementById('view-applicants-modal').classList.toggle('hidden', !show);
 }
 
+function renderApplicantTableRows(applicants) {
+    const statusOptions = ['Đã nộp', 'Đã xem', 'Mời phỏng vấn', 'Trúng tuyển', 'Không trúng tuyển'];
+    return applicants.map(app => `
+        <tr class="bg-white border-b">
+            <td class="px-4 py-4">
+                <p class="font-medium text-gray-900 whitespace-nowrap">${app.userEmail}</p>
+                <p class="text-xs text-gray-500">Nộp ngày: ${formatDate(app.appliedAt)}</p>
+            </td>
+            <td class="px-4 py-4">
+                <select data-appid="${app.id}" class="status-select bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5">
+                    ${statusOptions.map(opt => `<option value="${opt}" ${app.status === opt ? 'selected' : ''}>${opt}</option>`).join('')}
+                </select>
+            </td>
+            <td class="px-4 py-4">
+                <textarea data-appid="${app.id}" class="note-textarea w-full text-sm p-2 border rounded-md" rows="2" placeholder="Thêm ghi chú...">${app.notes || ''}</textarea>
+            </td>
+            <td class="px-4 py-4 text-center">
+                <button data-userid="${app.userId}" class="font-medium text-blue-600 hover:underline view-cv-btn">Xem CV</button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+
 export function displayApplicantsInModal(applicants) {
     const applicantListContainer = document.getElementById('applicant-list-container');
     if (applicants.length === 0) {
@@ -208,9 +232,24 @@ export function displayApplicantsInModal(applicants) {
         return;
     }
 
-    const statusOptions = ['Đã nộp', 'Đã xem', 'Mời phỏng vấn', 'Trúng tuyển', 'Không trúng tuyển'];
+    const statusOptions = ['Tất cả trạng thái', 'Đã nộp', 'Đã xem', 'Mời phỏng vấn', 'Trúng tuyển', 'Không trúng tuyển'];
 
     applicantListContainer.innerHTML = `
+        <div class="flex justify-between items-center mb-4 p-4 bg-gray-50 rounded-lg">
+            <div>
+                <label for="filter-status" class="text-sm font-medium text-gray-700 mr-2">Lọc theo trạng thái:</label>
+                <select id="filter-status" class="bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2">
+                    ${statusOptions.map(opt => `<option value="${opt}">${opt}</option>`).join('')}
+                </select>
+            </div>
+            <div>
+                <label for="sort-date" class="text-sm font-medium text-gray-700 mr-2">Sắp xếp:</label>
+                <select id="sort-date" class="bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2">
+                    <option value="newest">Mới nhất</option>
+                    <option value="oldest">Cũ nhất</option>
+                </select>
+            </div>
+        </div>
         <table class="w-full text-sm text-left text-gray-500">
             <thead class="text-xs text-gray-700 uppercase bg-gray-50">
                 <tr>
@@ -220,30 +259,20 @@ export function displayApplicantsInModal(applicants) {
                     <th scope="col" class="px-4 py-3 text-center">Hành động</th>
                 </tr>
             </thead>
-            <tbody>
-                ${applicants.map(app => `
-                    <tr class="bg-white border-b">
-                        <td class="px-4 py-4">
-                            <p class="font-medium text-gray-900 whitespace-nowrap">${app.userEmail}</p>
-                            <p class="text-xs text-gray-500">Nộp ngày: ${formatDate(app.appliedAt)}</p>
-                        </td>
-                        <td class="px-4 py-4">
-                            <select data-appid="${app.id}" class="status-select bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5">
-                                ${statusOptions.map(opt => `<option value="${opt}" ${app.status === opt ? 'selected' : ''}>${opt}</option>`).join('')}
-                            </select>
-                        </td>
-                        <td class="px-4 py-4">
-                            <textarea data-appid="${app.id}" class="note-textarea w-full text-sm p-2 border rounded-md" rows="2" placeholder="Thêm ghi chú...">${app.notes || ''}</textarea>
-                        </td>
-                        <td class="px-4 py-4 text-center">
-                            <button data-userid="${app.userId}" class="font-medium text-blue-600 hover:underline view-cv-btn">Xem CV</button>
-                        </td>
-                    </tr>
-                `).join('')}
+            <tbody id="applicants-table-body">
+                ${renderApplicantTableRows(applicants)}
             </tbody>
         </table>
     `;
 }
+
+export function rerenderApplicantsTable(applicants) {
+    const tableBody = document.getElementById('applicants-table-body');
+    if (tableBody) {
+        tableBody.innerHTML = renderApplicantTableRows(applicants);
+    }
+}
+
 
 export function displayUsersInModal(users) {
     const userListContainer = document.getElementById('user-list-container');
@@ -292,5 +321,56 @@ export function resetJobDetails() {
     const jobDetailsContainer = document.getElementById('job-details');
     if (jobDetailsContainer) {
         jobDetailsContainer.innerHTML = `<div class="text-center p-10 text-gray-500"><i class="fas fa-hand-pointer fa-3x mb-4"></i><p>Chọn một việc làm để xem chi tiết</p></div>`;
+    }
+}
+
+export function toggleDashboardView(show) {
+    document.getElementById('job-view').classList.toggle('hidden', show);
+    document.getElementById('dashboard-view').classList.toggle('hidden', !show);
+}
+
+export function renderDashboard(stats) {
+    document.getElementById('total-jobs').textContent = stats.jobsCount;
+    document.getElementById('total-companies').textContent = stats.companiesCount;
+    document.getElementById('total-students').textContent = stats.profilesCount;
+    document.getElementById('total-applications').textContent = stats.applicationsCount;
+
+    // 1. Job Type Chart
+    const jobTypes = stats.jobs.reduce((acc, job) => {
+        acc[job.type] = (acc[job.type] || 0) + 1;
+        return acc;
+    }, {});
+    
+    const jobTypeCtx = document.getElementById('job-type-chart').getContext('2d');
+    new Chart(jobTypeCtx, {
+        type: 'doughnut',
+        data: {
+            labels: Object.keys(jobTypes),
+            datasets: [{
+                data: Object.values(jobTypes),
+                backgroundColor: ['rgba(59, 130, 246, 0.8)', 'rgba(16, 185, 129, 0.8)', 'rgba(245, 158, 11, 0.8)'],
+            }]
+        },
+        options: { responsive: true, plugins: { legend: { position: 'top' } } }
+    });
+
+    // 2. Top Companies List
+    const companyPostCounts = stats.jobs.reduce((acc, job) => {
+        acc[job.company] = (acc[job.company] || 0) + 1;
+        return acc;
+    }, {});
+
+    const sortedCompanies = Object.entries(companyPostCounts).sort(([, a], [, b]) => b - a).slice(0, 5);
+    const topCompaniesList = document.getElementById('top-companies-list');
+    topCompaniesList.innerHTML = '';
+    if (sortedCompanies.length > 0) {
+        sortedCompanies.forEach(([name, count]) => {
+            const element = document.createElement('div');
+            element.className = 'flex justify-between items-center bg-gray-50 p-3 rounded-lg';
+            element.innerHTML = `<p class="font-medium text-gray-800">${name}</p><p class="font-bold text-blue-600">${count} tin</p>`;
+            topCompaniesList.appendChild(element);
+        });
+    } else {
+        topCompaniesList.innerHTML = `<p class="text-gray-500">Chưa có dữ liệu.</p>`;
     }
 }
