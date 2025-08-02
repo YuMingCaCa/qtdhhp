@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hướng dẫn: Quản lý Đề tài Tốt nghiệp - Khoa CNTT</title>
+    <link rel="icon" type="image/png" href="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRjTnSBGofmGpcMY_uEoXhgAB-FeeLjVslu1A&s">
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="guide-styles.css">
+</head>
+<body class="p-4 md:p-8 theme-blue">
+    <main class="max-w-4xl mx-auto">
+        <!-- Header -->
+        <div class="bg-white p-6 rounded-2xl shadow-lg mb-8">
+            <div class="flex items-center justify-between">
+                <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRjTnSBGofmGpcMY_uEoXhgAB-FeeLjVslu1A&s" alt="Logo Trường Đại học Hải Phòng" class="h-16 md:h-20">
+                <div class="text-center">
+                    <h1 class="text-xl md:text-3xl font-bold text-blue-800">Hướng dẫn: Quản lý Đề tài Tốt nghiệp</h1>
+                    <p class="text-md md:text-lg text-gray-600">&copy; Khoa Công Nghệ Thông Tin - Trường Đại học Hải Phòng</p>
+                </div>
+                <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQpzh7trviplRC5G2r75APp6H3wcTnXVixU-Q&s" alt="Logo Khoa Công nghệ Thông tin" class="h-16 md:h-20">
+            </div>
+        </div>
+
+        <!-- Nút Quay lại -->
+        <a href="/baocao/" class="mb-6 bg-white hover:bg-gray-100 border border-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg inline-flex items-center transition-colors no-underline">
+            <i class="fas fa-arrow-left mr-2"></i>
+            <span>Quay lại Danh mục Hướng dẫn</span>
+        </a>
+
+        <!-- Nội dung chính -->
+        <div class="bg-white p-6 md:p-8 rounded-2xl shadow-lg mt-4">
+            
+            <!-- Giới thiệu chung -->
+            <section class="guide-section mb-8">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4">I. Giới thiệu chung</h2>
+                <p class="text-gray-700">
+                    Module <strong>Quản lý Đề tài Tốt nghiệp</strong> là công cụ toàn diện giúp Khoa quản lý toàn bộ quy trình liên quan đến đề tài tốt nghiệp, từ khâu đề xuất của giảng viên, duyệt đề tài của quản trị viên, đến khâu đăng ký của sinh viên và theo dõi tiến độ.
+                </p>
+            </section>
+
+            <!-- Dành cho Giảng viên -->
+            <section class="guide-section mb-8">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4">II. Dành cho Giảng viên</h2>
+                <h3>1. Đề xuất đề tài mới</h3>
+                <ul>
+                    <li>Nhấn vào nút <code>Đề xuất Đề tài</code> màu xanh dương ở góc trên bên phải.</li>
+                    <li>Điền đầy đủ các thông tin: Năm học, Khoa, Tên đề tài, Mô tả chi tiết.</li>
+                    <li>Nhấn <code>Lưu Đề tài</code> để gửi đề xuất. Đề tài sẽ ở trạng thái "Chờ duyệt".</li>
+                </ul>
+                <h3>2. Xem và quản lý đề tài đã đề xuất</h3>
+                <ul>
+                    <li>Sử dụng bộ lọc "Lọc theo Giảng viên" và chọn tên của mình để xem danh sách các đề tài đã đề xuất.</li>
+                    <li>Bạn có thể theo dõi trạng thái (Chờ duyệt, Đã duyệt, Đã có SV, Bị từ chối) của từng đề tài.</li>
+                    <li>Nhấn vào biểu tượng <i class="fas fa-edit"></i> để chỉnh sửa thông tin đề tài nếu cần (chỉ khi đề tài chưa được duyệt).</li>
+                </ul>
+            </section>
+
+            <!-- Dành cho Sinh viên -->
+            <section class="guide-section mb-8">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4">III. Dành cho Sinh viên</h2>
+                <h3>1. Xem danh sách đề tài</h3>
+                <ul>
+                    <li>Sinh viên có thể xem tất cả các đề tài đã được duyệt và còn trống (trạng thái "Đã duyệt").</li>
+                    <li>Sử dụng các bộ lọc để tìm kiếm đề tài theo Khoa hoặc Giảng viên hướng dẫn.</li>
+                </ul>
+                <h3>2. Đăng ký đề tài</h3>
+                <ul>
+                    <li>Khi tìm thấy đề tài phù hợp, nhấn vào nút <code>Đăng ký</code> ở cột "Hành động".</li>
+                    <li>Một cửa sổ sẽ hiện ra, yêu cầu bạn điền thông tin cá nhân: Họ tên, Mã sinh viên, Lớp, và chọn Cơ sở thực tập.</li>
+                    <li>Nhấn <code>Xác nhận Đăng ký</code> để hoàn tất. Đề tài sẽ chuyển sang trạng thái "Đã có SV" và không cho phép sinh viên khác đăng ký.</li>
+                </ul>
+            </section>
+
+            <!-- Dành cho Quản trị viên -->
+            <section class="guide-section">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4">IV. Dành cho Quản trị viên (Admin)</h2>
+                <h3>1. Duyệt đề tài</h3>
+                <ul>
+                    <li>Sử dụng bộ lọc trạng thái, chọn "Chờ duyệt" để xem các đề tài mới.</li>
+                    <li>Nhấn vào biểu tượng <i class="fas fa-edit"></i> để xem chi tiết và duyệt. Trong cửa sổ hiện ra, thay đổi "Trạng thái" thành "Đã duyệt" hoặc "Từ chối".</li>
+                    <li>Để duyệt hàng loạt, tick vào các ô vuông bên cạnh đề tài, sau đó nhấn nút <code>Duyệt các đề tài đã chọn</code>.</li>
+                </ul>
+                <h3>2. Quản lý dữ liệu (Thủ công)</h3>
+                <ul>
+                    <li>Sử dụng menu <code>Quản lý Dữ liệu</code> để thêm/sửa/xóa thông tin Sinh viên và Cơ sở thực tập.</li>
+                </ul>
+                <h3>3. Nhập dữ liệu hàng loạt từ Excel</h3>
+                <ul>
+                    <li>Sử dụng menu <code>Import Excel</code> và chọn loại dữ liệu bạn muốn nhập (Đề tài, Sinh viên, hoặc Cơ sở TT).</li>
+                    <li>Một cửa sổ sẽ hiện ra. Nhấn vào nút <strong>"Tải file mẫu"</strong> để tải về tệp Excel với cấu trúc cột chính xác.</li>
+                    <li>Điền dữ liệu của bạn vào file mẫu. <strong>Lưu ý:</strong> Giữ nguyên tên các cột.</li>
+                    <li>Quay lại hệ thống, nhấn <strong>"Chọn file Excel"</strong> và chọn tệp bạn vừa điền dữ liệu.</li>
+                    <li>Nhấn nút <strong>"Bắt đầu Import"</strong>. Hệ thống sẽ xử lý và thông báo kết quả.</li>
+                </ul>
+                <h3>4. Phân công sinh viên</h3>
+                <ul>
+                    <li>Sử dụng nút <code>Phân công SV</code> để gán một sinh viên cụ thể vào một đề tài cụ thể.</li>
+                    <li>Sử dụng nút <code>Phân công Hàng loạt</code> để gán một danh sách sinh viên vào một danh sách đề tài tương ứng.</li>
+                </ul>
+                 <h3>5. In ấn và Báo cáo</h3>
+                <ul>
+                    <li>Sử dụng menu <code>In Danh sách</code> để tạo các bản in danh sách đề tài, danh sách sinh viên theo cơ sở thực tập.</li>
+                </ul>
+            </section>
+        </div>
+    </main>
+</body>
+</html>

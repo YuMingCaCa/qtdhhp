@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hướng dẫn sử dụng - Hệ thống Quản lý Khoa CNTT</title>
+    <link rel="icon" type="image/png" href="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRjTnSBGofmGpcMY_uEoXhgAB-FeeLjVslu1A&s">
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <main class="max-w-4xl mx-auto">
+        <!-- Header -->
+        <div class="bg-white p-6 rounded-2xl shadow-lg mb-8">
+            <div class="flex items-center justify-between">
+                <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRjTnSBGofmGpcMY_uEoXhgAB-FeeLjVslu1A&s" alt="Logo Trường Đại học Hải Phòng" class="h-16 md:h-20">
+                <div class="text-center">
+                    <h1 class="text-xl md:text-3xl font-bold text-blue-800">Hướng dẫn sử dụng Hệ thống</h1>
+                    <p class="text-md md:text-lg text-gray-600">&copy; Khoa Công Nghệ Thông Tin - Trường Đại học Hải Phòng</p>
+                </div>
+                <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQpzh7trviplRC5G2r75APp6H3wcTnXVixU-Q&s" alt="Logo Khoa Công nghệ Thông tin" class="h-16 md:h-20">
+            </div>
+        </div>
+
+        <!-- Nút Quay lại -->
+        <a href="/" class="mb-6 bg-white hover:bg-gray-100 border border-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg inline-flex items-center transition-colors no-underline">
+            <i class="fas fa-arrow-left mr-2"></i>
+            <span>Quay lại trang chọn hệ thống</span>
+        </a>
+
+        <!-- Nội dung chính -->
+        <div class="bg-white p-6 md:p-8 rounded-2xl shadow-lg mt-4">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">Danh mục Hướng dẫn</h2>
+            <p class="text-gray-600 mb-8">Chọn một chức năng bên dưới để xem giới thiệu và hướng dẫn sử dụng chi tiết.</p>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Mục 1: Đề tài Tốt nghiệp -->
+                <a href="/baocao/huong-dan-de-tai-tot-nghiep" class="group block p-6 bg-gray-50 hover:bg-blue-50 rounded-xl shadow-sm transition-all duration-300 border border-gray-200 hover:border-blue-300 hover:shadow-md no-underline">
+                    <h3 class="font-bold text-lg text-blue-800 group-hover:text-blue-900"><i class="fas fa-graduation-cap mr-3 text-blue-500"></i>Quản lý Đề tài Tốt nghiệp</h3>
+                    <p class="text-gray-700 mt-2 text-sm">Hướng dẫn đề xuất, duyệt, phân công và theo dõi đề tài tốt nghiệp cho sinh viên.</p>
+                </a>
+                
+                <!-- Mục 2: Giáo trình -->
+                <a href="/baocao/huong-dan-giao-trinh" class="group block p-6 bg-gray-50 hover:bg-green-50 rounded-xl shadow-sm transition-all duration-300 border border-gray-200 hover:border-green-300 hover:shadow-md no-underline">
+                    <h3 class="font-bold text-lg text-green-800 group-hover:text-green-900"><i class="fas fa-book mr-3 text-green-500"></i>Quản lý Giáo trình & Tài liệu</h3>
+                    <p class="text-gray-700 mt-2 text-sm">Hướng dẫn tải lên, quản lý phiên bản và chia sẻ giáo trình, tài liệu học tập.</p>
+                </a>
+
+                <!-- Mục 3: Giờ lao động -->
+                <a href="/baocao/huong-dan-lao-dong-cong-tac" class="group block p-6 bg-gray-50 hover:bg-yellow-50 rounded-xl shadow-sm transition-all duration-300 border border-gray-200 hover:border-yellow-300 hover:shadow-md no-underline">
+                    <h3 class="font-bold text-lg text-yellow-800 group-hover:text-yellow-900"><i class="fas fa-clock mr-3 text-yellow-500"></i>Quản lý Giờ lao động & Công tác</h3>
+                    <p class="text-gray-700 mt-2 text-sm">Hướng dẫn kê khai, theo dõi giờ lao động, giờ giảng và các công tác tuần.</p>
+                </a>
+
+                <!-- Mục 4: Cổng việc làm -->
+                <a href="/baocao/huong-dan-viec-lam" class="group block p-6 bg-gray-50 hover:bg-purple-50 rounded-xl shadow-sm transition-all duration-300 border border-gray-200 hover:border-purple-300 hover:shadow-md no-underline">
+                    <h3 class="font-bold text-lg text-purple-800 group-hover:text-purple-900"><i class="fas fa-briefcase mr-3 text-purple-500"></i>Cổng thông tin Việc làm</h3>
+                    <p class="text-gray-700 mt-2 text-sm">Hướng dẫn đăng tin tuyển dụng cho doanh nghiệp và cách sinh viên tìm kiếm, ứng tuyển.</p>
+                </a>
+
+                <!-- Mục 5: Sắp xếp Lịch giảng dạy -->
+                <a href="/baocao/huong-dan-sap-xep-lich-giang-day" class="group block p-6 bg-gray-50 hover:bg-red-50 rounded-xl shadow-sm transition-all duration-300 border border-gray-200 hover:border-red-300 hover:shadow-md no-underline">
+                    <h3 class="font-bold text-lg text-red-800 group-hover:text-red-900"><i class="fas fa-calendar-days mr-3 text-red-500"></i>Sắp xếp Lịch giảng dạy</h3>
+                    <p class="text-gray-700 mt-2 text-sm">Hướng dẫn tạo, quản lý và xem lịch giảng dạy cho các lớp học phần.</p>
+                </a>
+
+                <!-- Mục 6: Đăng ký Lịch thực hành -->
+                <a href="/baocao/huong-dan-dang-ky-lich-thuc-hanh" class="group block p-6 bg-gray-50 hover:bg-cyan-50 rounded-xl shadow-sm transition-all duration-300 border border-gray-200 hover:border-cyan-300 hover:shadow-md no-underline">
+                    <h3 class="font-bold text-lg text-cyan-800 group-hover:text-cyan-900"><i class="fas fa-computer mr-3 text-cyan-500"></i>Đăng ký Lịch thực hành</h3>
+                    <p class="text-gray-700 mt-2 text-sm">Hướng dẫn sinh viên đăng ký, giảng viên và admin quản lý các ca thực hành tại phòng máy.</p>
+                </a>
+            </div>
+        </div>
+    </main>
+</body>
+</html>

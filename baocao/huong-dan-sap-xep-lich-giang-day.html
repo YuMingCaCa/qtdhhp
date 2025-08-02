@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hướng dẫn: Sắp xếp Lịch giảng dạy - Khoa CNTT</title>
+    <link rel="icon" type="image/png" href="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRjTnSBGofmGpcMY_uEoXhgAB-FeeLjVslu1A&s">
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8;
+        }
+        .guide-section h3 {
+            border-left: 4px solid #dc2626; /* red-600 */
+            padding-left: 1rem;
+            margin-top: 2rem;
+            margin-bottom: 1rem;
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #7f1d1d; /* red-900 */
+        }
+        .guide-section ul {
+            list-style-type: none;
+            padding-left: 1.5rem;
+        }
+        .guide-section li {
+            position: relative;
+            padding-left: 1.75rem;
+            margin-bottom: 0.75rem;
+            color: #374151;
+        }
+        .guide-section li::before {
+            content: '\f058'; /* Font Awesome check-circle icon */
+            font-family: 'Font Awesome 6 Free';
+            font-weight: 900;
+            position: absolute;
+            left: 0;
+            top: 2px;
+            color: #dc2626;
+        }
+        .guide-section code {
+            background-color: #fef2f2; /* red-50 */
+            color: #b91c1c; /* red-700 */
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <main class="max-w-4xl mx-auto">
+        <!-- Header -->
+        <div class="bg-white p-6 rounded-2xl shadow-lg mb-8">
+            <div class="flex items-center justify-between">
+                <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRjTnSBGofmGpcMY_uEoXhgAB-FeeLjVslu1A&s" alt="Logo Trường Đại học Hải Phòng" class="h-16 md:h-20">
+                <div class="text-center">
+                    <h1 class="text-xl md:text-3xl font-bold text-red-800">Hướng dẫn: Sắp xếp Lịch giảng dạy</h1>
+                    <p class="text-md md:text-lg text-gray-600">&copy; Khoa Công Nghệ Thông Tin - Trường Đại học Hải Phòng</p>
+                </div>
+                <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQpzh7trviplRC5G2r75APp6H3wcTnXVixU-Q&s" alt="Logo Khoa Công nghệ Thông tin" class="h-16 md:h-20">
+            </div>
+        </div>
+
+        <!-- Nút Quay lại -->
+        <a href="/baocao/" class="mb-6 bg-white hover:bg-gray-100 border border-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg inline-flex items-center transition-colors no-underline">
+            <i class="fas fa-arrow-left mr-2"></i>
+            <span>Quay lại Danh mục Hướng dẫn</span>
+        </a>
+
+        <!-- Nội dung chính -->
+        <div class="bg-white p-6 md:p-8 rounded-2xl shadow-lg mt-4">
+            
+            <!-- Giới thiệu chung -->
+            <section class="guide-section mb-8">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4">I. Giới thiệu chung</h2>
+                <p class="text-gray-700">
+                    Module <strong>Sắp xếp Lịch giảng dạy</strong> là công cụ mạnh mẽ giúp Ban Chủ nhiệm Khoa và Giáo vụ tự động hóa và tối ưu hóa việc tạo thời khóa biểu cho các học kỳ. Hệ thống giúp giảm thiểu xung đột, tận dụng tối đa nguồn lực (phòng học, giảng viên) và cung cấp một lịch trình rõ ràng, dễ truy cập cho tất cả mọi người.
+                </p>
+            </section>
+
+            <!-- Dành cho Giảng viên & Sinh viên -->
+            <section class="guide-section mb-8">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4">II. Dành cho Giảng viên & Sinh viên</h2>
+                <h3>1. Xem lịch giảng dạy/học tập</h3>
+                <ul>
+                    <li>Sử dụng bộ lọc ở đầu trang để chọn <code>Năm học</code>, <code>Học kỳ</code>.</li>
+                    <li><strong>Giảng viên:</strong> Chọn tên mình trong bộ lọc <code>Giảng viên</code> để xem lịch dạy cá nhân.</li>
+                    <li><strong>Sinh viên:</strong> Chọn lớp của mình trong bộ lọc <code>Lớp</code> để xem lịch học.</li>
+                    <li>Lịch sẽ được hiển thị theo dạng bảng Tuần/Tháng. Có thể nhấn vào một tiết học để xem thông tin chi tiết (Phòng, Lớp, Môn học).</li>
+                </ul>
+                <h3>2. In lịch</h3>
+                <ul>
+                    <li>Sau khi lọc ra lịch mong muốn, nhấn nút <code>In Lịch</code> hoặc <code>Xuất Excel</code> để có bản cứng hoặc file mềm.</li>
+                </ul>
+            </section>
+
+            <!-- Dành cho Quản trị viên -->
+            <section class="guide-section">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4">III. Dành cho Quản trị viên (Admin)</h2>
+                <h3>1. Chuẩn bị dữ liệu đầu vào</h3>
+                <ul>
+                    <li><strong>Quản lý dữ liệu cơ bản:</strong> Trong menu <code>Quản lý</code>, cập nhật danh sách Phòng học, Giảng viên, Lớp học phần, Môn học.</li>
+                    <li><strong>Đăng ký lịch rảnh/bận:</strong> Giảng viên có thể đăng ký trước các khoảng thời gian không thể giảng dạy. Admin có thể xem và điều chỉnh các đăng ký này.</li>
+                </ul>
+                <h3>2. Sắp xếp lịch</h3>
+                <ul>
+                    <li><strong>Sắp xếp tự động:</strong> Nhấn nút <code>Sắp xếp Tự động</code>. Hệ thống sẽ dựa trên các ràng buộc (lịch bận của GV, sức chứa phòng, tránh trùng lịch lớp...) để tạo ra một thời khóa biểu tối ưu.</li>
+                    <li><strong>Sắp xếp thủ công (Kéo-thả):</strong> Sau khi có lịch tự động, admin có thể kéo-thả các tiết học trên giao diện lịch để tinh chỉnh. Hệ thống sẽ cảnh báo ngay nếu có xung đột xảy ra.</li>
+                </ul>
+                <h3>3. Kiểm tra và Xuất bản</h3>
+                <ul>
+                    <li>Nhấn nút <code>Kiểm tra Xung đột</code> để hệ thống rà soát lại toàn bộ lịch và liệt kê các vấn đề còn tồn tại.</li>
+                    <li>Khi lịch đã hoàn thiện, nhấn <code>Xuất bản Lịch</code>. Từ thời điểm này, sinh viên và giảng viên sẽ thấy được lịch chính thức.</li>
+                    <li>Sử dụng chức năng <code>In ấn & Báo cáo</code> để xuất lịch toàn khoa, lịch từng giảng viên, lịch sử dụng phòng học...</li>
+                </ul>
+            </section>
+        </div>
+    </main>
+</body>
+</html>

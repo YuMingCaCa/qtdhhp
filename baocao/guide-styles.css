@@ -1,0 +1,135 @@
+/* General Body Styles */
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: #f0f4f8;
+}
+
+/* Common Guide Section Styles */
+.guide-section h3 {
+    padding-left: 1rem;
+    margin-top: 2rem;
+    margin-bottom: 1rem;
+    font-size: 1.25rem;
+    font-weight: 700;
+}
+
+.guide-section ul {
+    list-style-type: none;
+    padding-left: 1.5rem;
+}
+
+.guide-section li {
+    position: relative;
+    padding-left: 1.75rem;
+    margin-bottom: 0.75rem;
+    color: #374151;
+}
+
+.guide-section li::before {
+    content: '\f058'; /* Font Awesome check-circle icon */
+    font-family: 'Font Awesome 6 Free';
+    font-weight: 900;
+    position: absolute;
+    left: 0;
+    top: 2px;
+}
+
+.guide-section code {
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+}
+
+/* Custom style for nested list (from giao-trinh.html) */
+.guide-section ul ul {
+    padding-left: 1rem !important;
+    margin-top: 0.5rem !important;
+}
+.guide-section ul ul li::before {
+    content: '\f0da' !important; /* Font Awesome caret-right icon */
+    top: 4px;
+}
+
+
+/* --- THEMES --- */
+
+/* Yellow Theme (Lao động & Công tác) */
+.theme-yellow .guide-section h3 {
+    border-left: 4px solid #d97706; /* yellow-600 */
+    color: #78350f; /* yellow-900 */
+}
+.theme-yellow .guide-section li::before {
+    color: #d97706;
+}
+.theme-yellow .guide-section code {
+    background-color: #fffbeb;
+    color: #b45309;
+}
+
+/* Green Theme (Giáo trình) */
+.theme-green .guide-section h3 {
+    border-left: 4px solid #16a34a; /* green-600 */
+    color: #14532d; /* green-900 */
+}
+.theme-green .guide-section li::before {
+    color: #16a34a;
+}
+.theme-green .guide-section ul ul li::before {
+    color: #15803d !important; /* green-700 */
+}
+.theme-green .guide-section code {
+    background-color: #f0fdf4;
+    color: #166534;
+}
+
+/* Purple Theme (Việc làm) */
+.theme-purple .guide-section h3 {
+    border-left: 4px solid #9333ea; /* purple-600 */
+    color: #581c87; /* purple-900 */
+}
+.theme-purple .guide-section li::before {
+    color: #9333ea;
+}
+.theme-purple .guide-section code {
+    background-color: #faf5ff;
+    color: #7e22ce;
+}
+
+/* Cyan Theme (Lịch thực hành - dự phòng) */
+.theme-cyan .guide-section h3 {
+    border-left: 4px solid #0891b2; /* cyan-600 */
+    color: #164e63; /* cyan-900 */
+}
+.theme-cyan .guide-section li::before {
+    color: #0891b2;
+}
+.theme-cyan .guide-section code {
+    background-color: #ecfeff; /* cyan-50 */
+    color: #0e7490; /* cyan-700 */
+}
+
+/* Red Theme (Lịch giảng dạy - dự phòng) */
+.theme-red .guide-section h3 {
+    border-left: 4px solid #dc2626; /* red-600 */
+    color: #7f1d1d; /* red-900 */
+}
+.theme-red .guide-section li::before {
+    color: #dc2626;
+}
+.theme-red .guide-section code {
+    background-color: #fef2f2; /* red-50 */
+    color: #b91c1c; /* red-700 */
+}
+
+/* Blue Theme (Đề tài tốt nghiệp) */
+.theme-blue .guide-section h3 {
+    border-left: 4px solid #3b82f6; /* blue-500 */
+    color: #1e3a8a; /* blue-900 */
+}
+.theme-blue .guide-section li::before {
+    color: #2563eb; /* blue-600 */
+}
+.theme-blue .guide-section code {
+    background-color: #eff6ff; /* blue-50 */
+    color: #1d4ed8; /* blue-700 */
+}

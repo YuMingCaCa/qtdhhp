@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hướng dẫn: Quản lý Giờ lao động & Công tác - Khoa CNTT</title>
+    <link rel="icon" type="image/png" href="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRjTnSBGofmGpcMY_uEoXhgAB-FeeLjVslu1A&s">
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="guide-styles.css">
+</head>
+<body class="p-4 md:p-8 theme-yellow">
+    <main class="max-w-4xl mx-auto">
+        <!-- Header -->
+        <div class="bg-white p-6 rounded-2xl shadow-lg mb-8">
+            <div class="flex items-center justify-between">
+                <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRjTnSBGofmGpcMY_uEoXhgAB-FeeLjVslu1A&s" alt="Logo Trường Đại học Hải Phòng" class="h-16 md:h-20">
+                <div class="text-center">
+                    <h1 class="text-xl md:text-3xl font-bold text-yellow-800">Hướng dẫn: Giờ lao động & Công tác</h1>
+                    <p class="text-md md:text-lg text-gray-600">&copy; Khoa Công Nghệ Thông Tin - Trường Đại học Hải Phòng</p>
+                </div>
+                <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQpzh7trviplRC5G2r75APp6H3wcTnXVixU-Q&s" alt="Logo Khoa Công nghệ Thông tin" class="h-16 md:h-20">
+            </div>
+        </div>
+
+        <!-- Nút Quay lại -->
+        <a href="/baocao/" class="mb-6 bg-white hover:bg-gray-100 border border-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg inline-flex items-center transition-colors no-underline">
+            <i class="fas fa-arrow-left mr-2"></i>
+            <span>Quay lại Danh mục Hướng dẫn</span>
+        </a>
+
+        <!-- Nội dung chính -->
+        <div class="bg-white p-6 md:p-8 rounded-2xl shadow-lg mt-4">
+            
+            <!-- Giới thiệu chung -->
+            <section class="guide-section mb-8">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4">I. Giới thiệu chung</h2>
+                <p class="text-gray-700">
+                    Nhóm module này giúp quản lý toàn diện các hoạt động của giảng viên, bao gồm: <strong>Giờ lao động A (Giờ giảng dạy)</strong>, <strong>Giờ lao động B (Hoạt động khác)</strong>, và <strong>Lịch công tác tuần</strong>.
+                </p>
+            </section>
+
+            <!-- Quản lý Giờ Lao động B -->
+            <section class="guide-section mb-8">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4">II. Quản lý Giờ Lao động B (Hoạt động khác)</h2>
+                <h3>1. Xem tổng hợp giờ</h3>
+                <ul>
+                    <li>Chọn Khoa và Năm học để xem bảng tổng hợp giờ lao động của tất cả giảng viên trong khoa.</li>
+                    <li>Nhấn nút <code>Chi tiết</code> để xem các hoạt động cụ thể của một giảng viên.</li>
+                </ul>
+                <h3>2. Admin: Thêm giờ và quản lý</h3>
+                <ul>
+                    <li>Sử dụng menu <code>Công cụ & Tác vụ</code> > <code>Thêm Giờ</code> để thêm giờ hàng loạt cho nhiều giảng viên.</li>
+                    <li>Sử dụng menu <code>Quản lý hệ thống</code> để quản lý danh mục Nhiệm vụ, Khoa, Giảng viên...</li>
+                    <li>Sử dụng <code>Thống kê & Báo cáo</code> để xem và xuất báo cáo tổng hợp.</li>
+                </ul>
+            </section>
+
+            <!-- Tính giờ Lao động A -->
+            <section class="guide-section mb-8">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4">III. Tính giờ Lao động A (Giờ Giảng dạy)</h2>
+                <h3>1. Xem giờ chuẩn</h3>
+                <ul>
+                    <li>Chọn Khoa và Năm học để xem bảng tổng hợp giờ chuẩn của giảng viên.</li>
+                    <li>Giờ chuẩn được tự động tính toán dựa trên dữ liệu từ module "Sắp xếp Lịch giảng dạy".</li>
+                </ul>
+                <h3>2. Admin: Quản lý và xuất báo cáo</h3>
+                <ul>
+                    <li>Quản lý các phân công giảng dạy, hướng dẫn tốt nghiệp (TTTN, ĐATN), và định mức/giảm trừ.</li>
+                    <li>Sử dụng nút <code>Xuất Báo cáo</code> để tạo file Excel chi tiết cho từng giảng viên hoặc toàn khoa.</li>
+                </ul>
+                <h3>3. Admin: Nhập dữ liệu từ Excel</h3>
+                <ul>
+                    <li>Nhấn nút <code>Import từ Excel</code> để mở cửa sổ nhập liệu.</li>
+                    <li><strong>Chọn loại dữ liệu:</strong> Chọn loại dữ liệu bạn muốn nhập (Chương trình đào tạo, Lớp học, hoặc Bảng phân công).</li>
+                    <li>Nhấn <strong>"Tải file mẫu"</strong> để có tệp Excel với cấu trúc cột tương ứng.</li>
+                    <li>Điền dữ liệu vào file mẫu và lưu lại.</li>
+                    <li>Chọn tệp Excel của bạn và nhấn <strong>"Bắt đầu Import"</strong> để tải dữ liệu lên hệ thống.</li>
+                </ul>
+            </section>
+
+            <!-- Quản lý Công tác tuần -->
+            <section class="guide-section">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4">IV. Quản lý Công tác tuần</h2>
+                <h3>1. Xem lịch tuần</h3>
+                <ul>
+                    <li>Chọn Khoa/Phòng ban và Tuần để xem lịch công tác chi tiết.</li>
+                    <li>Lịch bao gồm công tác trọng tâm, lịch chi tiết các ngày và ghi chú.</li>
+                </ul>
+                <h3>2. Admin: Cập nhật lịch</h3>
+                <ul>
+                    <li>Sử dụng nút <code>Thêm CV</code> để thêm một công việc mới vào ngày cụ thể.</li>
+                    <li>Sử dụng nút <code>TT Tuần</code> để cập nhật công tác trọng tâm, trực lãnh đạo và ghi chú cho tuần hiện tại.</li>
+                    <li>Sử dụng nút <code>TT Tháng</code> để cập nhật công tác trọng tâm cho cả tháng.</li>
+                    <li>Nhấn nút <code>In Lịch</code> để tạo bản in lịch tuần hoặc báo cáo tháng.</li>
+                </ul>
+            </section>
+        </div>
+    </main>
+</body>
+</html>

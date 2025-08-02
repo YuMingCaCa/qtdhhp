@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hướng dẫn: Quản lý Giáo trình & Tài liệu - Khoa CNTT</title>
+    <link rel="icon" type="image/png" href="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRjTnSBGofmGpcMY_uEoXhgAB-FeeLjVslu1A&s">
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="guide-styles.css">
+</head>
+<body class="p-4 md:p-8 theme-green">
+    <main class="max-w-4xl mx-auto">
+        <!-- Header -->
+        <div class="bg-white p-6 rounded-2xl shadow-lg mb-8">
+            <div class="flex items-center justify-between">
+                <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRjTnSBGofmGpcMY_uEoXhgAB-FeeLjVslu1A&s" alt="Logo Trường Đại học Hải Phòng" class="h-16 md:h-20">
+                <div class="text-center">
+                    <h1 class="text-xl md:text-3xl font-bold text-green-800">Hướng dẫn: Quản lý Giáo trình & Tài liệu</h1>
+                    <p class="text-md md:text-lg text-gray-600">&copy; Khoa Công Nghệ Thông Tin - Trường Đại học Hải Phòng</p>
+                </div>
+                <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQpzh7trviplRC5G2r75APp6H3wcTnXVixU-Q&s" alt="Logo Khoa Công nghệ Thông tin" class="h-16 md:h-20">
+            </div>
+        </div>
+
+        <!-- Nút Quay lại -->
+        <a href="/baocao/" class="mb-6 bg-white hover:bg-gray-100 border border-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg inline-flex items-center transition-colors no-underline">
+            <i class="fas fa-arrow-left mr-2"></i>
+            <span>Quay lại Danh mục Hướng dẫn</span>
+        </a>
+
+        <!-- Nội dung chính -->
+        <div class="bg-white p-6 md:p-8 rounded-2xl shadow-lg mt-4">
+            
+            <!-- Giới thiệu chung -->
+            <section class="guide-section mb-8">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4">I. Giới thiệu chung</h2>
+                <p class="text-gray-700">
+                    Module <strong>Quản lý Giáo trình & Tài liệu</strong> là một kho lưu trữ tập trung, cho phép giảng viên và quản trị viên tải lên, quản lý và chia sẻ tài liệu học tập cho các môn học. Sinh viên và giảng viên có thể dễ dàng tìm kiếm và tải về các tài liệu cần thiết.
+                </p>
+            </section>
+
+            <!-- Dành cho Giảng viên & Sinh viên -->
+            <section class="guide-section mb-8">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4">II. Dành cho Giảng viên & Sinh viên</h2>
+                <h3>1. Tìm kiếm và tải tài liệu</h3>
+                <ul>
+                    <li>Sử dụng ô <code>Tìm kiếm & Chọn Môn học</code> để nhập tên hoặc mã môn học.</li>
+                    <li>Chọn môn học từ danh sách kết quả tìm kiếm xổ xuống.</li>
+                    <li>Danh sách các tài liệu của môn học đó sẽ hiện ra bên dưới.</li>
+                    <li>Nhấn vào biểu tượng <i class="fas fa-download text-blue-600"></i> để tải tài liệu về máy.</li>
+                </ul>
+                <h3>2. Xem tất cả tài liệu</h3>
+                <ul>
+                    <li>Ở cuối trang, nhấn vào mục <code>Xem tất cả tài liệu đã tải lên</code>.</li>
+                    <li>Một danh sách các môn học có tài liệu sẽ hiện ra. Nhấn vào từng môn để xem danh sách tài liệu tương ứng.</li>
+                </ul>
+            </section>
+
+            <!-- Dành cho Quản trị viên -->
+            <section class="guide-section">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4">III. Dành cho Quản trị viên (Admin)</h2>
+                <h3>1. Tải lên tài liệu mới</h3>
+                <ul>
+                    <li>Trong khu vực <code>Tải lên tài liệu mới</code>, tìm và chọn môn học cần tải tài liệu lên.</li>
+                    <li>Nhấn nút <code>Chọn File</code> và chọn tệp từ máy tính của bạn.</li>
+                    <li>Nhấn nút <code>Tải lên</code> để hoàn tất. Bạn có thể theo dõi dung lượng lưu trữ đã sử dụng.</li>
+                </ul>
+                <h3>2. Quản lý Môn học</h3>
+                <ul>
+                    <li>Mở rộng mục <code>Quản lý Môn học</code> để xem các tùy chọn.</li>
+                    <li><strong>Thêm thủ công:</strong> Điền thông tin vào form và nhấn <code>Thêm môn học</code>.</li>
+                    <li>
+                        <strong>Nhập từ Excel:</strong>
+                        <ul>
+                            <li>Nhấn nút <code>Tải Excel mẫu</code> để có file với cấu trúc chuẩn.</li>
+                            <li>Điền thông tin môn học vào file mẫu (Tên môn học, Mã môn học, Tên khoa).</li>
+                            <li>Chọn tệp Excel đã điền và nhấn nút <code>Nhập môn học</code>.</li>
+                        </ul>
+                    </li>
+                    <li><strong>Xóa môn học:</strong> Tìm môn học trong danh sách, nhấn biểu tượng <i class="fas fa-trash text-red-600"></i> để xóa. Có thể chọn nhiều môn để xóa cùng lúc.</li>
+                </ul>
+                <h3>3. Xóa tài liệu</h3>
+                <ul>
+                    <li>Sau khi chọn một môn học, danh sách tài liệu sẽ hiện ra.</li>
+                    <li>Nhấn vào biểu tượng <i class="fas fa-trash text-red-600"></i> bên cạnh tên tài liệu bạn muốn xóa và xác nhận.</li>
+                </ul>
+            </section>
+        </div>
+    </main>
+</body>
+</html>

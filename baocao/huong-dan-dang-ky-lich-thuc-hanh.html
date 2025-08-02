@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hướng dẫn: Đăng ký Lịch thực hành - Khoa CNTT</title>
+    <link rel="icon" type="image/png" href="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRjTnSBGofmGpcMY_uEoXhgAB-FeeLjVslu1A&s">
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8;
+        }
+        .guide-section h3 {
+            border-left: 4px solid #0891b2; /* cyan-600 */
+            padding-left: 1rem;
+            margin-top: 2rem;
+            margin-bottom: 1rem;
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #164e63; /* cyan-900 */
+        }
+        .guide-section ul {
+            list-style-type: none;
+            padding-left: 1.5rem;
+        }
+        .guide-section li {
+            position: relative;
+            padding-left: 1.75rem;
+            margin-bottom: 0.75rem;
+            color: #374151;
+        }
+        .guide-section li::before {
+            content: '\f058'; /* Font Awesome check-circle icon */
+            font-family: 'Font Awesome 6 Free';
+            font-weight: 900;
+            position: absolute;
+            left: 0;
+            top: 2px;
+            color: #0891b2;
+        }
+        .guide-section code {
+            background-color: #ecfeff; /* cyan-50 */
+            color: #0e7490; /* cyan-700 */
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <main class="max-w-4xl mx-auto">
+        <!-- Header -->
+        <div class="bg-white p-6 rounded-2xl shadow-lg mb-8">
+            <div class="flex items-center justify-between">
+                <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRjTnSBGofmGpcMY_uEoXhgAB-FeeLjVslu1A&s" alt="Logo Trường Đại học Hải Phòng" class="h-16 md:h-20">
+                <div class="text-center">
+                    <h1 class="text-xl md:text-3xl font-bold text-cyan-800">Hướng dẫn: Đăng ký Lịch thực hành</h1>
+                    <p class="text-md md:text-lg text-gray-600">&copy; Khoa Công Nghệ Thông Tin - Trường Đại học Hải Phòng</p>
+                </div>
+                <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQpzh7trviplRC5G2r75APp6H3wcTnXVixU-Q&s" alt="Logo Khoa Công nghệ Thông tin" class="h-16 md:h-20">
+            </div>
+        </div>
+
+        <!-- Nút Quay lại -->
+        <a href="/baocao/" class="mb-6 bg-white hover:bg-gray-100 border border-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg inline-flex items-center transition-colors no-underline">
+            <i class="fas fa-arrow-left mr-2"></i>
+            <span>Quay lại Danh mục Hướng dẫn</span>
+        </a>
+
+        <!-- Nội dung chính -->
+        <div class="bg-white p-6 md:p-8 rounded-2xl shadow-lg mt-4">
+            
+            <!-- Giới thiệu chung -->
+            <section class="guide-section mb-8">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4">I. Giới thiệu chung</h2>
+                <p class="text-gray-700">
+                    Module <strong>Đăng ký Lịch thực hành</strong> cho phép sinh viên chủ động đăng ký các ca thực hành tại phòng máy cho các học phần có yêu cầu. Hệ thống đảm bảo mỗi sinh viên có một suất thực hành, tránh trùng lặp và giúp quản lý phòng máy hiệu quả.
+                </p>
+            </section>
+
+            <!-- Dành cho Sinh viên -->
+            <section class="guide-section mb-8">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4">II. Dành cho Sinh viên</h2>
+                <h3>1. Xem lịch và đăng ký</h3>
+                <ul>
+                    <li>Đăng nhập vào hệ thống bằng tài khoản sinh viên.</li>
+                    <li>Chọn menu <code>Đăng ký thực hành</code>.</li>
+                    <li>Chọn <code>Học kỳ</code> và <code>Môn học</code> bạn muốn đăng ký.</li>
+                    <li>Hệ thống sẽ hiển thị danh sách các ca thực hành còn trống (bao gồm ngày, giờ, phòng máy và số chỗ còn lại).</li>
+                    <li>Nhấn nút <code>Đăng ký</code> ở ca thực hành bạn mong muốn.</li>
+                    <li>Xác nhận đăng ký. Sau khi thành công, bạn sẽ không thể đăng ký ca khác cho môn học này nữa.</li>
+                </ul>
+                <h3>2. Xem lịch đã đăng ký và hủy đăng ký</h3>
+                <ul>
+                    <li>Vào mục <code>Lịch thực hành của tôi</code> để xem lại tất cả các ca thực hành bạn đã đăng ký.</li>
+                    <li>Nếu cần thay đổi, bạn phải nhấn nút <code>Hủy đăng ký</code> trước khi thời hạn cho phép kết thúc.</li>
+                    <li>Sau khi hủy, bạn có thể thực hiện lại việc đăng ký một ca khác.</li>
+                </ul>
+            </section>
+
+            <!-- Dành cho Quản trị viên & Giảng viên -->
+            <section class="guide-section">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4">III. Dành cho Quản trị viên (Admin) & Giảng viên</h2>
+                <h3>1. Admin: Thiết lập ca thực hành</h3>
+                <ul>
+                    <li>Trong menu quản trị, chọn <code>Quản lý Lịch thực hành</code>.</li>
+                    <li>Nhấn <code>Tạo đợt đăng ký mới</code>.</li>
+                    <li>Thiết lập các thông tin: Học kỳ, Môn học áp dụng, thời gian bắt đầu và kết thúc đăng ký.</li>
+                    <li>Nhấn <code>Thêm ca thực hành</code> để tạo các ca cụ thể: chọn Phòng máy, Ngày, Giờ bắt đầu/kết thúc, và Sĩ số tối đa.</li>
+                    <li>Sau khi thiết lập xong, nhấn <code>Mở đăng ký</code> để sinh viên có thể thấy và đăng ký.</li>
+                </ul>
+                <h3>2. Admin/Giảng viên: Xem và quản lý danh sách</h3>
+                <ul>
+                    <li>Chọn <code>Xem danh sách đăng ký</code>.</li>
+                    <li>Sử dụng bộ lọc để xem danh sách sinh viên đã đăng ký theo từng Môn học hoặc từng ca thực hành.</li>
+                    <li>Giảng viên có thể xem danh sách lớp mình phụ trách. Admin có thể xem toàn bộ.</li>
+                    <li>Nhấn nút <code>Xuất Excel</code> để tải về danh sách điểm danh cho buổi thực hành.</li>
+                </ul>
+                <h3>3. Admin: Quản lý đăng ký của sinh viên</h3>
+                <ul>
+                    <li>Admin có quyền xóa một lượt đăng ký của sinh viên (nếu có sai sót) hoặc thêm thủ công một sinh viên vào một ca cụ thể.</li>
+                </ul>
+            </section>
+        </div>
+    </main>
+</body>
+</html>
