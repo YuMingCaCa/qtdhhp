@@ -1348,6 +1348,10 @@ async function runAutoScheduler(btn) {
     try {
         if (allNewSchedules.length > 0) {
             await batch.commit();
+            // =========================================================================
+            // === FIX: Reload data for the current semester to refresh the UI ===
+            // =========================================================================
+            await loadDataForSemester(selectedSemesterId);
         }
         document.getElementById('auto-schedule-success').innerHTML = allSuccessLogs.length > 0 ? allSuccessLogs.join('<br>') : "Không có lớp nào được xếp thành công.";
         document.getElementById('auto-schedule-failed').innerHTML = allFailureLogs.length > 0 ? allFailureLogs.join('<br>') : "Tất cả các lớp đều được xếp thành công.";

@@ -183,7 +183,7 @@ const renderDepartmentsList = (departments) => {
 const populateDepartmentSelector = (departments) => {
     const currentValue = departmentSelector.value;
     // [UPDATED] Thay đổi "toàn khoa" thành "toàn trường"
-    departmentSelector.innerHTML = '<option value="general">Lịch chung Toàn Khoa Công Nghệ Thông Tin</option>';
+    departmentSelector.innerHTML = '<option value="general">KHOA CÔNG NGHỆ THÔNG TIN</option>';
     departments.forEach(dept => {
         const option = document.createElement('option');
         option.value = dept.id;
