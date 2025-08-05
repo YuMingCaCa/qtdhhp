@@ -20,154 +20,166 @@
         <div class="auth-message">Vui lòng đăng nhập để tiếp tục...</div>
     </div>
 
-
-    <div class="max-w-7xl mx-auto bg-white p-6 rounded-2xl shadow-lg">
-        <!-- Header -->
-        <div class="flex flex-col sm:flex-row items-center justify-between mb-6 pb-4 border-b">
-            <div class="flex items-center gap-4">
-                <i class="fas fa-file-invoice text-3xl text-pink-600"></i>
-                <h1 class="text-2xl font-bold text-gray-800">Quản lý Lịch trình Giảng dạy</h1>
-            </div>
-            <a href="/" class="btn btn-secondary mt-4 sm:mt-0">
-                <i class="fas fa-arrow-left mr-2"></i>Quay lại trang chủ
-            </a>
-        </div>
-
-        <!-- Action Buttons & Signatory Selection -->
-        <div class="flex flex-wrap items-end gap-4 mb-6 border-b pb-6">
-             <!-- Searchable input for saved schedules -->
-             <div class="flex-grow relative">
-                <label for="schedules-search-input" class="block text-sm font-medium text-gray-700 mb-1">Tìm và tải lịch đã lưu:</label>
-                <input type="text" id="schedules-search-input" class="form-input" placeholder="Gõ để tìm kiếm trong danh sách đã tải...">
-                <div id="schedules-search-results" class="search-results-container hidden"></div>
-                <input type="hidden" id="selected-schedule-id">
-            </div>
-            <!-- Signatory selection for printing -->
-            <div class="flex-grow grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                    <label for="faculty-head-select" class="block text-sm font-medium text-gray-700 mb-1">Người ký (Trưởng khoa):</label>
-                    <select id="faculty-head-select" class="form-input"></select>
+    <main>
+        <!-- [NEW] Header with Logos -->
+        <div class="max-w-7xl mx-auto bg-white p-6 rounded-2xl shadow-lg mb-8">
+            <div class="flex items-center justify-between">
+                <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRjTnSBGofmGpcMY_uEoXhgAB-FeeLjVslu1A&s" alt="Logo Trường Đại học Hải Phòng" class="h-16 md:h-20">
+                <div class="text-center">
+                    <h1 class="text-xl md:text-3xl font-bold text-blue-800">Hệ thống Quản lý Lịch trình Giảng dạy</h1>
+                    <p class="text-md md:text-lg text-gray-600">&copy; Khoa Công Nghệ Thông Tin - Trường Đại học Hải Phòng</p>
                 </div>
-                <div>
-                    <label for="department-head-select" class="block text-sm font-medium text-gray-700 mb-1">Người ký (Tổ trưởng):</label>
-                    <select id="department-head-select" class="form-input"></select>
-                </div>
-            </div>
-            <div class="flex gap-2 self-end flex-shrink-0">
-                <!-- [REVISED] Added New and Delete buttons -->
-                <button id="new-schedule-btn" class="btn btn-secondary"><i class="fas fa-plus mr-2"></i>Tạo mới</button>
-                <button id="manage-signatures-btn" class="btn btn-info hidden"><i class="fas fa-signature mr-2"></i>QL Chữ ký</button>
-                <button id="save-data-btn" class="btn btn-success"><i class="fas fa-save mr-2"></i>Lưu</button>
-                <button id="delete-schedule-btn" class="btn btn-warning"><i class="fas fa-trash-alt mr-2"></i>Xóa</button>
-                <button id="export-pdf-btn" class="btn btn-danger"><i class="fas fa-print mr-2"></i>In Lịch</button>
+                <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQpzh7trviplRC5G2r75APp6H3wcTnXVixU-Q&s" alt="Logo Khoa Công nghệ Thông tin" class="h-16 md:h-20">
             </div>
         </div>
 
-        <!-- Admin Filter Section -->
-        <div id="admin-filter-section" class="hidden items-start gap-4 mb-6 border-b pb-6">
-            <div class="flex-grow" style="flex-basis: 40%;">
-                <label for="lecturer-search-input" class="block text-sm font-medium text-gray-700 mb-1">Tìm lịch trình theo giảng viên:</label>
-                <div class="flex gap-2">
-                    <input type="text" id="lecturer-search-input" class="form-input" placeholder="Nhập tên giảng viên...">
-                    <button type="button" id="lecturer-search-btn" class="btn btn-primary flex-shrink-0">Tìm</button>
+        <div class="max-w-7xl mx-auto bg-white p-6 rounded-2xl shadow-lg">
+            <!-- Header -->
+            <div class="flex flex-col sm:flex-row items-center justify-between mb-6 pb-4 border-b">
+                <div class="flex items-center gap-4">
+                    <i class="fas fa-file-invoice text-3xl text-pink-600"></i>
+                    <h1 class="text-2xl font-bold text-gray-800">Bảng điều khiển</h1>
                 </div>
+                <a href="/" class="btn btn-secondary mt-4 sm:mt-0">
+                    <i class="fas fa-arrow-left mr-2"></i>Quay lại trang chủ
+                </a>
             </div>
-            <div class="flex-grow bg-gray-50 p-3 rounded-lg text-sm text-gray-700" style="flex-basis: 60%;">
-                <p id="schedule-count-info" class="font-bold mb-2">Kết quả tìm kiếm: <span class="text-blue-600">0</span> lịch trình</p>
-                <div id="lecturer-schedules-list" class="max-h-40 overflow-y-auto">
-                    <p class="text-gray-500 italic p-2">Nhập tên giảng viên và nhấn "Tìm" để xem danh sách.</p>
+
+            <!-- Action Buttons & Signatory Selection -->
+            <div class="flex flex-wrap items-end gap-4 mb-6 border-b pb-6">
+                 <!-- Searchable input for saved schedules -->
+                 <div class="flex-grow relative">
+                    <label for="schedules-search-input" class="block text-sm font-medium text-gray-700 mb-1">Tìm và tải lịch đã lưu:</label>
+                    <input type="text" id="schedules-search-input" class="form-input" placeholder="Gõ để tìm kiếm trong danh sách đã tải...">
+                    <div id="schedules-search-results" class="search-results-container hidden"></div>
+                    <input type="hidden" id="selected-schedule-id">
                 </div>
-            </div>
-        </div>
-        
-        <!-- Schedule Form -->
-        <form id="schedule-form">
-            <!-- General Information -->
-            <div class="bg-gray-50 p-4 rounded-lg mb-6">
-                <h2 class="text-xl font-semibold text-gray-700 mb-4">1. Thông tin chung</h2>
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div><label class="font-medium">Học phần:</label><input id="hoc-phan" type="text" class="form-input" value="An toàn và bảo mật thông tin"></div>
-                    <div><label class="font-medium">Giảng viên:</label><input id="giang-vien" type="text" class="form-input" value="PGS.TS Lê Đắc Nhường"></div>
-                    <div><label class="font-medium">Ngành:</label><input id="nganh" type="text" class="form-input" value="Công nghệ thông tin"></div>
-                    <div><label class="font-medium">Khoá:</label><input id="khoa" type="text" class="form-input" value="24"></div>
-                    <div><label class="font-medium">Năm học:</label><input id="nam-hoc" type="text" class="form-input" value="2024 - 2025"></div>
-                    <div><label class="font-medium">Lớp:</label><input id="lop" type="text" class="form-input" value="INF720.1"></div>
-                    <div><label class="font-medium">Học kỳ:</label><input id="hoc-ky" type="text" class="form-input" value="II"></div>
-                    <div><label class="font-medium">Ngày lập:</label><input id="ngay-lap" type="date" class="form-input"></div>
+                <!-- Signatory selection for printing -->
+                <div class="flex-grow grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label for="faculty-head-select" class="block text-sm font-medium text-gray-700 mb-1">Người ký (Trưởng khoa):</label>
+                        <select id="faculty-head-select" class="form-input"></select>
+                    </div>
+                    <div>
+                        <label for="department-head-select" class="block text-sm font-medium text-gray-700 mb-1">Người ký (Tổ trưởng):</label>
+                        <select id="department-head-select" class="form-input"></select>
+                    </div>
+                </div>
+                <div class="flex gap-2 self-end flex-shrink-0">
+                    <button id="new-schedule-btn" class="btn btn-secondary"><i class="fas fa-plus mr-2"></i>Tạo mới</button>
+                    <button id="manage-signatures-btn" class="btn btn-info hidden"><i class="fas fa-signature mr-2"></i>QL Chữ ký</button>
+                    <button id="save-data-btn" class="btn btn-success"><i class="fas fa-save mr-2"></i>Lưu</button>
+                    <button id="delete-schedule-btn" class="btn btn-warning"><i class="fas fa-trash-alt mr-2"></i>Xóa</button>
+                    <button id="export-pdf-btn" class="btn btn-danger"><i class="fas fa-print mr-2"></i>In Lịch</button>
                 </div>
             </div>
 
-            <!-- Auto Generation Section -->
-            <div class="bg-blue-50 p-4 rounded-lg mb-6 border border-blue-200">
-                <h2 class="text-xl font-semibold text-blue-800 mb-4">2. Tạo lịch tự động</h2>
-                 <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                    <div>
-                        <label class="font-medium">Ngày bắt đầu:</label>
-                        <input id="auto-start-date" type="date" class="form-input">
+            <!-- Admin Filter Section -->
+            <div id="admin-filter-section" class="hidden items-start gap-4 mb-6 border-b pb-6">
+                <div class="flex-grow" style="flex-basis: 40%;">
+                    <label for="lecturer-search-input" class="block text-sm font-medium text-gray-700 mb-1">Tìm lịch trình theo giảng viên:</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="lecturer-search-input" class="form-input" placeholder="Nhập tên giảng viên...">
+                        <button type="button" id="lecturer-search-btn" class="btn btn-primary flex-shrink-0">Tìm</button>
                     </div>
-                    <div>
-                        <label class="font-medium">Thứ trong tuần:</label>
-                        <select id="auto-day-of-week" class="form-input">
-                            <option value="1">Thứ Hai</option>
-                            <option value="2">Thứ Ba</option>
-                            <option value="3">Thứ Tư</option>
-                            <option value="4">Thứ Năm</option>
-                            <option value="5">Thứ Sáu</option>
-                            <option value="6">Thứ Bảy</option>
-                            <option value="0">Chủ Nhật</option>
-                        </select>
+                </div>
+                <div class="flex-grow bg-gray-50 p-3 rounded-lg text-sm text-gray-700" style="flex-basis: 60%;">
+                    <p id="schedule-count-info" class="font-bold mb-2">Kết quả tìm kiếm: <span class="text-blue-600">0</span> lịch trình</p>
+                    <div id="lecturer-schedules-list" class="max-h-40 overflow-y-auto">
+                        <p class="text-gray-500 italic p-2">Nhập tên giảng viên và nhấn "Tìm" để xem danh sách.</p>
                     </div>
-                    <div>
-                        <label class="font-medium">Số tuần:</label>
-                        <input id="auto-num-weeks" type="number" class="form-input" value="15">
+                </div>
+            </div>
+            
+            <!-- Schedule Form -->
+            <form id="schedule-form">
+                <!-- General Information -->
+                <div class="bg-gray-50 p-4 rounded-lg mb-6">
+                    <h2 class="text-xl font-semibold text-gray-700 mb-4">1. Thông tin chung</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div><label class="font-medium">Học phần:</label><input id="hoc-phan" type="text" class="form-input" value="An toàn và bảo mật thông tin"></div>
+                        <div><label class="font-medium">Giảng viên:</label><input id="giang-vien" type="text" class="form-input" value="PGS.TS Lê Đắc Nhường"></div>
+                        <div><label class="font-medium">Ngành:</label><input id="nganh" type="text" class="form-input" value="Công nghệ thông tin"></div>
+                        <div><label class="font-medium">Khoá:</label><input id="khoa" type="text" class="form-input" value="24"></div>
+                        <div><label class="font-medium">Năm học:</label><input id="nam-hoc" type="text" class="form-input" value="2024 - 2025"></div>
+                        <div><label class="font-medium">Lớp:</label><input id="lop" type="text" class="form-input" value="INF720.1"></div>
+                        <div><label class="font-medium">Học kỳ:</label><input id="hoc-ky" type="text" class="form-input" value="II"></div>
+                        <div><label class="font-medium">Ngày lập:</label><input id="ngay-lap" type="date" class="form-input"></div>
                     </div>
-                     <div>
-                        <label class="font-medium">Tiết (BĐ-KT):</label>
-                        <div class="flex gap-2">
-                           <input id="auto-start-period" type="number" class="form-input" placeholder="BĐ" value="1">
-                           <input id="auto-end-period" type="number" class="form-input" placeholder="KT" value="3">
+                </div>
+
+                <!-- Auto Generation Section -->
+                <div class="bg-blue-50 p-4 rounded-lg mb-6 border border-blue-200">
+                    <h2 class="text-xl font-semibold text-blue-800 mb-4">2. Tạo lịch tự động</h2>
+                     <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                        <div>
+                            <label class="font-medium">Ngày bắt đầu:</label>
+                            <input id="auto-start-date" type="date" class="form-input">
+                        </div>
+                        <div>
+                            <label class="font-medium">Thứ trong tuần:</label>
+                            <select id="auto-day-of-week" class="form-input">
+                                <option value="1">Thứ Hai</option>
+                                <option value="2">Thứ Ba</option>
+                                <option value="3">Thứ Tư</option>
+                                <option value="4">Thứ Năm</option>
+                                <option value="5">Thứ Sáu</option>
+                                <option value="6">Thứ Bảy</option>
+                                <option value="0">Chủ Nhật</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="font-medium">Số tuần:</label>
+                            <input id="auto-num-weeks" type="number" class="form-input" value="15">
+                        </div>
+                         <div>
+                            <label class="font-medium">Tiết (BĐ-KT):</label>
+                            <div class="flex gap-2">
+                               <input id="auto-start-period" type="number" class="form-input" placeholder="BĐ" value="1">
+                               <input id="auto-end-period" type="number" class="form-input" placeholder="KT" value="3">
+                            </div>
+                        </div>
+                        <div class="self-end">
+                            <button type="button" id="generate-schedule-btn" class="btn btn-primary w-full"><i class="fas fa-cogs mr-2"></i>Tạo Lịch</button>
                         </div>
                     </div>
-                    <div class="self-end">
-                        <button type="button" id="generate-schedule-btn" class="btn btn-primary w-full"><i class="fas fa-cogs mr-2"></i>Tạo Lịch</button>
+                </div>
+
+
+                <!-- Detailed Schedule Table -->
+                <div>
+                    <h2 class="text-xl font-semibold text-gray-700 mb-4 flex justify-between items-center">
+                        <span>3. Nội dung chi tiết</span>
+                        <button type="button" id="add-week-btn" class="btn btn-primary"><i class="fas fa-plus mr-2"></i>Thêm tuần thủ công</button>
+                    </h2>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full border border-gray-300 text-sm">
+                            <thead class="bg-gray-200 text-gray-700">
+                                <tr>
+                                    <th rowspan="2" class="border p-2">Tuần</th>
+                                    <th rowspan="2" class="border p-2">Thời gian</th>
+                                    <th rowspan="2" class="border p-2">Thứ/Ngày</th>
+                                    <th colspan="2" class="border p-2">Giảng dạy lý thuyết</th>
+                                    <th colspan="2" class="border p-2">BT, TH, TL, TH</th>
+                                    <th rowspan="2" class="border p-2">Ghi chú</th>
+                                    <th rowspan="2" class="border p-2">Xóa</th>
+                                </tr>
+                                <tr>
+                                    <th class="border p-2">Tên bài</th>
+                                    <th class="border p-2 w-20">Số tiết</th>
+                                    <th class="border p-2">Tên bài</th>
+                                    <th class="border p-2 w-20">Số tiết</th>
+                                </tr>
+                            </thead>
+                            <tbody id="schedule-details-body">
+                                <!-- Rows will be added dynamically by JavaScript -->
+                            </tbody>
+                        </table>
                     </div>
                 </div>
-            </div>
-
-
-            <!-- Detailed Schedule Table -->
-            <div>
-                <h2 class="text-xl font-semibold text-gray-700 mb-4 flex justify-between items-center">
-                    <span>3. Nội dung chi tiết</span>
-                    <button type="button" id="add-week-btn" class="btn btn-primary"><i class="fas fa-plus mr-2"></i>Thêm tuần thủ công</button>
-                </h2>
-                <div class="overflow-x-auto">
-                    <table class="min-w-full border border-gray-300 text-sm">
-                        <thead class="bg-gray-200 text-gray-700">
-                            <tr>
-                                <th rowspan="2" class="border p-2">Tuần</th>
-                                <th rowspan="2" class="border p-2">Thời gian</th>
-                                <th rowspan="2" class="border p-2">Thứ/Ngày</th>
-                                <th colspan="2" class="border p-2">Giảng dạy lý thuyết</th>
-                                <th colspan="2" class="border p-2">BT, TH, TL, TH</th>
-                                <th rowspan="2" class="border p-2">Ghi chú</th>
-                                <th rowspan="2" class="border p-2">Xóa</th>
-                            </tr>
-                            <tr>
-                                <th class="border p-2">Tên bài</th>
-                                <th class="border p-2 w-20">Số tiết</th>
-                                <th class="border p-2">Tên bài</th>
-                                <th class="border p-2 w-20">Số tiết</th>
-                            </tr>
-                        </thead>
-                        <tbody id="schedule-details-body">
-                            <!-- Rows will be added dynamically by JavaScript -->
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </form>
-    </div>
+            </form>
+        </div>
+    </main>
 
     <!-- Modal for Managing Signatories -->
     <div id="signatory-modal" class="modal">
@@ -203,20 +215,12 @@
         </div>
     </div>
 
-
-    <!-- Firebase Libraries -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        const firebaseConfig = {
-          apiKey: "AIzaSyCJcTMUwO-w7V0YsGUKWeaW-zl42Ww7fxo",
-          authDomain: "qlylaodongbdhhp.firebaseapp.com",
-          projectId: "qlylaodongbdhhp",
-          storageBucket: "qlylaodongbdhhp.appspot.com",
-          messagingSenderId: "462439202995",
-          appId: "1:462439202995:web:06bc11042efb9b99d4f0c6"
-        };
-        const app = initializeApp(firebaseConfig);
-    </script>
+    <!-- [NEW] Footer -->
+    <footer class="mt-8 text-center text-sm text-gray-500">
+        <div class="max-w-7xl mx-auto py-4 border-t border-gray-200">
+            <p>&copy; 2025 Bản quyền thuộc về Khoa Công nghệ Thông tin - Trường Đại học Hải Phòng.</p>
+        </div>
+    </footer>
 
     <!-- Link to your custom JavaScript file -->
     <script type="module" src="js/schedule-logic.js"></script>
