@@ -415,10 +415,9 @@ function generatePrintableView() {
         return;
     }
 
-    const { weekNumber, weekDates } = getWeekInfo(currentWeekStartDate);
+    const { weekNumber, weekDates, startDate } = getWeekInfo(currentWeekStartDate);
     const roomName = currentRoom.name;
     const daysOfWeek = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ nhật'];
-    const today = new Date();
 
     let tableBodyHtml = '';
     weekDates.forEach((date) => {
@@ -508,18 +507,18 @@ function generatePrintableView() {
 
                 <div class="footer-container">
                     <div class="signature-block">
-                        <h4 contenteditable="true">PHÒNG QTSCVC & ĐT</h4>
+                        <h4 contenteditable="true">BAN CHỦ NHIỆM KHOA</h4>
                         <p contenteditable="true">      </p>
                     </div>
                     <div class="signature-block">
-                        <h4 contenteditable="true">Khoa CNTT</h4>
+                        <h4 contenteditable="true">TỔ BỘ MÔN</h4>
                     </div>
                     <div class="signature-block">
                         <h4 contenteditable="true">NGƯỜI LẬP</h4>
-                        <p contenteditable="true">${currentUserInfo.email}</p>
+                        
                     </div>
                 </div>
-                 <p style="text-align: right; font-style: italic; margin-top: 10px;">Hải Phòng, ngày ${today.getDate()} tháng ${today.getMonth() + 1} năm ${today.getFullYear()}</p>
+                 <p style="text-align: right; font-style: italic; margin-top: 10px;">Hải Phòng, ngày ${startDate.getDate()} tháng ${startDate.getMonth() + 1} năm ${startDate.getFullYear()}</p>
             </div>
         </body>
         </html>
