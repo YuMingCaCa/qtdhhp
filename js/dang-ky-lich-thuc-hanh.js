@@ -1,7 +1,7 @@
 // Import các hàm cần thiết từ Firebase SDK
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-import { getFirestore, collection, addDoc, doc, getDoc, setDoc, updateDoc, deleteDoc, onSnapshot, query, where, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { getFirestore, collection, addDoc, doc, getDoc, setDoc, updateDoc, deleteDoc, onSnapshot, query, where, getDocs, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 // --- CẤU HÌNH FIREBASE ---
 const firebaseConfig = {
@@ -108,8 +108,7 @@ function getWeekInfo(date) {
     const d = new Date(date);
     d.setHours(0, 0, 0, 0);
     const day = d.getDay() === 0 ? 6 : d.getDay() - 1; // Monday is 0, Sunday is 6
-    const startDate = new Date(d.setDate(d.getDate() - day));
-    const endDate = new Date(new Date(startDate).getTime() + 6 * 24 * 60 * 60 * 1000);
+    const startDate = new Date(new Date(d).setDate(d.getDate() - day));
     const year = startDate.getFullYear();
     const oneJan = new Date(year, 0, 1);
     const numberOfDays = Math.floor((startDate - oneJan) / (24 * 60 * 60 * 1000));
@@ -122,11 +121,12 @@ function getWeekInfo(date) {
         weekDates.push(dayDate);
     }
 
-    return { startDate, endDate, weekNumber, weekDates };
+    return { startDate, weekNumber, weekDates };
 }
 
 function updateDatePickerDisplay() {
-    const { startDate, endDate, weekNumber } = getWeekInfo(currentWeekStartDate);
+    const { startDate, weekNumber } = getWeekInfo(currentWeekStartDate);
+    const endDate = new Date(new Date(startDate).setDate(startDate.getDate() + 6));
     const display_text = `Tuần ${weekNumber} (${formatDateToDDMMYYYY(startDate)} - ${formatDateToDDMMYYYY(endDate)})`;
     if(datePickerInstance) {
         datePickerInstance.set('defaultDate', currentWeekStartDate);
@@ -223,7 +223,7 @@ function renderSingleRoomSchedule() {
             .sort((a, b) => a.startTime.localeCompare(b.startTime));
 
         let bookingsHtml = dayBookings.map(booking => `
-            <div class="schedule-booking" onclick="window.showBookingDetails('${booking.id}')">
+            <div class="schedule-booking ${booking.seriesId ? 'border-l-yellow-400' : 'border-l-blue-500'}" onclick="window.showBookingDetails('${booking.id}')">
                 <p class="font-bold truncate">${booking.startTime} - ${booking.endTime}</p>
                 <p class="truncate">${booking.className}</p>
                 <p class="truncate text-xs">${booking.lecturerName}</p>
@@ -272,7 +272,7 @@ function renderAllRoomsSchedule() {
                 .sort((a, b) => a.startTime.localeCompare(b.startTime));
             
             let bookingsHtml = dayBookings.map(booking => `
-                <div class="schedule-booking" onclick="window.showBookingDetails('${booking.id}')">
+                <div class="schedule-booking ${booking.seriesId ? 'border-l-yellow-400' : 'border-l-blue-500'}" onclick="window.showBookingDetails('${booking.id}')">
                     <p class="font-bold truncate">${booking.startTime} - ${booking.endTime}</p>
                     <p class="truncate">${booking.className}</p>
                     <p class="truncate text-xs">${booking.lecturerName}</p>
@@ -488,7 +488,8 @@ async function handleBookingFormSubmit(e) {
     const className = document.getElementById('booking-class-name').value;
     const lecturerName = document.getElementById('booking-lecturer-name').value;
     const content = document.getElementById('booking-content').value;
-    const repeatWeeks = parseInt(document.getElementById('booking-repeat-weeks').value) || 0;
+    const repeatType = document.getElementById('booking-repeat-type').value;
+    const repeatCount = parseInt(document.getElementById('booking-repeat-count').value) || 1;
     
     if (!timeSlotValue || !className || !lecturerName || !content) {
         showAlert("Vui lòng điền đầy đủ thông tin.");
@@ -499,57 +500,83 @@ async function handleBookingFormSubmit(e) {
 
     const [newStartTime, newEndTime] = timeSlotValue.split('|');
     const originalDate = new Date(document.getElementById('booking-date').value);
-
-    // --- Phase 1: Conflict Checking for all weeks ---
+    const seriesId = repeatType !== 'none' ? Date.now().toString() : null;
+    
     const bookingsToCreate = [];
-    for (let i = 0; i <= repeatWeeks; i++) {
+    let createdCount = 0;
+    let weekOffset = 0;
+
+    while (createdCount < repeatCount) {
         const targetDate = new Date(originalDate);
-        targetDate.setDate(targetDate.getDate() + i * 7);
+        targetDate.setDate(targetDate.getDate() + weekOffset * 7);
+
+        const { weekNumber } = getWeekInfo(targetDate);
         const dateString = formatDateToYYYYMMDD(targetDate);
 
-        // Query firestore for potential conflicts on this specific day
-        const q = query(schedulesCol, where("date", "==", dateString), where("roomId", "==", bookingRoomId));
-        const querySnapshot = await getDocs(q);
-        const bookingsForDay = querySnapshot.docs.map(doc => doc.data());
-
-        const isConflict = bookingsForDay.some(existingBooking =>
-            (newStartTime < existingBooking.endTime) && (newEndTime > existingBooking.startTime)
-        );
-
-        if (isConflict) {
-            showAlert(`Lịch bị trùng vào ngày ${formatDateToDDMMYYYY(targetDate)}. Vui lòng chọn khung giờ khác. Đã dừng đăng ký.`);
-            submitButton.disabled = false;
-            submitButton.innerHTML = `<i class="fas fa-check-circle mr-2"></i> Xác nhận Đăng ký`;
-            return;
+        let shouldBook = false;
+        if (repeatType === 'none' || repeatType === 'weekly') {
+            shouldBook = true;
+        } else if (repeatType === 'even' && weekNumber % 2 === 0) {
+            shouldBook = true;
+        } else if (repeatType === 'odd' && weekNumber % 2 !== 0) {
+            shouldBook = true;
         }
+        
+        if (shouldBook) {
+            // Check for conflicts
+            const q = query(schedulesCol, where("date", "==", dateString), where("roomId", "==", bookingRoomId));
+            const querySnapshot = await getDocs(q);
+            const bookingsForDay = querySnapshot.docs.map(doc => doc.data());
+            const isConflict = bookingsForDay.some(existingBooking =>
+                (newStartTime < existingBooking.endTime) && (newEndTime > existingBooking.startTime)
+            );
 
-        const { startDate: weekStartDate } = getWeekInfo(targetDate);
-        const weekId = formatDateToYYYYMMDD(weekStartDate);
+            if (isConflict) {
+                showAlert(`Lịch bị trùng vào ngày ${formatDateToDDMMYYYY(targetDate)}. Vui lòng chọn khung giờ khác. Đã dừng đăng ký.`);
+                submitButton.disabled = false;
+                submitButton.innerHTML = `<i class="fas fa-check-circle mr-2"></i> Xác nhận Đăng ký`;
+                return;
+            }
 
-        bookingsToCreate.push({
-            roomId: bookingRoomId,
-            weekId: weekId,
-            date: dateString,
-            startTime: newStartTime,
-            endTime: newEndTime,
-            className,
-            lecturerName,
-            content,
-            bookedByUid: currentUserInfo.uid,
-            bookedByEmail: currentUserInfo.email,
-            createdAt: new Date()
-        });
+            const { startDate: weekStartDate } = getWeekInfo(targetDate);
+            const weekId = formatDateToYYYYMMDD(weekStartDate);
+
+            const bookingData = {
+                roomId: bookingRoomId,
+                weekId: weekId,
+                date: dateString,
+                startTime: newStartTime,
+                endTime: newEndTime,
+                className,
+                lecturerName,
+                content,
+                bookedByUid: currentUserInfo.uid,
+                bookedByEmail: currentUserInfo.email,
+                createdAt: new Date()
+            };
+            if(seriesId) bookingData.seriesId = seriesId;
+
+            bookingsToCreate.push(bookingData);
+            createdCount++;
+        }
+        
+        weekOffset++;
+        if (weekOffset > 100) { // Safety break to prevent infinite loops
+            showAlert("Không thể tìm thấy đủ tuần hợp lệ trong 100 tuần tới. Vui lòng kiểm tra lại.");
+            break;
+        }
     }
 
-    // --- Phase 2: Writing Data ---
+    // Write data using a batch
     try {
-        const writePromises = bookingsToCreate.map(bookingData => addDoc(schedulesCol, bookingData));
-        await Promise.all(writePromises);
+        const batch = writeBatch(db);
+        bookingsToCreate.forEach(booking => {
+            const docRef = doc(collection(db, schedulesCol.path));
+            batch.set(docRef, booking);
+        });
+        await batch.commit();
         
-        const successMessage = repeatWeeks > 0 
-            ? `Đăng ký thành công cho tuần này và ${repeatWeeks} tuần tiếp theo!`
-            : "Đăng ký lịch thành công!";
-        showAlert(successMessage);
+        showAlert(`Đăng ký thành công ${bookingsToCreate.length} lịch!`);
         closeModal('booking-modal');
     } catch (error) {
         console.error("Error creating bookings: ", error);
@@ -578,6 +605,7 @@ window.showBookingDetails = (bookingId) => {
         <p><strong>Giảng viên:</strong> ${booking.lecturerName}</p>
         <p><strong>Nội dung:</strong> ${booking.content}</p>
         <p class="text-sm text-gray-500 mt-2">Đăng ký bởi: ${booking.bookedByEmail}</p>
+        ${booking.seriesId ? '<p class="text-sm text-yellow-600 mt-2"><i class="fas fa-sync-alt"></i> Lịch này thuộc một chuỗi lặp lại.</p>' : ''}
     `;
 
     const deleteBtn = document.getElementById('delete-booking-btn');
@@ -594,14 +622,67 @@ window.showBookingDetails = (bookingId) => {
     document.getElementById('booking-details-modal').style.display = 'flex';
 };
 
-async function deleteBooking() {
+async function handleDeleteRequest() {
     const bookingId = this.dataset.id;
-    if (await showConfirm("Bạn có chắc muốn hủy lịch đăng ký này?")) {
-        await deleteDoc(doc(schedulesCol, bookingId));
-        showAlert("Đã hủy lịch thành công.");
-        closeModal('booking-details-modal');
+    const booking = weekSchedules.find(s => s.id === bookingId);
+    if (!booking) {
+        showAlert("Không tìm thấy lịch để xóa.");
+        return;
+    }
+    
+    closeModal('booking-details-modal');
+
+    if (booking.seriesId) {
+        // Show the new series deletion modal
+        const modal = document.getElementById('delete-series-confirm-modal');
+        document.getElementById('delete-series-btn-one').onclick = () => deleteSingleBooking(bookingId);
+        document.getElementById('delete-series-btn-future').onclick = () => deleteFutureBookings(booking.seriesId, booking.date);
+        modal.style.display = 'flex';
+    } else {
+        // Standard single deletion
+        deleteSingleBooking(bookingId);
     }
 }
+
+async function deleteSingleBooking(bookingId) {
+    closeModal('delete-series-confirm-modal');
+    if (await showConfirm("Bạn có chắc muốn hủy lịch đăng ký này?")) {
+        try {
+            await deleteDoc(doc(schedulesCol, bookingId));
+            showAlert("Đã hủy lịch thành công.");
+        } catch (error) {
+            showAlert("Lỗi khi hủy lịch.");
+            console.error("Error deleting single booking:", error);
+        }
+    }
+}
+
+async function deleteFutureBookings(seriesId, fromDate) {
+    closeModal('delete-series-confirm-modal');
+    if (await showConfirm("Bạn có chắc muốn hủy lịch này và TẤT CẢ các lịch lặp lại trong tương lai?")) {
+        try {
+            const q = query(schedulesCol, where("seriesId", "==", seriesId), where("date", ">=", fromDate));
+            const snapshot = await getDocs(q);
+            
+            if (snapshot.empty) {
+                showAlert("Không tìm thấy lịch lặp lại nào trong tương lai.");
+                return;
+            }
+
+            const batch = writeBatch(db);
+            snapshot.docs.forEach(doc => {
+                batch.delete(doc.ref);
+            });
+            await batch.commit();
+
+            showAlert(`Đã hủy thành công ${snapshot.docs.length} lịch lặp lại.`);
+        } catch (error) {
+            showAlert("Lỗi khi hủy chuỗi lịch.");
+            console.error("Error deleting future bookings:", error);
+        }
+    }
+}
+
 
 // --- PRINTING LOGIC (Unchanged) ---
 function openPrintOptionsModal() {
@@ -672,7 +753,8 @@ function generatePrintableView() {
         return;
     }
 
-    const { weekNumber, weekDates, startDate, endDate } = getWeekInfo(currentWeekStartDate);
+    const { weekNumber, weekDates, startDate } = getWeekInfo(currentWeekStartDate);
+    const endDate = new Date(new Date(startDate).setDate(startDate.getDate() + 6));
     const daysOfWeek = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ nhật'];
     
     let contentHtml = '';
@@ -853,8 +935,9 @@ function addEventListeners() {
     document.getElementById('content-form').addEventListener('submit', (e) => handleFormSubmit(e, contentsCol, 'content-id', { value: e.target.elements['content-text'].value }));
     
     document.getElementById('booking-form').addEventListener('submit', handleBookingFormSubmit);
-    document.getElementById('delete-booking-btn').addEventListener('click', deleteBooking);
+    document.getElementById('delete-booking-btn').addEventListener('click', handleDeleteRequest);
     document.getElementById('alert-ok-btn').addEventListener('click', () => closeModal('alert-modal'));
+    document.getElementById('delete-series-btn-cancel').addEventListener('click', () => closeModal('delete-series-confirm-modal'));
     
     // Print Listeners
     document.getElementById('print-schedule-btn').addEventListener('click', openPrintOptionsModal);
