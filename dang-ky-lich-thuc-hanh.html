@@ -47,6 +47,31 @@
             padding-left: 1rem;
             width: 150px; /* Fixed width for room name column */
         }
+        /* Management Modal Tabs */
+        .tab-button {
+            padding: 10px 15px;
+            cursor: pointer;
+            border: none;
+            background-color: #e5e7eb;
+            border-radius: 8px 8px 0 0;
+            font-weight: 500;
+            transition: background-color 0.3s;
+        }
+        .tab-button.active {
+            background-color: #fff;
+            border-bottom: 2px solid #3b82f6;
+        }
+        .tab-content {
+            display: none;
+            padding: 1.5rem;
+            border: 1px solid #e5e7eb;
+            border-top: none;
+            border-radius: 0 0 8px 8px;
+            background-color: #fff;
+        }
+        .tab-content.active {
+            display: block;
+        }
     </style>
 </head>
 <body class="p-4 md:p-8">
@@ -84,8 +109,8 @@
                     <button id="print-schedule-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center transition-all">
                         <i class="fas fa-print mr-2"></i> In Lịch
                     </button>
-                    <button id="manage-rooms-btn" class="admin-only bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center transition-all">
-                        <i class="fas fa-cogs mr-2"></i> Quản lý
+                    <button id="manage-data-btn" class="admin-only bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center transition-all">
+                        <i class="fas fa-cogs mr-2"></i> Quản lý Dữ liệu
                     </button>
                 </div>
             </div>
@@ -97,34 +122,122 @@
         </div>
     </main>
 
-    <!-- Modal Quản lý Phòng thực hành -->
-    <div id="manage-rooms-modal" class="modal">
-        <div class="modal-content !max-w-2xl">
-            <span class="close-button" onclick="closeModal('manage-rooms-modal')">&times;</span>
-            <h3 class="text-xl font-bold mb-4">Quản lý Phòng thực hành</h3>
-            <form id="room-form" class="mb-4 p-4 border rounded-lg bg-gray-50">
-                <input type="hidden" id="room-id">
-                <div class="space-y-4">
-                    <div>
-                        <label for="room-name" class="block text-sm font-medium text-gray-700">Tên phòng</label>
-                        <input type="text" id="room-name" placeholder="VD: Phòng thực hành số 1" required class="mt-1 p-2 border rounded-md w-full">
+    <!-- Modal Quản lý Dữ liệu Tổng hợp -->
+    <div id="management-modal" class="modal">
+        <div class="modal-content !max-w-4xl">
+            <span class="close-button" onclick="closeModal('management-modal')">&times;</span>
+            <h3 class="text-2xl font-bold mb-4">Quản lý Dữ liệu</h3>
+            
+            <!-- Tab Buttons -->
+            <div class="border-b border-gray-200">
+                <nav class="flex space-x-2" aria-label="Tabs">
+                    <button class="tab-button active" onclick="openTab(event, 'tab-rooms')">Phòng học</button>
+                    <button class="tab-button" onclick="openTab(event, 'tab-timeslots')">Khung giờ</button>
+                    <button class="tab-button" onclick="openTab(event, 'tab-classes')">Lớp học phần</button>
+                    <button class="tab-button" onclick="openTab(event, 'tab-lecturers')">Giảng viên</button>
+                    <button class="tab-button" onclick="openTab(event, 'tab-contents')">Nội dung</button>
+                </nav>
+            </div>
+
+            <!-- Tab Content: Rooms -->
+            <div id="tab-rooms" class="tab-content active">
+                <form id="room-form" class="mb-4 p-4 border rounded-lg bg-gray-50">
+                    <input type="hidden" id="room-id">
+                    <h4 class="font-semibold text-lg mb-3">Thêm/Sửa Phòng học</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="room-name" class="block text-sm font-medium text-gray-700">Tên phòng</label>
+                            <input type="text" id="room-name" placeholder="VD: Phòng thực hành số 1" required class="mt-1 p-2 border rounded-md w-full">
+                        </div>
+                        <div>
+                            <label for="room-description" class="block text-sm font-medium text-gray-700">Mô tả</label>
+                            <input type="text" id="room-description" placeholder="VD: Phòng thực hành Tin học cơ sở" class="mt-1 p-2 border rounded-md w-full">
+                        </div>
                     </div>
-                    <div>
-                        <label for="room-description" class="block text-sm font-medium text-gray-700">Mô tả</label>
-                        <textarea id="room-description" rows="2" placeholder="VD: Phòng thực hành Tin học cơ sở" class="mt-1 p-2 border rounded-md w-full"></textarea>
+                    <div class="mt-4 flex justify-end gap-2">
+                        <button type="button" class="bg-gray-200 hover:bg-gray-300 text-black p-2 rounded-md px-4" onclick="clearForm('room-form')">Làm mới</button>
+                        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-md px-4">Lưu</button>
                     </div>
-                </div>
-                <div class="mt-4 flex justify-end gap-2">
-                    <button type="button" id="clear-room-form-btn" class="bg-gray-200 hover:bg-gray-300 text-black p-2 rounded-md px-4">Làm mới</button>
-                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-md px-4">Lưu phòng</button>
-                </div>
-            </form>
-            <div id="rooms-list-container" class="overflow-y-auto max-h-60">
-                <!-- Room list will be rendered here -->
+                </form>
+                <div id="rooms-list-container" class="overflow-y-auto max-h-64"></div>
+            </div>
+
+            <!-- Tab Content: Time Slots -->
+            <div id="tab-timeslots" class="tab-content">
+                <form id="timeslot-form" class="mb-4 p-4 border rounded-lg bg-gray-50">
+                    <input type="hidden" id="timeslot-id">
+                    <h4 class="font-semibold text-lg mb-3">Thêm/Sửa Khung giờ</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="timeslot-start" class="block text-sm font-medium text-gray-700">Giờ bắt đầu</label>
+                            <input type="time" id="timeslot-start" required class="mt-1 p-2 border rounded-md w-full">
+                        </div>
+                        <div>
+                            <label for="timeslot-end" class="block text-sm font-medium text-gray-700">Giờ kết thúc</label>
+                            <input type="time" id="timeslot-end" required class="mt-1 p-2 border rounded-md w-full">
+                        </div>
+                    </div>
+                    <div class="mt-4 flex justify-end gap-2">
+                        <button type="button" class="bg-gray-200 hover:bg-gray-300 text-black p-2 rounded-md px-4" onclick="clearForm('timeslot-form')">Làm mới</button>
+                        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-md px-4">Lưu</button>
+                    </div>
+                </form>
+                <div id="timeslots-list-container" class="overflow-y-auto max-h-64"></div>
+            </div>
+
+            <!-- Tab Content: Classes -->
+            <div id="tab-classes" class="tab-content">
+                <form id="class-form" class="mb-4 p-4 border rounded-lg bg-gray-50">
+                    <input type="hidden" id="class-id">
+                    <h4 class="font-semibold text-lg mb-3">Thêm/Sửa Lớp học phần</h4>
+                    <div>
+                        <label for="class-name" class="block text-sm font-medium text-gray-700">Tên lớp học phần</label>
+                        <input type="text" id="class-name" placeholder="VD: 125215 - Lập trình C#" required class="mt-1 p-2 border rounded-md w-full">
+                    </div>
+                    <div class="mt-4 flex justify-end gap-2">
+                        <button type="button" class="bg-gray-200 hover:bg-gray-300 text-black p-2 rounded-md px-4" onclick="clearForm('class-form')">Làm mới</button>
+                        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-md px-4">Lưu</button>
+                    </div>
+                </form>
+                <div id="classes-list-container" class="overflow-y-auto max-h-64"></div>
+            </div>
+
+            <!-- Tab Content: Lecturers -->
+            <div id="tab-lecturers" class="tab-content">
+                <form id="lecturer-form" class="mb-4 p-4 border rounded-lg bg-gray-50">
+                    <input type="hidden" id="lecturer-id">
+                    <h4 class="font-semibold text-lg mb-3">Thêm/Sửa Giảng viên</h4>
+                    <div>
+                        <label for="lecturer-name" class="block text-sm font-medium text-gray-700">Tên giảng viên</label>
+                        <input type="text" id="lecturer-name" placeholder="VD: ThS. Nguyễn Văn A" required class="mt-1 p-2 border rounded-md w-full">
+                    </div>
+                    <div class="mt-4 flex justify-end gap-2">
+                        <button type="button" class="bg-gray-200 hover:bg-gray-300 text-black p-2 rounded-md px-4" onclick="clearForm('lecturer-form')">Làm mới</button>
+                        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-md px-4">Lưu</button>
+                    </div>
+                </form>
+                <div id="lecturers-list-container" class="overflow-y-auto max-h-64"></div>
+            </div>
+
+            <!-- Tab Content: Contents -->
+            <div id="tab-contents" class="tab-content">
+                <form id="content-form" class="mb-4 p-4 border rounded-lg bg-gray-50">
+                    <input type="hidden" id="content-id">
+                    <h4 class="font-semibold text-lg mb-3">Thêm/Sửa Nội dung thực hành</h4>
+                    <div>
+                        <label for="content-text" class="block text-sm font-medium text-gray-700">Nội dung</p>
+                        <input type="text" id="content-text" placeholder="VD: Thực hành bài 1" required class="mt-1 p-2 border rounded-md w-full">
+                    </div>
+                    <div class="mt-4 flex justify-end gap-2">
+                        <button type="button" class="bg-gray-200 hover:bg-gray-300 text-black p-2 rounded-md px-4" onclick="clearForm('content-form')">Làm mới</button>
+                        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-md px-4">Lưu</button>
+                    </div>
+                </form>
+                <div id="contents-list-container" class="overflow-y-auto max-h-64"></div>
             </div>
         </div>
     </div>
-
+    
     <!-- Modal Đăng ký Lịch -->
     <div id="booking-modal" class="modal">
         <div class="modal-content">
@@ -135,28 +248,27 @@
                 <input type="hidden" id="booking-date">
                 <input type="hidden" id="booking-room-id">
                 
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label for="booking-start-time" class="block text-sm font-medium text-gray-700">Thời gian bắt đầu</label>
-                        <input type="time" id="booking-start-time" required class="mt-1 block w-full p-2 border border-gray-300 rounded-md" step="1800">
-                    </div>
-                    <div>
-                        <label for="booking-end-time" class="block text-sm font-medium text-gray-700">Thời gian kết thúc</label>
-                        <input type="time" id="booking-end-time" required class="mt-1 block w-full p-2 border border-gray-300 rounded-md" step="1800">
-                    </div>
+                <div>
+                    <label for="booking-timeslot" class="block text-sm font-medium text-gray-700">Khung giờ</label>
+                    <select id="booking-timeslot" required class="mt-1 block w-full p-2 border border-gray-300 rounded-md"></select>
                 </div>
 
                 <div>
                     <label for="booking-class-name" class="block text-sm font-medium text-gray-700">Lớp học phần</label>
-                    <input type="text" id="booking-class-name" required class="mt-1 block w-full p-2 border border-gray-300 rounded-md">
+                    <select id="booking-class-name" required class="mt-1 block w-full p-2 border border-gray-300 rounded-md"></select>
                 </div>
                 <div>
                     <label for="booking-lecturer-name" class="block text-sm font-medium text-gray-700">Giảng viên</label>
-                    <input type="text" id="booking-lecturer-name" required class="mt-1 block w-full p-2 border border-gray-300 rounded-md">
+                    <select id="booking-lecturer-name" required class="mt-1 block w-full p-2 border border-gray-300 rounded-md"></select>
                 </div>
                 <div>
                     <label for="booking-content" class="block text-sm font-medium text-gray-700">Nội dung thực hành</label>
-                    <textarea id="booking-content" rows="3" required class="mt-1 block w-full p-2 border border-gray-300 rounded-md"></textarea>
+                    <select id="booking-content" required class="mt-1 block w-full p-2 border border-gray-300 rounded-md"></select>
+                </div>
+                 <div>
+                    <label for="booking-repeat-weeks" class="block text-sm font-medium text-gray-700">Lặp lại cho các tuần tới</label>
+                    <input type="number" id="booking-repeat-weeks" min="0" value="0" class="mt-1 block w-full p-2 border border-gray-300 rounded-md" placeholder="Nhập 0 nếu không lặp lại">
+                    <p class="text-xs text-gray-500 mt-1">Nhập số tuần muốn đăng ký lặp lại (ví dụ: nhập 3 để đăng ký cho 3 tuần tiếp theo).</p>
                 </div>
                 <div class="flex justify-end pt-4">
                     <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg">

@@ -1,7 +1,7 @@
 // Import các hàm cần thiết từ Firebase SDK
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-import { getFirestore, collection, addDoc, doc, getDoc, setDoc, updateDoc, deleteDoc, onSnapshot, query, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { getFirestore, collection, addDoc, doc, getDoc, setDoc, updateDoc, deleteDoc, onSnapshot, query, where, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 // --- CẤU HÌNH FIREBASE ---
 const firebaseConfig = {
@@ -21,12 +21,22 @@ const auth = getAuth(app);
 const appId = firebaseConfig.projectId || 'hpu-workload-tracker-app';
 const basePath = `artifacts/${appId}/public/data`;
 const usersCol = collection(db, `${basePath}/users`);
-const roomsCol = collection(db, `${basePath}/practice_rooms`);
 const schedulesCol = collection(db, `${basePath}/practice_schedules`);
+// Collections for management data
+const roomsCol = collection(db, `${basePath}/practice_rooms`);
+const timeSlotsCol = collection(db, `${basePath}/practice_timeslots`);
+const classNamesCol = collection(db, `${basePath}/practice_classnames`);
+const lecturersCol = collection(db, `${basePath}/practice_lecturers`);
+const contentsCol = collection(db, `${basePath}/practice_contents`);
+
 
 // --- GLOBAL STATE ---
 let currentUserInfo = null;
 let allRooms = [];
+let allTimeSlots = [];
+let allClassNames = [];
+let allLecturers = [];
+let allContents = [];
 let weekSchedules = [];
 let currentWeekStartDate = null;
 let selectedRoomId = null;
@@ -73,8 +83,21 @@ const showConfirm = (message) => {
 };
 
 window.closeModal = (modalId) => {
-    document.getElementById(modalId).style.display = 'none';
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        modal.style.display = 'none';
+    }
 };
+
+window.clearForm = (formId) => {
+    const form = document.getElementById(formId);
+    if(form) {
+        form.reset();
+        // also clear any hidden id fields
+        const hiddenInput = form.querySelector('input[type="hidden"]');
+        if (hiddenInput) hiddenInput.value = '';
+    }
+}
 
 const formatDateToDDMMYYYY = (d) => `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`;
 const formatDateToYYYYMMDD = (d) => `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}`;
@@ -117,6 +140,20 @@ function setWeek(date) {
     listenForSchedules();
 }
 
+// --- MANAGEMENT MODAL TABS ---
+window.openTab = (evt, tabName) => {
+    let i, tabcontent, tablinks;
+    tabcontent = document.getElementsByClassName("tab-content");
+    for (i = 0; i < tabcontent.length; i++) {
+        tabcontent[i].style.display = "none";
+    }
+    tablinks = document.getElementsByClassName("tab-button");
+    for (i = 0; i < tablinks.length; i++) {
+        tablinks[i].className = tablinks[i].className.replace(" active", "");
+    }
+    document.getElementById(tabName).style.display = "block";
+    evt.currentTarget.className += " active";
+}
 
 // --- UI RENDERING ---
 function updateUIForRole() {
@@ -253,51 +290,53 @@ function renderAllRoomsSchedule() {
     scheduleContainer.appendChild(table);
 }
 
-
-function renderRoomManagementList() {
-    const container = document.getElementById('rooms-list-container');
+// --- RENDER MANAGEMENT LISTS ---
+const renderList = (containerId, items, nameProp, descriptionProp, editFn, deleteFn) => {
+    const container = document.getElementById(containerId);
     container.innerHTML = '';
-    if (allRooms.length === 0) {
-        container.innerHTML = '<p class="text-center text-gray-500 p-4">Chưa có phòng nào.</p>';
+    if (items.length === 0) {
+        container.innerHTML = '<p class="text-center text-gray-500 p-4">Chưa có dữ liệu.</p>';
         return;
     }
     const list = document.createElement('ul');
     list.className = 'divide-y divide-gray-200';
-    allRooms.forEach(room => {
-        const item = document.createElement('li');
-        item.className = 'py-3 flex justify-between items-center';
-        item.innerHTML = `
+    items.forEach(item => {
+        const itemEl = document.createElement('li');
+        itemEl.className = 'py-3 flex justify-between items-center';
+        itemEl.innerHTML = `
             <div>
-                <p class="font-medium text-gray-800">${room.name}</p>
-                <p class="text-sm text-gray-500">${room.description}</p>
+                <p class="font-medium text-gray-800">${item[nameProp]}</p>
+                ${descriptionProp && item[descriptionProp] ? `<p class="text-sm text-gray-500">${item[descriptionProp]}</p>` : ''}
             </div>
             <div class="flex gap-3">
-                <button class="text-blue-500 hover:text-blue-700" onclick="window.editRoom('${room.id}')"><i class="fas fa-edit"></i></button>
-                <button class="text-red-500 hover:text-red-700" onclick="window.deleteRoom('${room.id}')"><i class="fas fa-trash"></i></button>
+                <button class="text-blue-500 hover:text-blue-700" onclick="${editFn}('${item.id}')"><i class="fas fa-edit"></i></button>
+                <button class="text-red-500 hover:text-red-700" onclick="${deleteFn}('${item.id}')"><i class="fas fa-trash"></i></button>
             </div>
         `;
-        list.appendChild(item);
+        list.appendChild(itemEl);
     });
     container.appendChild(list);
-}
+};
 
-// --- DATA LOGIC ---
-async function listenForRooms() {
-    onSnapshot(query(roomsCol), (snapshot) => {
-        allRooms = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a, b) => a.name.localeCompare(b.name));
-        renderRoomSelector();
-        renderRoomManagementList();
-        if (selectedRoomId === null && allRooms.length > 0) {
-            selectedRoomId = allRooms[0].id;
+// --- DATA LISTENERS ---
+const createListener = (col, stateArray, renderFn) => {
+    onSnapshot(query(col), (snapshot) => {
+        stateArray.length = 0; // Clear the array
+        snapshot.docs.forEach(doc => stateArray.push({ id: doc.id, ...doc.data() }));
+        // Sort logic
+        if (stateArray.length > 0 && stateArray[0].startTime) { // TimeSlots
+             stateArray.sort((a, b) => a.startTime.localeCompare(b.startTime));
+        } else if (stateArray.length > 0 && stateArray[0].name) { // Rooms
+             stateArray.sort((a, b) => a.name.localeCompare(b.name));
+        } else if (stateArray.length > 0 && stateArray[0].value) { // Others
+             stateArray.sort((a, b) => a.value.localeCompare(b.value));
         }
-        listenForSchedules(); // Reload schedules when rooms change
+        if (renderFn) renderFn();
     });
-}
+};
 
 function listenForSchedules() {
-    if (scheduleListener) {
-        scheduleListener(); // Unsubscribe from the old listener
-    }
+    if (scheduleListener) scheduleListener(); 
     if (!selectedRoomId) {
         weekSchedules = [];
         renderSchedule();
@@ -309,12 +348,9 @@ function listenForSchedules() {
     const { startDate } = getWeekInfo(currentWeekStartDate);
     const weekId = formatDateToYYYYMMDD(startDate);
 
-    let q;
-    if (selectedRoomId === 'all') {
-        q = query(schedulesCol, where("weekId", "==", weekId));
-    } else {
-        q = query(schedulesCol, where("weekId", "==", weekId), where("roomId", "==", selectedRoomId));
-    }
+    let q = selectedRoomId === 'all'
+        ? query(schedulesCol, where("weekId", "==", weekId))
+        : query(schedulesCol, where("weekId", "==", weekId), where("roomId", "==", selectedRoomId));
 
     scheduleListener = onSnapshot(q, (snapshot) => {
         weekSchedules = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -325,52 +361,76 @@ function listenForSchedules() {
     });
 }
 
-// --- EVENT HANDLERS & ACTIONS ---
-function handleRoomFormSubmit(e) {
+// --- CRUD ACTIONS ---
+const handleFormSubmit = async (e, col, idField, data) => {
     e.preventDefault();
-    const id = document.getElementById('room-id').value;
-    const name = document.getElementById('room-name').value.trim();
-    const description = document.getElementById('room-description').value.trim();
-    if (!name) {
-        showAlert("Tên phòng không được để trống.");
-        return;
+    const id = document.getElementById(idField).value;
+    try {
+        if (id) {
+            await updateDoc(doc(col, id), data);
+            showAlert("Cập nhật thành công!");
+        } else {
+            await addDoc(col, data);
+            showAlert("Lưu thành công!");
+        }
+        clearForm(e.target.id);
+    } catch (error) {
+        console.error("Error saving document: ", error);
+        showAlert("Đã xảy ra lỗi khi lưu.");
     }
-    const data = { name, description };
-    if (id) {
-        updateDoc(doc(roomsCol, id), data).then(() => {
-            showAlert("Cập nhật phòng thành công!");
-            clearRoomForm();
-        });
-    } else {
-        addDoc(roomsCol, data).then(() => {
-            showAlert("Lưu phòng thành công!");
-            clearRoomForm();
-        });
+};
+
+const deleteItem = async (id, col, itemName) => {
+    if (await showConfirm(`Bạn có chắc muốn xóa ${itemName} này?`)) {
+        try {
+            await deleteDoc(doc(col, id));
+            showAlert(`Đã xóa ${itemName}.`);
+        } catch (error) {
+            console.error(`Error deleting ${itemName}: `, error);
+            showAlert(`Lỗi khi xóa ${itemName}.`);
+        }
     }
-}
+};
 
-function clearRoomForm() {
-    document.getElementById('room-form').reset();
-    document.getElementById('room-id').value = '';
-}
-
+// --- ROOMS ---
 window.editRoom = (id) => {
-    const room = allRooms.find(r => r.id === id);
-    if (room) {
-        document.getElementById('room-id').value = room.id;
-        document.getElementById('room-name').value = room.name;
-        document.getElementById('room-description').value = room.description;
-        document.getElementById('manage-rooms-modal').style.display = 'flex';
+    const item = allRooms.find(r => r.id === id);
+    if (item) {
+        document.getElementById('room-id').value = item.id;
+        document.getElementById('room-name').value = item.name;
+        document.getElementById('room-description').value = item.description;
     }
 };
+window.deleteRoom = (id) => deleteItem(id, roomsCol, 'phòng');
 
-window.deleteRoom = async (id) => {
-    if (await showConfirm("Bạn có chắc muốn xóa phòng này? Tất cả lịch đã đăng ký trong phòng này cũng sẽ bị xóa.")) {
-        await deleteDoc(doc(roomsCol, id));
-        showAlert("Đã xóa phòng.");
+// --- TIMESLOTS ---
+window.editTimeSlot = (id) => {
+    const item = allTimeSlots.find(r => r.id === id);
+    if (item) {
+        document.getElementById('timeslot-id').value = item.id;
+        document.getElementById('timeslot-start').value = item.startTime;
+        document.getElementById('timeslot-end').value = item.endTime;
     }
 };
+window.deleteTimeSlot = (id) => deleteItem(id, timeSlotsCol, 'khung giờ');
 
+// --- GENERIC (Classes, Lecturers, Contents) ---
+const editGenericItem = (id, items, idField, valueField, valueProp) => {
+    const item = items.find(i => i.id === id);
+    if (item) {
+        document.getElementById(idField).value = item.id;
+        document.getElementById(valueField).value = item[valueProp];
+    }
+};
+window.editClassName = (id) => editGenericItem(id, allClassNames, 'class-id', 'class-name', 'value');
+window.deleteClassName = (id) => deleteItem(id, classNamesCol, 'lớp học phần');
+window.editLecturer = (id) => editGenericItem(id, allLecturers, 'lecturer-id', 'lecturer-name', 'value');
+window.deleteLecturer = (id) => deleteItem(id, lecturersCol, 'giảng viên');
+window.editContent = (id) => editGenericItem(id, allContents, 'content-id', 'content-text', 'value');
+window.deleteContent = (id) => deleteItem(id, contentsCol, 'nội dung');
+
+
+// --- BOOKING MODAL & SUBMISSION ---
 window.openBookingModal = (dateString, roomId) => {
     const room = allRooms.find(r => r.id === roomId);
     if (!room) {
@@ -385,58 +445,121 @@ window.openBookingModal = (dateString, roomId) => {
     document.getElementById('booking-date').value = dateString;
     document.getElementById('booking-room-id').value = roomId;
     document.getElementById('booking-form').reset();
-    window.closeModal('booking-details-modal');
-    window.closeModal('manage-rooms-modal');
+
+    // Populate dropdowns
+    const populateSelect = (selectId, items, valueProp, textProp) => {
+        const select = document.getElementById(selectId);
+        select.innerHTML = `<option value="">-- Chọn --</option>`;
+        items.forEach(item => {
+            const option = document.createElement('option');
+            option.value = item[valueProp];
+            option.textContent = textProp ? item[textProp] : item[valueProp];
+            select.appendChild(option);
+        });
+    };
+    
+    const timeSlotSelect = document.getElementById('booking-timeslot');
+    timeSlotSelect.innerHTML = `<option value="">-- Chọn --</option>`;
+    allTimeSlots.forEach(slot => {
+        const option = document.createElement('option');
+        option.value = `${slot.startTime}|${slot.endTime}`;
+        option.textContent = `${slot.startTime} - ${slot.endTime}`;
+        timeSlotSelect.appendChild(option);
+    });
+
+    populateSelect('booking-class-name', allClassNames, 'value');
+    populateSelect('booking-lecturer-name', allLecturers, 'value');
+    populateSelect('booking-content', allContents, 'value');
+
+    closeModal('booking-details-modal');
+    closeModal('management-modal');
     document.getElementById('booking-modal').style.display = 'flex';
 };
 
 async function handleBookingFormSubmit(e) {
     e.preventDefault();
-    const date = document.getElementById('booking-date').value;
+    const form = e.target;
+    const submitButton = form.querySelector('button[type="submit"]');
+    submitButton.disabled = true;
+    submitButton.innerHTML = `<i class="fas fa-spinner fa-spin mr-2"></i> Đang xử lý...`;
+
     const bookingRoomId = document.getElementById('booking-room-id').value;
-    const { startDate } = getWeekInfo(new Date(date));
-    const weekId = formatDateToYYYYMMDD(startDate);
+    const timeSlotValue = document.getElementById('booking-timeslot').value;
+    const className = document.getElementById('booking-class-name').value;
+    const lecturerName = document.getElementById('booking-lecturer-name').value;
+    const content = document.getElementById('booking-content').value;
+    const repeatWeeks = parseInt(document.getElementById('booking-repeat-weeks').value) || 0;
     
-    const newStartTime = document.getElementById('booking-start-time').value;
-    const newEndTime = document.getElementById('booking-end-time').value;
-
-    if (!newStartTime || !newEndTime) {
-        showAlert("Vui lòng chọn cả thời gian bắt đầu và kết thúc.");
-        return;
-    }
-    if (newStartTime >= newEndTime) {
-        showAlert("Thời gian kết thúc phải sau thời gian bắt đầu.");
+    if (!timeSlotValue || !className || !lecturerName || !content) {
+        showAlert("Vui lòng điền đầy đủ thông tin.");
+        submitButton.disabled = false;
+        submitButton.innerHTML = `<i class="fas fa-check-circle mr-2"></i> Xác nhận Đăng ký`;
         return;
     }
 
-    const bookingsForDay = weekSchedules.filter(s => s.date === date && s.roomId === bookingRoomId);
-    const isConflict = bookingsForDay.some(existingBooking => 
-        (newStartTime < existingBooking.endTime) && (newEndTime > existingBooking.startTime)
-    );
+    const [newStartTime, newEndTime] = timeSlotValue.split('|');
+    const originalDate = new Date(document.getElementById('booking-date').value);
 
-    if (isConflict) {
-        showAlert("Lịch bị trùng! Vui lòng chọn một khung giờ khác.");
-        return;
+    // --- Phase 1: Conflict Checking for all weeks ---
+    const bookingsToCreate = [];
+    for (let i = 0; i <= repeatWeeks; i++) {
+        const targetDate = new Date(originalDate);
+        targetDate.setDate(targetDate.getDate() + i * 7);
+        const dateString = formatDateToYYYYMMDD(targetDate);
+
+        // Query firestore for potential conflicts on this specific day
+        const q = query(schedulesCol, where("date", "==", dateString), where("roomId", "==", bookingRoomId));
+        const querySnapshot = await getDocs(q);
+        const bookingsForDay = querySnapshot.docs.map(doc => doc.data());
+
+        const isConflict = bookingsForDay.some(existingBooking =>
+            (newStartTime < existingBooking.endTime) && (newEndTime > existingBooking.startTime)
+        );
+
+        if (isConflict) {
+            showAlert(`Lịch bị trùng vào ngày ${formatDateToDDMMYYYY(targetDate)}. Vui lòng chọn khung giờ khác. Đã dừng đăng ký.`);
+            submitButton.disabled = false;
+            submitButton.innerHTML = `<i class="fas fa-check-circle mr-2"></i> Xác nhận Đăng ký`;
+            return;
+        }
+
+        const { startDate: weekStartDate } = getWeekInfo(targetDate);
+        const weekId = formatDateToYYYYMMDD(weekStartDate);
+
+        bookingsToCreate.push({
+            roomId: bookingRoomId,
+            weekId: weekId,
+            date: dateString,
+            startTime: newStartTime,
+            endTime: newEndTime,
+            className,
+            lecturerName,
+            content,
+            bookedByUid: currentUserInfo.uid,
+            bookedByEmail: currentUserInfo.email,
+            createdAt: new Date()
+        });
     }
 
-    const data = {
-        roomId: bookingRoomId,
-        weekId: weekId,
-        date: date,
-        startTime: newStartTime,
-        endTime: newEndTime,
-        className: document.getElementById('booking-class-name').value,
-        lecturerName: document.getElementById('booking-lecturer-name').value,
-        content: document.getElementById('booking-content').value,
-        bookedByUid: currentUserInfo.uid,
-        bookedByEmail: currentUserInfo.email,
-        createdAt: new Date()
-    };
-    
-    await addDoc(schedulesCol, data);
-    showAlert("Đăng ký lịch thành công!");
-    closeModal('booking-modal');
+    // --- Phase 2: Writing Data ---
+    try {
+        const writePromises = bookingsToCreate.map(bookingData => addDoc(schedulesCol, bookingData));
+        await Promise.all(writePromises);
+        
+        const successMessage = repeatWeeks > 0 
+            ? `Đăng ký thành công cho tuần này và ${repeatWeeks} tuần tiếp theo!`
+            : "Đăng ký lịch thành công!";
+        showAlert(successMessage);
+        closeModal('booking-modal');
+    } catch (error) {
+        console.error("Error creating bookings: ", error);
+        showAlert("Đã xảy ra lỗi trong quá trình đăng ký.");
+    } finally {
+        submitButton.disabled = false;
+        submitButton.innerHTML = `<i class="fas fa-check-circle mr-2"></i> Xác nhận Đăng ký`;
+    }
 }
+
 
 window.showBookingDetails = (bookingId) => {
     const booking = weekSchedules.find(s => s.id === bookingId);
@@ -466,8 +589,8 @@ window.showBookingDetails = (bookingId) => {
         deleteBtn.style.display = 'none';
     }
 
-    window.closeModal('booking-modal');
-    window.closeModal('manage-rooms-modal');
+    closeModal('booking-modal');
+    closeModal('management-modal');
     document.getElementById('booking-details-modal').style.display = 'flex';
 };
 
@@ -480,8 +603,7 @@ async function deleteBooking() {
     }
 }
 
-// --- PRINTING LOGIC ---
-
+// --- PRINTING LOGIC (Unchanged) ---
 function openPrintOptionsModal() {
     const currentRoomNameSpan = document.getElementById('print-current-room-name');
     const printCurrentRadio = document.getElementById('print-current');
@@ -508,7 +630,6 @@ function openPrintOptionsModal() {
     renderPrintRoomSelectionList();
     document.getElementById('print-options-modal').style.display = 'flex';
 }
-
 function renderPrintRoomSelectionList() {
     const container = document.getElementById('print-room-selection-list');
     container.innerHTML = '';
@@ -521,7 +642,6 @@ function renderPrintRoomSelectionList() {
         `;
     });
 }
-
 function generatePrintableView() {
     const printOption = document.querySelector('input[name="print-option"]:checked').value;
     let roomsToPrint = [];
@@ -557,7 +677,6 @@ function generatePrintableView() {
     
     let contentHtml = '';
 
-    // If printing multiple rooms, create one consolidated table
     if (printOption === 'all' || printOption === 'multiple') {
         let tableHeaderHtml = `<thead><tr><th class="room-name-cell">Phòng</th>`;
         weekDates.forEach((date, index) => {
@@ -615,7 +734,7 @@ function generatePrintableView() {
                 </div>
             </div>
         `;
-    } else { // If printing a single room, keep the old format (one page per room)
+    } else { 
         roomsToPrint.forEach(room => {
             let tableBodyHtml = '';
             weekDates.forEach((date) => {
@@ -711,26 +830,28 @@ function addEventListeners() {
     flatpickr.localize(flatpickr.l10ns.vn);
     datePickerInstance = flatpickr(datePickerInput, {
         weekNumbers: true,
-        onChange: function(selectedDates, dateStr, instance) {
-            if (selectedDates.length > 0) {
-                setWeek(selectedDates[0]);
-            }
+        onChange: (selectedDates) => {
+            if (selectedDates.length > 0) setWeek(selectedDates[0]);
         },
-        onReady: function() {
-            updateDatePickerDisplay();
-        }
+        onReady: () => updateDatePickerDisplay()
     });
 
     roomSelector.addEventListener('change', (e) => {
         selectedRoomId = e.target.value;
         listenForSchedules();
     });
-    document.getElementById('manage-rooms-btn').addEventListener('click', () => {
-        clearRoomForm();
-        document.getElementById('manage-rooms-modal').style.display = 'flex';
+    
+    document.getElementById('manage-data-btn').addEventListener('click', () => {
+        document.getElementById('management-modal').style.display = 'flex';
     });
-    document.getElementById('room-form').addEventListener('submit', handleRoomFormSubmit);
-    document.getElementById('clear-room-form-btn').addEventListener('click', clearRoomForm);
+
+    // Form Submissions
+    document.getElementById('room-form').addEventListener('submit', (e) => handleFormSubmit(e, roomsCol, 'room-id', { name: e.target.elements['room-name'].value, description: e.target.elements['room-description'].value }));
+    document.getElementById('timeslot-form').addEventListener('submit', (e) => handleFormSubmit(e, timeSlotsCol, 'timeslot-id', { startTime: e.target.elements['timeslot-start'].value, endTime: e.target.elements['timeslot-end'].value }));
+    document.getElementById('class-form').addEventListener('submit', (e) => handleFormSubmit(e, classNamesCol, 'class-id', { value: e.target.elements['class-name'].value }));
+    document.getElementById('lecturer-form').addEventListener('submit', (e) => handleFormSubmit(e, lecturersCol, 'lecturer-id', { value: e.target.elements['lecturer-name'].value }));
+    document.getElementById('content-form').addEventListener('submit', (e) => handleFormSubmit(e, contentsCol, 'content-id', { value: e.target.elements['content-text'].value }));
+    
     document.getElementById('booking-form').addEventListener('submit', handleBookingFormSubmit);
     document.getElementById('delete-booking-btn').addEventListener('click', deleteBooking);
     document.getElementById('alert-ok-btn').addEventListener('click', () => closeModal('alert-modal'));
@@ -740,8 +861,7 @@ function addEventListeners() {
     document.getElementById('confirm-print-btn').addEventListener('click', generatePrintableView);
     document.querySelectorAll('input[name="print-option"]').forEach(radio => {
         radio.addEventListener('change', (e) => {
-            const selectionList = document.getElementById('print-room-selection-list');
-            selectionList.style.display = e.target.value === 'multiple' ? 'block' : 'none';
+            document.getElementById('print-room-selection-list').style.display = e.target.value === 'multiple' ? 'block' : 'none';
         });
     });
 }
@@ -749,19 +869,33 @@ function addEventListeners() {
 function initializePage() {
     mainContent.classList.remove('hidden');
     currentWeekStartDate = new Date();
-    addEventListeners(); // Initialize listeners and datepicker
+    addEventListeners();
     updateUIForRole();
-    listenForRooms(); // This will trigger the first schedule load
+
+    // Start all listeners
+    createListener(roomsCol, allRooms, () => {
+        renderList('rooms-list-container', allRooms, 'name', 'description', 'editRoom', 'deleteRoom');
+        renderRoomSelector();
+        if (selectedRoomId === null && allRooms.length > 0) {
+            selectedRoomId = allRooms[0].id;
+        }
+        listenForSchedules(); // Reload schedules when rooms change
+    });
+    createListener(timeSlotsCol, allTimeSlots, () => {
+        const transformedSlots = allTimeSlots.map(s => ({...s, display: `${s.startTime} - ${s.endTime}`}));
+        renderList('timeslots-list-container', transformedSlots, 'display', null, 'editTimeSlot', 'deleteTimeSlot');
+    });
+    createListener(classNamesCol, allClassNames, () => renderList('classes-list-container', allClassNames, 'value', null, 'editClassName', 'deleteClassName'));
+    createListener(lecturersCol, allLecturers, () => renderList('lecturers-list-container', allLecturers, 'value', null, 'editLecturer', 'deleteLecturer'));
+    createListener(contentsCol, allContents, () => renderList('contents-list-container', allContents, 'value', null, 'editContent', 'deleteContent'));
 }
 
 onAuthStateChanged(auth, async (user) => {
     if (user) {
         const userDoc = await getDoc(doc(usersCol, user.uid));
-        if (userDoc.exists()) {
-            currentUserInfo = { uid: user.uid, ...userDoc.data() };
-        } else {
-            currentUserInfo = { uid: user.uid, email: user.email, role: 'viewer' };
-        }
+        currentUserInfo = userDoc.exists() 
+            ? { uid: user.uid, ...userDoc.data() } 
+            : { uid: user.uid, email: user.email, role: 'viewer' };
         initializePage();
     } else {
         mainContent.innerHTML = '<p class="text-center text-red-500">Vui lòng đăng nhập để sử dụng chức năng này.</p>';
