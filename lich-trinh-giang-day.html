@@ -21,7 +21,7 @@
     </div>
 
     <main>
-        <!-- [NEW] Header with Logos -->
+        <!-- Header with Logos -->
         <div class="max-w-7xl mx-auto bg-white p-6 rounded-2xl shadow-lg mb-8">
             <div class="flex items-center justify-between">
                 <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRjTnSBGofmGpcMY_uEoXhgAB-FeeLjVslu1A&s" alt="Logo Trường Đại học Hải Phòng" class="h-16 md:h-20">
@@ -74,19 +74,16 @@
                 </div>
             </div>
 
-            <!-- Admin Filter Section -->
+            <!-- [REVISED] Admin/Viewer Filter Section -->
             <div id="admin-filter-section" class="hidden items-start gap-4 mb-6 border-b pb-6">
                 <div class="flex-grow" style="flex-basis: 40%;">
-                    <label for="lecturer-search-input" class="block text-sm font-medium text-gray-700 mb-1">Tìm lịch trình theo giảng viên:</label>
-                    <div class="flex gap-2">
-                        <input type="text" id="lecturer-search-input" class="form-input" placeholder="Nhập tên giảng viên...">
-                        <button type="button" id="lecturer-search-btn" class="btn btn-primary flex-shrink-0">Tìm</button>
-                    </div>
+                    <label for="lecturer-search-input" class="block text-sm font-medium text-gray-700 mb-1">Lọc lịch trình theo tên giảng viên:</label>
+                    <input type="text" id="lecturer-search-input" class="form-input" placeholder="Gõ tên giảng viên để lọc danh sách...">
                 </div>
                 <div class="flex-grow bg-gray-50 p-3 rounded-lg text-sm text-gray-700" style="flex-basis: 60%;">
-                    <p id="schedule-count-info" class="font-bold mb-2">Kết quả tìm kiếm: <span class="text-blue-600">0</span> lịch trình</p>
+                    <p id="schedule-count-info" class="font-bold mb-2">Kết quả lọc: <span class="text-blue-600">0</span> lịch trình</p>
                     <div id="lecturer-schedules-list" class="max-h-40 overflow-y-auto">
-                        <p class="text-gray-500 italic p-2">Nhập tên giảng viên và nhấn "Tìm" để xem danh sách.</p>
+                        <p class="text-gray-500 italic p-2">Danh sách lịch trình sẽ hiện ở đây khi bạn lọc.</p>
                     </div>
                 </div>
             </div>
@@ -215,12 +212,13 @@
         </div>
     </div>
 
-    <!-- [NEW] Footer -->
+    <!-- Footer -->
     <footer class="mt-8 text-center text-sm text-gray-500">
         <div class="max-w-7xl mx-auto py-4 border-t border-gray-200">
             <p>&copy; 2025 Bản quyền thuộc về Khoa Công nghệ Thông tin - Trường Đại học Hải Phòng.</p>
         </div>
     </footer>
+
 
     <!-- Link to your custom JavaScript file -->
     <script type="module" src="js/schedule-logic.js"></script>

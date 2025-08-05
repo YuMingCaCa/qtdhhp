@@ -26,8 +26,7 @@ let currentUserRole = 'viewer';
 let schedulesColPath = '';
 let settingsDocPath = '';
 let signatories = [];
-let allSchedules = null; 
-let isCacheLoaded = false;
+let allSchedulesCache = null; // null: not loaded, []: loaded but empty, [...]: loaded with data
 
 // --- DOM Elements ---
 const addWeekBtn = document.getElementById('add-week-btn');
@@ -55,11 +54,9 @@ const departmentHeadSelect = document.getElementById('department-head-select');
 
 const adminFilterSection = document.getElementById('admin-filter-section');
 const lecturerSearchInput = document.getElementById('lecturer-search-input');
-const lecturerSearchBtn = document.getElementById('lecturer-search-btn');
 const scheduleCountInfo = document.getElementById('schedule-count-info');
 const lecturerSchedulesList = document.getElementById('lecturer-schedules-list');
 
-// [NEW] Get new buttons
 const newScheduleBtn = document.getElementById('new-schedule-btn');
 const deleteScheduleBtn = document.getElementById('delete-schedule-btn');
 
@@ -231,7 +228,7 @@ async function saveScheduleData() {
     const isNewSchedule = !scheduleId;
 
     if (!isNewSchedule && currentUserRole === 'viewer') {
-        const currentSchedule = allSchedules.find(s => s.id === scheduleId);
+        const currentSchedule = allSchedulesCache.find(s => s.id === scheduleId);
         if (currentSchedule && currentSchedule.ownerId !== currentUserId) {
             alert('Bạn không có quyền chỉnh sửa lịch trình của người khác.');
             return;
@@ -260,8 +257,9 @@ async function saveScheduleData() {
         await setDoc(scheduleDocRef, dataToSave);
         alert(`Đã lưu thành công lịch trình: ${scheduleId}`);
         
-        isCacheLoaded = false; 
-        await handleLecturerSearch();
+        allSchedulesCache = null; // Invalidate cache
+        await loadAllSchedulesForCache(); // Re-fetch all data
+        filterAndDisplayLecturerSchedules(); // Re-display lists
 
         schedulesSearchInput.value = scheduleId;
         selectedScheduleIdInput.value = scheduleId;
@@ -277,36 +275,40 @@ async function saveScheduleData() {
 // --- Searchable Schedule & Filter Functions ---
 
 /**
- * Handles the lecturer search request. Fetches all schedules if not cached,
- * then performs a client-side partial search. This is now used by all roles.
+ * [REVISED] Loads all schedules into a local cache ONCE per session.
  */
-async function handleLecturerSearch() {
-    if (!isCacheLoaded) {
-        loader.style.display = 'block';
-        try {
-            const q = query(collection(db, schedulesColPath));
-            const querySnapshot = await getDocs(q);
-            allSchedules = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            isCacheLoaded = true;
-        } catch (error) {
-            console.error("Error fetching all schedules:", error);
-            allSchedules = [];
-        } finally {
-            loader.style.display = 'none';
-        }
+async function loadAllSchedulesForCache() {
+    if (allSchedulesCache !== null) return; // Already loaded
+
+    loader.style.display = 'block';
+    try {
+        const q = query(collection(db, schedulesColPath));
+        const querySnapshot = await getDocs(q);
+        allSchedulesCache = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    } catch (error) {
+        console.error("Error loading schedule cache:", error);
+        allSchedulesCache = [];
+    } finally {
+        loader.style.display = 'none';
     }
+}
+
+/**
+ * [REVISED] Filters and displays schedules based on the lecturer search input.
+ */
+function filterAndDisplayLecturerSchedules() {
+    if (allSchedulesCache === null) return;
 
     const searchTerm = lecturerSearchInput.value.trim().toLowerCase();
-    if (!searchTerm) {
-        displayLecturerSchedules([]);
-        return;
-    }
-
-    const filteredSchedules = allSchedules.filter(schedule => 
-        schedule.lecturerName && schedule.lecturerName.toLowerCase().includes(searchTerm)
-    );
     
-    displayLecturerSchedules(filteredSchedules);
+    let filtered = [];
+    if (searchTerm) {
+        filtered = allSchedulesCache.filter(schedule => 
+            schedule.lecturerName && schedule.lecturerName.toLowerCase().includes(searchTerm)
+        );
+    }
+    
+    displayLecturerSchedulesList(filtered);
 }
 
 
@@ -314,7 +316,7 @@ async function handleLecturerSearch() {
  * Displays the list of schedules in the admin/viewer panel.
  * @param {Array} schedules - The array of schedules to display.
  */
-function displayLecturerSchedules(schedules) {
+function displayLecturerSchedulesList(schedules) {
     lecturerSchedulesList.innerHTML = '';
     scheduleCountInfo.querySelector('span').textContent = schedules.length;
 
@@ -332,24 +334,25 @@ function displayLecturerSchedules(schedules) {
             lecturerSchedulesList.appendChild(item);
         });
     } else {
-        lecturerSchedulesList.innerHTML = `<p class="text-gray-500 italic p-2">Không có lịch trình nào được tìm thấy.</p>`;
+        const message = lecturerSearchInput.value ? "Không có lịch trình nào được tìm thấy." : "Gõ tên giảng viên để lọc danh sách.";
+        lecturerSchedulesList.innerHTML = `<p class="text-gray-500 italic p-2">${message}</p>`;
     }
 }
 
 
 /**
- * Filters and displays schedules from the currently loaded cache (`allSchedules`).
+ * Filters and displays schedules from the currently loaded cache (`allSchedulesCache`).
  */
 function filterAndShowSchedules() {
     const searchTerm = schedulesSearchInput.value.toLowerCase();
     schedulesSearchResults.innerHTML = '';
 
-    if (!searchTerm || allSchedules === null) {
+    if (!searchTerm || allSchedulesCache === null) {
         schedulesSearchResults.classList.add('hidden');
         return;
     }
 
-    const filtered = allSchedules.filter(schedule => schedule.id.toLowerCase().includes(searchTerm));
+    const filtered = allSchedulesCache.filter(schedule => schedule.id.toLowerCase().includes(searchTerm));
 
     if (filtered.length > 0) {
         filtered.forEach(schedule => {
@@ -551,7 +554,7 @@ function exportToPrintableHTML() {
         
         const selectedFacultyHeadId = facultyHeadSelect.value;
         const selectedDeptHeadId = departmentHeadSelect.value;
-        const facultyHead = signatories.find(p => p.id === selectedFacultyHeadId) || { name: '', title: 'TRƯỞỞNG KHOA' };
+        const facultyHead = signatories.find(p => p.id === selectedFacultyHeadId) || { name: '', title: 'TRƯỞNG KHOA' };
         const deptHead = signatories.find(p => p.id === selectedDeptHeadId) || { name: '', title: 'TỔ TRƯỞNG' };
 
         const ngayLap = new Date(data.general.ngay_lap).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -597,7 +600,7 @@ function exportToPrintableHTML() {
     }
 }
 
-// [REVISED] Sets the read/write state of the entire form
+// Sets the read/write state of the entire form
 function setFormInteractivity(isInteractive) {
     const formElements = document.querySelectorAll('#schedule-form input, #schedule-form textarea, #schedule-form select');
     formElements.forEach(el => {
@@ -613,7 +616,7 @@ function setFormInteractivity(isInteractive) {
     generateScheduleBtn.disabled = !isInteractive;
 }
 
-// [REVISED] Renamed and expanded to control the whole UI
+// Update UI based on user role and ownership
 function updateUIPermissions() {
     adminFilterSection.style.display = 'flex';
     
@@ -629,10 +632,10 @@ function updateUIPermissions() {
 
     if (!scheduleId) { // New schedule
         canEdit = true;
-        canDelete = false; // Cannot delete something that is not saved
+        canDelete = false;
         saveDataBtn.title = 'Lưu lịch trình mới';
     } else { // Existing schedule
-        const currentSchedule = allSchedules.find(s => s.id === scheduleId);
+        const currentSchedule = allSchedulesCache.find(s => s.id === scheduleId);
         if (currentUserRole === 'admin') {
             canEdit = true;
             canDelete = true;
@@ -656,7 +659,7 @@ function updateUIPermissions() {
     setFormInteractivity(canEdit);
 }
 
-// [NEW] Function to delete the currently selected schedule
+// Function to delete the currently selected schedule
 async function deleteSchedule() {
     const scheduleId = selectedScheduleIdInput.value;
     if (!scheduleId) {
@@ -664,9 +667,7 @@ async function deleteSchedule() {
         return;
     }
 
-    // Permission check is implicitly handled by the disabled state of the button,
-    // but a double check doesn't hurt.
-    const currentSchedule = allSchedules.find(s => s.id === scheduleId);
+    const currentSchedule = allSchedulesCache.find(s => s.id === scheduleId);
     if (currentUserRole === 'viewer' && (!currentSchedule || currentSchedule.ownerId !== currentUserId)) {
         alert('Bạn không có quyền xóa lịch trình này.');
         return;
@@ -680,13 +681,11 @@ async function deleteSchedule() {
     try {
         await deleteDoc(doc(db, schedulesColPath, scheduleId));
 
-        // Remove from local cache
-        allSchedules = allSchedules.filter(s => s.id !== scheduleId);
-        isCacheLoaded = true; // Cache is still valid, just one item removed
+        allSchedulesCache = allSchedulesCache.filter(s => s.id !== scheduleId);
 
         alert("Đã xóa lịch trình thành công.");
         resetFormForNewSchedule();
-        displayLecturerSchedules(allSchedules.filter(s => s.lecturerName.toLowerCase().includes(lecturerSearchInput.value.trim().toLowerCase())));
+        filterAndDisplayLecturerSchedules();
 
     } catch (error) {
         console.error("Error deleting schedule:", error);
@@ -696,7 +695,7 @@ async function deleteSchedule() {
     }
 }
 
-// [NEW] Function to reset the form to a "new" state
+// Function to reset the form to a "new" state
 function resetFormForNewSchedule() {
     selectedScheduleIdInput.value = '';
     schedulesSearchInput.value = '';
@@ -710,7 +709,6 @@ addWeekBtn.addEventListener('click', () => addWeekRow());
 exportPdfBtn.addEventListener('click', exportToPrintableHTML);
 saveDataBtn.addEventListener('click', saveScheduleData);
 generateScheduleBtn.addEventListener('click', generateScheduleRows);
-// [NEW] Add event listeners for new buttons
 newScheduleBtn.addEventListener('click', resetFormForNewSchedule);
 deleteScheduleBtn.addEventListener('click', deleteSchedule);
 
@@ -723,8 +721,9 @@ document.addEventListener('click', (e) => {
     }
 });
 
-lecturerSearchBtn.addEventListener('click', () => {
-    handleLecturerSearch();
+// [REVISED] Event listener for the lecturer search input
+lecturerSearchInput.addEventListener('input', () => {
+    filterAndDisplayLecturerSchedules();
 });
 
 manageSignaturesBtn.addEventListener('click', () => { signatoryModal.style.display = 'flex'; });
@@ -768,9 +767,8 @@ onAuthStateChanged(auth, async (user) => {
 
         updateUIPermissions();
         await loadSignatories();
-
-        allSchedules = [];
-        displayLecturerSchedules([]);
+        await loadAllSchedulesForCache(); // Load cache for everyone on startup
+        filterAndDisplayLecturerSchedules(); // Display initial (empty) list
         
         setInitialDate();
 
