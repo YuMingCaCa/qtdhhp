@@ -27,7 +27,6 @@ const roomsCol = collection(db, `${basePath}/practice_rooms`);
 const timeSlotsCol = collection(db, `${basePath}/practice_timeslots`);
 const classNamesCol = collection(db, `${basePath}/practice_classnames`);
 const lecturersCol = collection(db, `${basePath}/practice_lecturers`);
-const contentsCol = collection(db, `${basePath}/practice_contents`);
 
 
 // --- GLOBAL STATE ---
@@ -36,18 +35,21 @@ let allRooms = [];
 let allTimeSlots = [];
 let allClassNames = [];
 let allLecturers = [];
-let allContents = [];
 let weekSchedules = [];
 let currentWeekStartDate = null;
 let selectedRoomId = null;
 let scheduleListener = null; // To hold the unsubscribe function for the schedule listener
 let datePickerInstance = null;
+let selectedBookings = new Set();
 
 // --- UI ELEMENTS ---
 const mainContent = document.getElementById('practice-schedule-module');
 const datePickerInput = document.getElementById('date-picker');
 const roomSelector = document.getElementById('room-selector');
 const scheduleContainer = document.getElementById('schedule-container');
+const massActionToolbar = document.getElementById('mass-action-toolbar');
+const selectionCounter = document.getElementById('selection-counter');
+const massDeleteBtn = document.getElementById('mass-delete-btn');
 
 // --- HELPER FUNCTIONS ---
 const showAlert = (message) => {
@@ -223,10 +225,13 @@ function renderSingleRoomSchedule() {
             .sort((a, b) => a.startTime.localeCompare(b.startTime));
 
         let bookingsHtml = dayBookings.map(booking => `
-            <div class="schedule-booking ${booking.seriesId ? 'border-l-yellow-400' : 'border-l-blue-500'}" onclick="window.showBookingDetails('${booking.id}')">
-                <p class="font-bold truncate">${booking.startTime} - ${booking.endTime}</p>
-                <p class="truncate">${booking.className}</p>
-                <p class="truncate text-xs">${booking.lecturerName}</p>
+            <div class="schedule-booking flex items-center gap-2 p-1 ${booking.seriesId ? 'border-l-yellow-400' : 'border-l-blue-500'}">
+                <input type="checkbox" value="${booking.id}" onchange="window.handleBookingSelection(event)" class="form-checkbox h-5 w-5 text-blue-600 rounded flex-shrink-0" ${selectedBookings.has(booking.id) ? 'checked' : ''}>
+                <div class="flex-grow booking-details p-1 rounded" onclick="window.showBookingDetails('${booking.id}')">
+                    <p class="font-bold truncate">${booking.startTime} - ${booking.endTime}</p>
+                    <p class="truncate">${booking.className}</p>
+                    <p class="truncate text-xs">${booking.lecturerName}</p>
+                </div>
             </div>
         `).join('');
 
@@ -272,10 +277,13 @@ function renderAllRoomsSchedule() {
                 .sort((a, b) => a.startTime.localeCompare(b.startTime));
             
             let bookingsHtml = dayBookings.map(booking => `
-                <div class="schedule-booking ${booking.seriesId ? 'border-l-yellow-400' : 'border-l-blue-500'}" onclick="window.showBookingDetails('${booking.id}')">
-                    <p class="font-bold truncate">${booking.startTime} - ${booking.endTime}</p>
-                    <p class="truncate">${booking.className}</p>
-                    <p class="truncate text-xs">${booking.lecturerName}</p>
+                 <div class="schedule-booking flex items-center gap-2 p-1 ${booking.seriesId ? 'border-l-yellow-400' : 'border-l-blue-500'}">
+                    <input type="checkbox" value="${booking.id}" onchange="window.handleBookingSelection(event)" class="form-checkbox h-5 w-5 text-blue-600 rounded flex-shrink-0" ${selectedBookings.has(booking.id) ? 'checked' : ''}>
+                    <div class="flex-grow booking-details p-1 rounded" onclick="window.showBookingDetails('${booking.id}')">
+                        <p class="font-bold truncate">${booking.startTime} - ${booking.endTime}</p>
+                        <p class="truncate">${booking.className}</p>
+                        <p class="truncate text-xs">${booking.lecturerName}</p>
+                    </div>
                 </div>
             `).join('');
 
@@ -337,6 +345,10 @@ const createListener = (col, stateArray, renderFn) => {
 
 function listenForSchedules() {
     if (scheduleListener) scheduleListener(); 
+    
+    selectedBookings.clear();
+    updateMassActionUI();
+
     if (!selectedRoomId) {
         weekSchedules = [];
         renderSchedule();
@@ -414,7 +426,7 @@ window.editTimeSlot = (id) => {
 };
 window.deleteTimeSlot = (id) => deleteItem(id, timeSlotsCol, 'khung giờ');
 
-// --- GENERIC (Classes, Lecturers, Contents) ---
+// --- GENERIC (Classes, Lecturers) ---
 const editGenericItem = (id, items, idField, valueField, valueProp) => {
     const item = items.find(i => i.id === id);
     if (item) {
@@ -426,8 +438,6 @@ window.editClassName = (id) => editGenericItem(id, allClassNames, 'class-id', 'c
 window.deleteClassName = (id) => deleteItem(id, classNamesCol, 'lớp học phần');
 window.editLecturer = (id) => editGenericItem(id, allLecturers, 'lecturer-id', 'lecturer-name', 'value');
 window.deleteLecturer = (id) => deleteItem(id, lecturersCol, 'giảng viên');
-window.editContent = (id) => editGenericItem(id, allContents, 'content-id', 'content-text', 'value');
-window.deleteContent = (id) => deleteItem(id, contentsCol, 'nội dung');
 
 
 // --- BOOKING MODAL & SUBMISSION ---
@@ -469,7 +479,6 @@ window.openBookingModal = (dateString, roomId) => {
 
     populateSelect('booking-class-name', allClassNames, 'value');
     populateSelect('booking-lecturer-name', allLecturers, 'value');
-    populateSelect('booking-content', allContents, 'value');
 
     closeModal('booking-details-modal');
     closeModal('management-modal');
@@ -622,69 +631,117 @@ window.showBookingDetails = (bookingId) => {
     document.getElementById('booking-details-modal').style.display = 'flex';
 };
 
+// --- DELETE LOGIC ---
+
 async function handleDeleteRequest() {
     const bookingId = this.dataset.id;
-    const booking = weekSchedules.find(s => s.id === bookingId);
-    if (!booking) {
-        showAlert("Không tìm thấy lịch để xóa.");
-        return;
-    }
-    
     closeModal('booking-details-modal');
 
-    if (booking.seriesId) {
-        // Show the new series deletion modal
-        const modal = document.getElementById('delete-series-confirm-modal');
-        document.getElementById('delete-series-btn-one').onclick = () => deleteSingleBooking(bookingId);
-        document.getElementById('delete-series-btn-future').onclick = () => deleteFutureBookings(booking.seriesId, booking.date);
-        modal.style.display = 'flex';
-    } else {
-        // Standard single deletion
-        deleteSingleBooking(bookingId);
-    }
-}
+    try {
+        const bookingDocRef = doc(schedulesCol, bookingId);
+        const bookingDoc = await getDoc(bookingDocRef);
 
-async function deleteSingleBooking(bookingId) {
-    closeModal('delete-series-confirm-modal');
-    if (await showConfirm("Bạn có chắc muốn hủy lịch đăng ký này?")) {
-        try {
-            await deleteDoc(doc(schedulesCol, bookingId));
-            showAlert("Đã hủy lịch thành công.");
-        } catch (error) {
-            showAlert("Lỗi khi hủy lịch.");
-            console.error("Error deleting single booking:", error);
+        if (!bookingDoc.exists()) {
+            showAlert("Không tìm thấy lịch để xóa hoặc lịch đã bị xóa.");
+            return;
         }
+        
+        const bookingData = bookingDoc.data();
+
+        if (bookingData.seriesId) {
+            const modal = document.getElementById('delete-series-confirm-modal');
+            document.getElementById('delete-series-btn-one').onclick = () => performDeleteSingleBooking(bookingId);
+            document.getElementById('delete-series-btn-future').onclick = () => performDeleteFutureBookings(bookingData.seriesId, bookingData.date);
+            modal.style.display = 'flex';
+        } else {
+            if (await showConfirm("Bạn có chắc muốn hủy lịch đăng ký này?")) {
+                performDeleteSingleBooking(bookingId, false);
+            }
+        }
+    } catch (error) {
+        console.error("Error fetching booking for deletion:", error);
+        showAlert("Đã xảy ra lỗi khi chuẩn bị xóa lịch.");
     }
 }
 
-async function deleteFutureBookings(seriesId, fromDate) {
-    closeModal('delete-series-confirm-modal');
-    if (await showConfirm("Bạn có chắc muốn hủy lịch này và TẤT CẢ các lịch lặp lại trong tương lai?")) {
-        try {
-            const q = query(schedulesCol, where("seriesId", "==", seriesId), where("date", ">=", fromDate));
-            const snapshot = await getDocs(q);
-            
-            if (snapshot.empty) {
-                showAlert("Không tìm thấy lịch lặp lại nào trong tương lai.");
-                return;
-            }
+async function performDeleteSingleBooking(bookingId, closeModalFirst = true) {
+    if (closeModalFirst) closeModal('delete-series-confirm-modal');
+    try {
+        await deleteDoc(doc(schedulesCol, bookingId));
+        showAlert("Đã hủy lịch thành công.");
+    } catch (error) {
+        showAlert("Lỗi khi hủy lịch.");
+        console.error("Error deleting single booking:", error);
+    }
+}
 
+async function performDeleteFutureBookings(seriesId, fromDate) {
+    closeModal('delete-series-confirm-modal');
+    try {
+        const q = query(schedulesCol, where("seriesId", "==", seriesId), where("date", ">=", fromDate));
+        const snapshot = await getDocs(q);
+        
+        if (snapshot.empty) {
+            showAlert("Không tìm thấy lịch lặp lại nào trong tương lai để xóa.");
+            return;
+        }
+
+        const batch = writeBatch(db);
+        snapshot.docs.forEach(doc => batch.delete(doc.ref));
+        await batch.commit();
+
+        showAlert(`Đã hủy thành công ${snapshot.docs.length} lịch lặp lại.`);
+    } catch (error) {
+        showAlert("Lỗi khi hủy chuỗi lịch.");
+        console.error("Error deleting future bookings:", error);
+    }
+}
+
+// --- MASS ACTIONS ---
+window.handleBookingSelection = (event) => {
+    const bookingId = event.target.value;
+    if (event.target.checked) {
+        selectedBookings.add(bookingId);
+    } else {
+        selectedBookings.delete(bookingId);
+    }
+    updateMassActionUI();
+};
+
+function updateMassActionUI() {
+    if (selectedBookings.size > 0) {
+        selectionCounter.textContent = `Đã chọn: ${selectedBookings.size}`;
+        massActionToolbar.classList.remove('hidden');
+    } else {
+        massActionToolbar.classList.add('hidden');
+    }
+}
+
+async function handleMassDelete() {
+    if (selectedBookings.size === 0) {
+        showAlert("Vui lòng chọn ít nhất một lịch để xóa.");
+        return;
+    }
+
+    if (await showConfirm(`Bạn có chắc muốn xóa ${selectedBookings.size} lịch đã chọn?`)) {
+        try {
             const batch = writeBatch(db);
-            snapshot.docs.forEach(doc => {
-                batch.delete(doc.ref);
+            selectedBookings.forEach(bookingId => {
+                batch.delete(doc(schedulesCol, bookingId));
             });
             await batch.commit();
-
-            showAlert(`Đã hủy thành công ${snapshot.docs.length} lịch lặp lại.`);
+            showAlert(`Đã xóa thành công ${selectedBookings.size} lịch.`);
+            selectedBookings.clear();
+            updateMassActionUI();
         } catch (error) {
-            showAlert("Lỗi khi hủy chuỗi lịch.");
-            console.error("Error deleting future bookings:", error);
+            console.error("Error during mass deletion: ", error);
+            showAlert("Đã xảy ra lỗi khi xóa hàng loạt.");
         }
     }
 }
 
 
-// --- PRINTING LOGIC (Unchanged) ---
+// --- PRINTING LOGIC ---
 function openPrintOptionsModal() {
     const currentRoomNameSpan = document.getElementById('print-current-room-name');
     const printCurrentRadio = document.getElementById('print-current');
@@ -932,13 +989,15 @@ function addEventListeners() {
     document.getElementById('timeslot-form').addEventListener('submit', (e) => handleFormSubmit(e, timeSlotsCol, 'timeslot-id', { startTime: e.target.elements['timeslot-start'].value, endTime: e.target.elements['timeslot-end'].value }));
     document.getElementById('class-form').addEventListener('submit', (e) => handleFormSubmit(e, classNamesCol, 'class-id', { value: e.target.elements['class-name'].value }));
     document.getElementById('lecturer-form').addEventListener('submit', (e) => handleFormSubmit(e, lecturersCol, 'lecturer-id', { value: e.target.elements['lecturer-name'].value }));
-    document.getElementById('content-form').addEventListener('submit', (e) => handleFormSubmit(e, contentsCol, 'content-id', { value: e.target.elements['content-text'].value }));
     
     document.getElementById('booking-form').addEventListener('submit', handleBookingFormSubmit);
     document.getElementById('delete-booking-btn').addEventListener('click', handleDeleteRequest);
     document.getElementById('alert-ok-btn').addEventListener('click', () => closeModal('alert-modal'));
     document.getElementById('delete-series-btn-cancel').addEventListener('click', () => closeModal('delete-series-confirm-modal'));
     
+    // Mass Action Listener
+    massDeleteBtn.addEventListener('click', handleMassDelete);
+
     // Print Listeners
     document.getElementById('print-schedule-btn').addEventListener('click', openPrintOptionsModal);
     document.getElementById('confirm-print-btn').addEventListener('click', generatePrintableView);
@@ -970,7 +1029,6 @@ function initializePage() {
     });
     createListener(classNamesCol, allClassNames, () => renderList('classes-list-container', allClassNames, 'value', null, 'editClassName', 'deleteClassName'));
     createListener(lecturersCol, allLecturers, () => renderList('lecturers-list-container', allLecturers, 'value', null, 'editLecturer', 'deleteLecturer'));
-    createListener(contentsCol, allContents, () => renderList('contents-list-container', allContents, 'value', null, 'editContent', 'deleteContent'));
 }
 
 onAuthStateChanged(auth, async (user) => {

@@ -34,8 +34,8 @@
 
         .booking-container { height: 100%; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
 
-        .schedule-booking { background-color: #dbeafe; border-left: 4px solid #3b82f6; padding: 6px; border-radius: 4px; font-size: 0.8rem; text-align: left; cursor: pointer; transition: background-color 0.2s; }
-        .schedule-booking:hover { background-color: #bfdbfe; }
+        .schedule-booking { background-color: #dbeafe; border-left: 4px solid #3b82f6; padding: 6px; border-radius: 4px; font-size: 0.8rem; text-align: left; transition: background-color 0.2s; }
+        .schedule-booking .booking-details:hover { background-color: #bfdbfe; cursor: pointer; }
 
         .admin-only { display: none; }
 
@@ -114,6 +114,17 @@
                     </button>
                 </div>
             </div>
+            
+            <!-- Mass Actions Toolbar -->
+            <div id="mass-action-toolbar" class="hidden my-4 p-3 bg-blue-100 border border-blue-300 rounded-lg flex justify-between items-center transition-all">
+                <span id="selection-counter" class="font-semibold text-blue-800"></span>
+                <div class="flex gap-2">
+                    <button id="mass-delete-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg flex items-center">
+                        <i class="fas fa-trash mr-2"></i> Xóa mục đã chọn
+                    </button>
+                    <!-- Nút sửa hàng loạt có thể thêm ở đây trong tương lai -->
+                </div>
+            </div>
 
             <!-- Schedule Table -->
             <div id="schedule-container" class="overflow-x-auto">
@@ -135,7 +146,6 @@
                     <button class="tab-button" onclick="openTab(event, 'tab-timeslots')">Khung giờ</button>
                     <button class="tab-button" onclick="openTab(event, 'tab-classes')">Lớp học phần</button>
                     <button class="tab-button" onclick="openTab(event, 'tab-lecturers')">Giảng viên</button>
-                    <button class="tab-button" onclick="openTab(event, 'tab-contents')">Nội dung</button>
                 </nav>
             </div>
 
@@ -218,23 +228,6 @@
                 </form>
                 <div id="lecturers-list-container" class="overflow-y-auto max-h-64"></div>
             </div>
-
-            <!-- Tab Content: Contents -->
-            <div id="tab-contents" class="tab-content">
-                <form id="content-form" class="mb-4 p-4 border rounded-lg bg-gray-50">
-                    <input type="hidden" id="content-id">
-                    <h4 class="font-semibold text-lg mb-3">Thêm/Sửa Nội dung thực hành</h4>
-                    <div>
-                        <label for="content-text" class="block text-sm font-medium text-gray-700">Nội dung</p>
-                        <input type="text" id="content-text" placeholder="VD: Thực hành bài 1" required class="mt-1 p-2 border rounded-md w-full">
-                    </div>
-                    <div class="mt-4 flex justify-end gap-2">
-                        <button type="button" class="bg-gray-200 hover:bg-gray-300 text-black p-2 rounded-md px-4" onclick="clearForm('content-form')">Làm mới</button>
-                        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-md px-4">Lưu</button>
-                    </div>
-                </form>
-                <div id="contents-list-container" class="overflow-y-auto max-h-64"></div>
-            </div>
         </div>
     </div>
     
@@ -263,7 +256,7 @@
                 </div>
                 <div>
                     <label for="booking-content" class="block text-sm font-medium text-gray-700">Nội dung thực hành</label>
-                    <select id="booking-content" required class="mt-1 block w-full p-2 border border-gray-300 rounded-md"></select>
+                    <input type="text" id="booking-content" placeholder="Nhập nội dung buổi thực hành..." required class="mt-1 block w-full p-2 border border-gray-300 rounded-md">
                 </div>
                  <div class="border-t pt-4">
                     <p class="font-semibold text-gray-700 mb-2">Tùy chọn lặp lại</p>
