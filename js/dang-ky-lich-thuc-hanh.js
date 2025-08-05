@@ -31,10 +31,11 @@ let weekSchedules = [];
 let currentWeekStartDate = null;
 let selectedRoomId = null;
 let scheduleListener = null; // To hold the unsubscribe function for the schedule listener
+let datePickerInstance = null;
 
 // --- UI ELEMENTS ---
 const mainContent = document.getElementById('practice-schedule-module');
-const weekDisplay = document.getElementById('week-display');
+const datePickerInput = document.getElementById('date-picker');
 const roomSelector = document.getElementById('room-selector');
 const scheduleContainer = document.getElementById('schedule-container');
 
@@ -101,19 +102,21 @@ function getWeekInfo(date) {
     return { startDate, endDate, weekNumber, weekDates };
 }
 
-function updateWeekDisplay() {
+function updateDatePickerDisplay() {
     const { startDate, endDate, weekNumber } = getWeekInfo(currentWeekStartDate);
-    weekDisplay.innerHTML = `
-        <span class="font-bold">Tuần ${weekNumber}</span>
-        <span class="text-xs text-gray-500">${formatDateToDDMMYYYY(startDate)} - ${formatDateToDDMMYYYY(endDate)}</span>
-    `;
+    const display_text = `Tuần ${weekNumber} (${formatDateToDDMMYYYY(startDate)} - ${formatDateToDDMMYYYY(endDate)})`;
+    if(datePickerInstance) {
+        datePickerInstance.set('defaultDate', currentWeekStartDate);
+        datePickerInput.value = display_text;
+    }
 }
 
-function changeWeek(offset) {
-    currentWeekStartDate.setDate(currentWeekStartDate.getDate() + offset * 7);
-    updateWeekDisplay();
+function setWeek(date) {
+    currentWeekStartDate = new Date(date);
+    updateDatePickerDisplay();
     listenForSchedules();
 }
+
 
 // --- UI RENDERING ---
 function updateUIForRole() {
@@ -125,28 +128,41 @@ function updateUIForRole() {
 
 function renderRoomSelector() {
     const currentVal = roomSelector.value;
-    roomSelector.innerHTML = '<option value="">-- Vui lòng chọn phòng --</option>';
+    roomSelector.innerHTML = `
+        <option value="">-- Vui lòng chọn phòng --</option>
+        <option value="all">-- Hiển thị tất cả phòng --</option>
+    `;
     allRooms.forEach(room => {
         const option = document.createElement('option');
         option.value = room.id;
         option.textContent = room.name;
         roomSelector.appendChild(option);
     });
-    if (currentVal && allRooms.some(r => r.id === currentVal)) {
+    if (currentVal && (allRooms.some(r => r.id === currentVal) || currentVal === 'all')) {
         roomSelector.value = currentVal;
     } else if (allRooms.length > 0) {
         roomSelector.value = allRooms[0].id;
         selectedRoomId = allRooms[0].id;
+    } else {
+        roomSelector.value = 'all';
+        selectedRoomId = 'all';
     }
 }
 
 function renderSchedule() {
-    scheduleContainer.innerHTML = '';
     if (!selectedRoomId) {
-        scheduleContainer.innerHTML = `<p class="text-center text-gray-500 p-8">Vui lòng chọn một phòng để xem lịch hoặc thêm phòng mới trong mục Quản lý.</p>`;
+        scheduleContainer.innerHTML = `<p class="text-center text-gray-500 p-8">Vui lòng chọn một phòng để xem lịch.</p>`;
         return;
     }
 
+    if (selectedRoomId === 'all') {
+        renderAllRoomsSchedule();
+    } else {
+        renderSingleRoomSchedule();
+    }
+}
+
+function renderSingleRoomSchedule() {
     const { weekDates } = getWeekInfo(currentWeekStartDate);
     const table = document.createElement('table');
     table.className = 'schedule-table';
@@ -166,7 +182,7 @@ function renderSchedule() {
     weekDates.forEach(date => {
         const dateString = formatDateToYYYYMMDD(date);
         const dayBookings = weekSchedules
-            .filter(s => s.date === dateString)
+            .filter(s => s.date === dateString && s.roomId === selectedRoomId)
             .sort((a, b) => a.startTime.localeCompare(b.startTime));
 
         let bookingsHtml = dayBookings.map(booking => `
@@ -177,9 +193,9 @@ function renderSchedule() {
             </div>
         `).join('');
 
-        tbody += `<td>
+        tbody += `<td class="h-[200px]">
             <div class="booking-container">
-                <button class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-3 rounded-md mb-2 text-sm" onclick="window.openBookingModal('${dateString}')">
+                <button class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-3 rounded-md mb-2 text-sm" onclick="window.openBookingModal('${dateString}', '${selectedRoomId}')">
                     <i class="fas fa-plus-circle mr-1"></i> Đăng ký
                 </button>
                 ${bookingsHtml}
@@ -189,8 +205,54 @@ function renderSchedule() {
     tbody += '</tr></tbody>';
     table.innerHTML += tbody;
 
+    scheduleContainer.innerHTML = '';
     scheduleContainer.appendChild(table);
 }
+
+function renderAllRoomsSchedule() {
+    const { weekDates } = getWeekInfo(currentWeekStartDate);
+    const table = document.createElement('table');
+    table.className = 'schedule-table all-rooms-table';
+    const daysOfWeek = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ nhật'];
+
+    let thead = '<thead><tr><th>Phòng</th>';
+    weekDates.forEach((date, index) => {
+        thead += `<th>
+            <div class="day-header">${daysOfWeek[index]}</div>
+            <div class="date-header">${formatDateToDDMMYYYY(date)}</div>
+        </th>`;
+    });
+    thead += '</tr></thead>';
+    table.innerHTML = thead;
+
+    let tbody = '<tbody>';
+    allRooms.forEach(room => {
+        tbody += `<tr><td class="room-name-cell">${room.name}</td>`;
+        weekDates.forEach(date => {
+            const dateString = formatDateToYYYYMMDD(date);
+            const dayBookings = weekSchedules
+                .filter(s => s.date === dateString && s.roomId === room.id)
+                .sort((a, b) => a.startTime.localeCompare(b.startTime));
+            
+            let bookingsHtml = dayBookings.map(booking => `
+                <div class="schedule-booking" onclick="window.showBookingDetails('${booking.id}')">
+                    <p class="font-bold truncate">${booking.startTime} - ${booking.endTime}</p>
+                    <p class="truncate">${booking.className}</p>
+                    <p class="truncate text-xs">${booking.lecturerName}</p>
+                </div>
+            `).join('');
+
+            tbody += `<td><div class="booking-container">${bookingsHtml}</div></td>`;
+        });
+        tbody += '</tr>';
+    });
+    tbody += '</tbody>';
+    table.innerHTML += tbody;
+    
+    scheduleContainer.innerHTML = '';
+    scheduleContainer.appendChild(table);
+}
+
 
 function renderRoomManagementList() {
     const container = document.getElementById('rooms-list-container');
@@ -247,10 +309,19 @@ function listenForSchedules() {
     const { startDate } = getWeekInfo(currentWeekStartDate);
     const weekId = formatDateToYYYYMMDD(startDate);
 
-    const q = query(schedulesCol, where("weekId", "==", weekId), where("roomId", "==", selectedRoomId));
+    let q;
+    if (selectedRoomId === 'all') {
+        q = query(schedulesCol, where("weekId", "==", weekId));
+    } else {
+        q = query(schedulesCol, where("weekId", "==", weekId), where("roomId", "==", selectedRoomId));
+    }
+
     scheduleListener = onSnapshot(q, (snapshot) => {
         weekSchedules = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         renderSchedule();
+    }, (error) => {
+        console.error("Error listening to schedules: ", error);
+        scheduleContainer.innerHTML = `<p class="text-center text-red-500 p-8">Lỗi khi tải dữ liệu. Vui lòng thử lại.</p>`;
     });
 }
 
@@ -289,6 +360,7 @@ window.editRoom = (id) => {
         document.getElementById('room-id').value = room.id;
         document.getElementById('room-name').value = room.name;
         document.getElementById('room-description').value = room.description;
+        document.getElementById('manage-rooms-modal').style.display = 'flex';
     }
 };
 
@@ -299,13 +371,19 @@ window.deleteRoom = async (id) => {
     }
 };
 
-window.openBookingModal = (dateString) => {
+window.openBookingModal = (dateString, roomId) => {
+    const room = allRooms.find(r => r.id === roomId);
+    if (!room) {
+        showAlert("Phòng không hợp lệ.");
+        return;
+    }
     const date = new Date(dateString);
     const days = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
     const dayName = days[date.getUTCDay()];
 
-    document.getElementById('booking-info').textContent = `Phòng: ${allRooms.find(r => r.id === selectedRoomId)?.name} - Ngày: ${dayName}, ${formatDateToDDMMYYYY(date)}`;
+    document.getElementById('booking-info').textContent = `Phòng: ${room.name} - Ngày: ${dayName}, ${formatDateToDDMMYYYY(date)}`;
     document.getElementById('booking-date').value = dateString;
+    document.getElementById('booking-room-id').value = roomId;
     document.getElementById('booking-form').reset();
     window.closeModal('booking-details-modal');
     window.closeModal('manage-rooms-modal');
@@ -314,14 +392,14 @@ window.openBookingModal = (dateString) => {
 
 async function handleBookingFormSubmit(e) {
     e.preventDefault();
-    const { startDate } = getWeekInfo(currentWeekStartDate);
+    const date = document.getElementById('booking-date').value;
+    const bookingRoomId = document.getElementById('booking-room-id').value;
+    const { startDate } = getWeekInfo(new Date(date));
     const weekId = formatDateToYYYYMMDD(startDate);
     
     const newStartTime = document.getElementById('booking-start-time').value;
     const newEndTime = document.getElementById('booking-end-time').value;
-    const date = document.getElementById('booking-date').value;
 
-    // Validation
     if (!newStartTime || !newEndTime) {
         showAlert("Vui lòng chọn cả thời gian bắt đầu và kết thúc.");
         return;
@@ -331,8 +409,7 @@ async function handleBookingFormSubmit(e) {
         return;
     }
 
-    // Conflict Check
-    const bookingsForDay = weekSchedules.filter(s => s.date === date);
+    const bookingsForDay = weekSchedules.filter(s => s.date === date && s.roomId === bookingRoomId);
     const isConflict = bookingsForDay.some(existingBooking => 
         (newStartTime < existingBooking.endTime) && (newEndTime > existingBooking.startTime)
     );
@@ -343,7 +420,7 @@ async function handleBookingFormSubmit(e) {
     }
 
     const data = {
-        roomId: selectedRoomId,
+        roomId: bookingRoomId,
         weekId: weekId,
         date: date,
         startTime: newStartTime,
@@ -404,79 +481,116 @@ async function deleteBooking() {
 }
 
 // --- PRINTING LOGIC ---
-function generatePrintableView() {
-    if (!selectedRoomId) {
-        showAlert("Vui lòng chọn một phòng để in lịch.");
-        return;
+
+function openPrintOptionsModal() {
+    const currentRoomNameSpan = document.getElementById('print-current-room-name');
+    const printCurrentRadio = document.getElementById('print-current');
+    
+    if (selectedRoomId && selectedRoomId !== 'all') {
+        const currentRoom = allRooms.find(r => r.id === selectedRoomId);
+        currentRoomNameSpan.textContent = currentRoom ? currentRoom.name : 'N/A';
+        printCurrentRadio.disabled = false;
+        printCurrentRadio.checked = true;
+    } else {
+        currentRoomNameSpan.textContent = '(Không có phòng nào được chọn)';
+        printCurrentRadio.disabled = true;
+        document.getElementById('print-all').checked = true;
     }
-    const currentRoom = allRooms.find(r => r.id === selectedRoomId);
-    if (!currentRoom) {
-        showAlert("Không tìm thấy thông tin phòng.");
-        return;
-    }
-
-    const { weekNumber, weekDates, startDate } = getWeekInfo(currentWeekStartDate);
-    const roomName = currentRoom.name;
-    const daysOfWeek = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ nhật'];
-
-    let tableBodyHtml = '';
-    weekDates.forEach((date) => {
-        const dateString = formatDateToYYYYMMDD(date);
-        const dayBookings = weekSchedules
-            .filter(s => s.date === dateString)
-            .sort((a, b) => a.startTime.localeCompare(b.startTime));
-
-        let bookingsHtml = dayBookings.map(booking => `
-            <div class="schedule-booking">
-                <p class="font-bold">${booking.startTime} - ${booking.endTime}</p>
-                <p>${booking.className}</p>
-                <p class="text-xs">${booking.lecturerName}</p>
-                <p class="text-xs" style="font-style: italic;">ND: ${booking.content || ''}</p>
-            </div>
-        `).join('');
-
-        tableBodyHtml += `<td>
-            <div class="booking-container">
-                ${bookingsHtml || ''}
-            </div>
-        </td>`;
+    
+    document.getElementById('print-room-selection-list').style.display = 'none';
+    document.querySelectorAll('input[name="print-option"]').forEach(radio => {
+        if(radio.checked) {
+            const event = new Event('change');
+            radio.dispatchEvent(event);
+        }
     });
 
-    const printHtml = `
-        <!DOCTYPE html>
-        <html lang="vi">
-        <head>
-            <meta charset="UTF-8">
-            <title>Lịch thực hành tuần ${weekNumber} - ${roomName}</title>
-            <style>
-                body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; margin: 0; }
-                .page { padding: 2cm; width: 29.7cm; min-height: 21cm; box-sizing: border-box; page-break-after: always; margin: 0 auto; }
-                .print-header { display: flex; justify-content: space-between; align-items: center; text-align: center; font-weight: bold; }
-                .print-header .school-info { flex: 1; text-align: left; }
-                .print-header .school-info img { height: 60px; vertical-align: middle; margin-right: 10px; }
-                .print-header .school-info p { margin: 0; font-size: 13pt; }
-                .print-header .motto { flex: 1; text-align: center; }
-                .print-header .motto hr { width: 50%; margin: 2px auto; border-top: 1px solid black; }
-                .title { text-align: center; font-weight: bold; font-size: 16pt; margin: 30px 0; }
-                .schedule-table { border-collapse: collapse; width: 100%; table-layout: fixed; font-size: 11pt; }
-                .schedule-table th, .schedule-table td { border: 1px solid black; text-align: center; padding: 5px; vertical-align: top; }
-                .schedule-table th { font-weight: bold; }
-                .schedule-table td { height: 150px; }
-                .booking-container { height: 100%; overflow: hidden; display: flex; flex-direction: column; gap: 4px; }
-                .schedule-booking { border: 1px solid #ccc; padding: 4px; border-radius: 4px; font-size: 10pt; text-align: left; margin-bottom: 2px; }
-                .schedule-booking .font-bold { font-weight: bold; }
-                .footer-container { display: flex; justify-content: space-around; margin-top: 50px; text-align: center; font-weight: bold; }
-                .signature-block { width: 30%; }
-                .signature-block p { margin-top: 60px; }
-                .print-button { position: fixed; top: 10px; right: 10px; padding: 8px 12px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; z-index: 1000; }
-                @media print {
-                    .print-button { display: none; }
-                    .page { padding: 1.5cm; }
-                }
-            </style>
-        </head>
-        <body>
-            <button class="print-button" onclick="window.print()">In Lịch</button>
+    renderPrintRoomSelectionList();
+    document.getElementById('print-options-modal').style.display = 'flex';
+}
+
+function renderPrintRoomSelectionList() {
+    const container = document.getElementById('print-room-selection-list');
+    container.innerHTML = '';
+    allRooms.forEach(room => {
+        container.innerHTML += `
+            <div>
+                <input type="checkbox" id="print-room-${room.id}" value="${room.id}" class="mr-2 print-room-checkbox">
+                <label for="print-room-${room.id}">${room.name}</label>
+            </div>
+        `;
+    });
+}
+
+function generatePrintableView() {
+    const printOption = document.querySelector('input[name="print-option"]:checked').value;
+    let roomsToPrint = [];
+
+    if (printOption === 'current') {
+        if (!selectedRoomId || selectedRoomId === 'all') {
+            showAlert("Vui lòng chọn một phòng cụ thể để in.");
+            return;
+        }
+        const currentRoom = allRooms.find(r => r.id === selectedRoomId);
+        if (currentRoom) roomsToPrint.push(currentRoom);
+    } else if (printOption === 'all') {
+        roomsToPrint = [...allRooms];
+    } else if (printOption === 'multiple') {
+        const selectedCheckboxes = document.querySelectorAll('#print-room-selection-list input:checked');
+        if (selectedCheckboxes.length === 0) {
+            showAlert("Vui lòng chọn ít nhất một phòng để in.");
+            return;
+        }
+        selectedCheckboxes.forEach(cb => {
+            const room = allRooms.find(r => r.id === cb.value);
+            if (room) roomsToPrint.push(room);
+        });
+    }
+
+    if (roomsToPrint.length === 0) {
+        showAlert("Không có phòng nào hợp lệ được chọn để in.");
+        return;
+    }
+
+    const { weekNumber, weekDates, startDate, endDate } = getWeekInfo(currentWeekStartDate);
+    const daysOfWeek = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ nhật'];
+    
+    let contentHtml = '';
+
+    // If printing multiple rooms, create one consolidated table
+    if (printOption === 'all' || printOption === 'multiple') {
+        let tableHeaderHtml = `<thead><tr><th class="room-name-cell">Phòng</th>`;
+        weekDates.forEach((date, index) => {
+            tableHeaderHtml += `<th>${daysOfWeek[index]}<br>${formatDateToDDMMYYYY(date)}</th>`;
+        });
+        tableHeaderHtml += '</tr></thead>';
+
+        let tableBodyHtml = '<tbody>';
+        roomsToPrint.forEach(room => {
+            tableBodyHtml += `<tr><td class="room-name-cell">${room.name}</td>`;
+            weekDates.forEach(date => {
+                const dateString = formatDateToYYYYMMDD(date);
+                const dayBookings = weekSchedules
+                    .filter(s => s.date === dateString && s.roomId === room.id)
+                    .sort((a, b) => a.startTime.localeCompare(b.startTime));
+                let bookingsHtml = dayBookings.map(booking => `
+                    <div class="schedule-booking">
+                        <p class="font-bold">${booking.startTime} - ${booking.endTime}</p>
+                        <p>${booking.className}</p>
+                        <p class="text-xs">${booking.lecturerName}</p>
+                        <p class="text-xs" style="font-style: italic;">ND: ${booking.content || ''}</p>
+                    </div>
+                `).join('');
+                tableBodyHtml += `<td><div class="booking-container">${bookingsHtml || ''}</div></td>`;
+            });
+            tableBodyHtml += '</tr>';
+        });
+        tableBodyHtml += '</tbody>';
+
+        const pageDate = new Date();
+        const formattedPageDate = `ngày ${pageDate.getDate()} tháng ${pageDate.getMonth() + 1} năm ${pageDate.getFullYear()}`;
+
+        contentHtml = `
             <div class="page">
                 <div class="print-header">
                     <div class="school-info">
@@ -489,52 +603,125 @@ function generatePrintableView() {
                         <hr>
                     </div>
                 </div>
-
-                <h1 class="title">LỊCH THỰC HÀNH PHÒNG MÁY<br>Tuần ${weekNumber} (Phòng: ${roomName})</h1>
-
-                <table class="schedule-table">
-                    <thead>
-                        <tr>
-                            ${daysOfWeek.map((day, index) => `<th>${day}<br>${formatDateToDDMMYYYY(weekDates[index])}</th>`).join('')}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            ${tableBodyHtml}
-                        </tr>
-                    </tbody>
-                </table>
-
+                <h1 class="title">LỊCH THỰC HÀNH CÁC PHÒNG MÁY<br>
+                    Tuần ${weekNumber} (từ ngày ${formatDateToDDMMYYYY(startDate)} đến ngày ${formatDateToDDMMYYYY(endDate)})
+                </h1>
+                <p style="text-align: right; font-style: italic; margin-bottom: 15px;">Hải Phòng, ${formattedPageDate}</p>
+                <table class="schedule-table all-rooms-print">${tableHeaderHtml}${tableBodyHtml}</table>
                 <div class="footer-container">
-                    <div class="signature-block">
-                        <h4 contenteditable="true">BAN CHỦ NHIỆM KHOA</h4>
-                        <p contenteditable="true">      </p>
+                    <div class="signature-block"><h4 contenteditable="true">BAN CHỦ NHIỆM KHOA</h4><p contenteditable="true"></p></div>
+                    <div class="signature-block"><h4 contenteditable="true">TỔ BỘ MÔN</h4><p contenteditable="true"></p></div>
+                    <div class="signature-block"><h4 contenteditable="true">NGƯỜI LẬP</h4><p contenteditable="true"></p></div>
+                </div>
+            </div>
+        `;
+    } else { // If printing a single room, keep the old format (one page per room)
+        roomsToPrint.forEach(room => {
+            let tableBodyHtml = '';
+            weekDates.forEach((date) => {
+                const dateString = formatDateToYYYYMMDD(date);
+                const dayBookings = weekSchedules
+                    .filter(s => s.date === dateString && s.roomId === room.id)
+                    .sort((a, b) => a.startTime.localeCompare(b.startTime));
+                let bookingsHtml = dayBookings.map(booking => `
+                    <div class="schedule-booking">
+                        <p class="font-bold">${booking.startTime} - ${booking.endTime}</p>
+                        <p>${booking.className}</p>
+                        <p class="text-xs">${booking.lecturerName}</p>
+                        <p class="text-xs" style="font-style: italic;">ND: ${booking.content || ''}</p>
                     </div>
-                    <div class="signature-block">
-                        <h4 contenteditable="true">TỔ BỘ MÔN</h4>
+                `).join('');
+                tableBodyHtml += `<td><div class="booking-container">${bookingsHtml || ''}</div></td>`;
+            });
+
+            const pageDate = new Date();
+            const formattedPageDate = `ngày ${pageDate.getDate()} tháng ${pageDate.getMonth() + 1} năm ${pageDate.getFullYear()}`;
+
+            contentHtml += `
+            <div class="page">
+                <div class="print-header">
+                    <div class="school-info">
+                        <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRjTnSBGofmGpcMY_uEoXhgAB-FeeLjVslu1A&s" alt="Logo HPU">
+                        <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQpzh7trviplRC5G2r75APp6H3wcTnXVixU-Q&s" alt="Logo FIT">
                     </div>
-                    <div class="signature-block">
-                        <h4 contenteditable="true">NGƯỜI LẬP</h4>
-                        
+                    <div class="motto">
+                        <p><strong>CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</strong></p>
+                        <p><strong>Độc lập - Tự do - Hạnh phúc</strong></p>
+                        <hr>
                     </div>
                 </div>
-                 <p style="text-align: right; font-style: italic; margin-top: 10px;">Hải Phòng, ngày ${startDate.getDate()} tháng ${startDate.getMonth() + 1} năm ${startDate.getFullYear()}</p>
-            </div>
-        </body>
-        </html>
-    `;
+                <h1 class="title">LỊCH THỰC HÀNH PHÒNG MÁY<br>
+                    Phòng: ${room.name}<br>
+                    Tuần ${weekNumber} (từ ngày ${formatDateToDDMMYYYY(startDate)} đến ngày ${formatDateToDDMMYYYY(endDate)})
+                </h1>
+                <p style="text-align: right; font-style: italic; margin-bottom: 15px;">Hải Phòng, ${formattedPageDate}</p>
+                <table class="schedule-table">
+                    <thead><tr>${daysOfWeek.map((day, index) => `<th>${day}<br>${formatDateToDDMMYYYY(weekDates[index])}</th>`).join('')}</tr></thead>
+                    <tbody><tr>${tableBodyHtml}</tr></tbody>
+                </table>
+                <div class="footer-container">
+                    <div class="signature-block"><h4 contenteditable="true">BAN CHỦ NHIỆM KHOA</h4><p contenteditable="true"></p></div>
+                    <div class="signature-block"><h4 contenteditable="true">TỔ BỘ MÔN</h4><p contenteditable="true"></p></div>
+                    <div class="signature-block"><h4 contenteditable="true">NGƯỜI LẬP</h4><p contenteditable="true"></p></div>
+                </div>
+            </div>`;
+        });
+    }
+
+    const printHtml = `
+        <!DOCTYPE html><html lang="vi"><head><meta charset="UTF-8">
+        <title>Lịch thực hành tuần ${weekNumber}</title>
+        <style>
+            body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; margin: 0; }
+            .page { padding: 2cm; width: 29.7cm; min-height: 20.9cm; box-sizing: border-box; page-break-after: always; margin: 0 auto; display: flex; flex-direction: column; }
+            .page:last-child { page-break-after: auto; }
+            .print-header { display: flex; justify-content: space-between; align-items: center; text-align: center; font-weight: bold; }
+            .print-header .school-info { flex: 1; text-align: left; }
+            .print-header .school-info img { height: 60px; vertical-align: middle; margin-right: 10px; }
+            .print-header .motto { flex: 1; text-align: center; }
+            .print-header .motto hr { width: 50%; margin: 2px auto; border-top: 1px solid black; }
+            .title { text-align: center; font-weight: bold; font-size: 16pt; margin: 20px 0; line-height: 1.4; }
+            .schedule-table { border-collapse: collapse; width: 100%; table-layout: fixed; font-size: 11pt; }
+            .schedule-table th, .schedule-table td { border: 1px solid black; text-align: center; padding: 5px; vertical-align: top; }
+            .schedule-table th { font-weight: bold; }
+            .schedule-table.all-rooms-print .room-name-cell { font-weight: bold; text-align: left; padding-left: 8px; vertical-align: middle; width: 12%;}
+            .booking-container { min-height: 100px; height: 100%; overflow: hidden; display: flex; flex-direction: column; gap: 4px; }
+            .schedule-booking { border: 1px solid #ccc; padding: 4px; border-radius: 4px; font-size: 10pt; text-align: left; margin-bottom: 2px; }
+            .schedule-booking .font-bold { font-weight: bold; }
+            .footer-container { display: flex; justify-content: space-around; margin-top: auto; padding-top: 30px; text-align: center; font-weight: bold; width: 100%; }
+            .signature-block { width: 30%; }
+            .signature-block p { margin-top: 60px; }
+            .print-button { position: fixed; top: 10px; right: 10px; padding: 8px 12px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; z-index: 1000; }
+            @media print { .print-button { display: none; } .page { padding: 1.5cm; height: auto; min-height: 0;} }
+        </style></head><body>
+        <button class="print-button" onclick="window.print()">In Lịch</button>
+        ${contentHtml}
+        </body></html>`;
 
     const printWindow = window.open('', '_blank');
     printWindow.document.write(printHtml);
     printWindow.document.close();
+    closeModal('print-options-modal');
 }
 
 
 // --- INITIALIZATION ---
 function addEventListeners() {
-    document.getElementById('prev-week-btn').addEventListener('click', () => changeWeek(-1));
-    document.getElementById('next-week-btn').addEventListener('click', () => changeWeek(1));
-    document.getElementById('room-selector').addEventListener('change', (e) => {
+    // Initialize Flatpickr
+    flatpickr.localize(flatpickr.l10ns.vn);
+    datePickerInstance = flatpickr(datePickerInput, {
+        weekNumbers: true,
+        onChange: function(selectedDates, dateStr, instance) {
+            if (selectedDates.length > 0) {
+                setWeek(selectedDates[0]);
+            }
+        },
+        onReady: function() {
+            updateDatePickerDisplay();
+        }
+    });
+
+    roomSelector.addEventListener('change', (e) => {
         selectedRoomId = e.target.value;
         listenForSchedules();
     });
@@ -547,16 +734,24 @@ function addEventListeners() {
     document.getElementById('booking-form').addEventListener('submit', handleBookingFormSubmit);
     document.getElementById('delete-booking-btn').addEventListener('click', deleteBooking);
     document.getElementById('alert-ok-btn').addEventListener('click', () => closeModal('alert-modal'));
-    document.getElementById('print-schedule-btn').addEventListener('click', generatePrintableView);
+    
+    // Print Listeners
+    document.getElementById('print-schedule-btn').addEventListener('click', openPrintOptionsModal);
+    document.getElementById('confirm-print-btn').addEventListener('click', generatePrintableView);
+    document.querySelectorAll('input[name="print-option"]').forEach(radio => {
+        radio.addEventListener('change', (e) => {
+            const selectionList = document.getElementById('print-room-selection-list');
+            selectionList.style.display = e.target.value === 'multiple' ? 'block' : 'none';
+        });
+    });
 }
 
 function initializePage() {
     mainContent.classList.remove('hidden');
     currentWeekStartDate = new Date();
-    updateWeekDisplay();
+    addEventListeners(); // Initialize listeners and datepicker
     updateUIForRole();
     listenForRooms(); // This will trigger the first schedule load
-    addEventListeners();
 }
 
 onAuthStateChanged(auth, async (user) => {
@@ -565,11 +760,11 @@ onAuthStateChanged(auth, async (user) => {
         if (userDoc.exists()) {
             currentUserInfo = { uid: user.uid, ...userDoc.data() };
         } else {
-            // Fallback for users who might not have a doc in the 'users' collection
             currentUserInfo = { uid: user.uid, email: user.email, role: 'viewer' };
         }
         initializePage();
     } else {
-        window.location.href = 'index.html';
+        mainContent.innerHTML = '<p class="text-center text-red-500">Vui lòng đăng nhập để sử dụng chức năng này.</p>';
+        mainContent.classList.remove('hidden');
     }
 });

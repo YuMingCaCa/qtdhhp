@@ -11,6 +11,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Flatpickr CSS (Date Picker) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -25,39 +27,26 @@
         .schedule-table { border-collapse: collapse; width: 100%; table-layout: fixed; }
         .schedule-table th, .schedule-table td { border: 1px solid #e5e7eb; text-align: center; padding: 8px; vertical-align: top; }
         .schedule-table th { font-weight: 600; background-color: #f9fafb; }
-        .schedule-table td { height: 200px; /* Increased height for more bookings */ }
+        .schedule-table td { min-height: 180px; }
         
-        .day-header {
-            font-weight: bold;
-        }
-        .date-header {
-            font-size: 0.8rem;
-            color: #6b7280;
-        }
+        .day-header { font-weight: bold; }
+        .date-header { font-size: 0.8rem; color: #6b7280; }
 
-        .booking-container {
-            height: 100%;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
+        .booking-container { height: 100%; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
 
-        .schedule-booking { 
-            background-color: #dbeafe; 
-            border-left: 4px solid #3b82f6; 
-            padding: 6px; 
-            border-radius: 4px; 
-            font-size: 0.8rem; 
-            text-align: left; 
-            cursor: pointer;
-            transition: background-color 0.2s;
-        }
-        .schedule-booking:hover {
-            background-color: #bfdbfe;
-        }
+        .schedule-booking { background-color: #dbeafe; border-left: 4px solid #3b82f6; padding: 6px; border-radius: 4px; font-size: 0.8rem; text-align: left; cursor: pointer; transition: background-color 0.2s; }
+        .schedule-booking:hover { background-color: #bfdbfe; }
 
         .admin-only { display: none; }
+
+        /* Styles for All Rooms View */
+        .all-rooms-table .room-name-cell {
+            font-weight: bold;
+            background-color: #f9fafb;
+            text-align: left;
+            padding-left: 1rem;
+            width: 150px; /* Fixed width for room name column */
+        }
     </style>
 </head>
 <body class="p-4 md:p-8">
@@ -84,11 +73,10 @@
             <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
                 <h2 class="text-2xl font-bold text-gray-800">Lịch phòng máy</h2>
                 <div class="flex items-center gap-4 w-full md:w-auto flex-wrap justify-end">
-                    <!-- Week Navigator -->
-                    <div class="flex items-center gap-2 border rounded-lg p-2 bg-gray-50">
-                        <button id="prev-week-btn" class="p-2 rounded-md hover:bg-gray-200"><i class="fas fa-chevron-left"></i></button>
-                        <div id="week-display" class="text-center font-semibold w-40">Đang tải...</div>
-                        <button id="next-week-btn" class="p-2 rounded-md hover:bg-gray-200"><i class="fas fa-chevron-right"></i></button>
+                    <!-- Date Picker -->
+                    <div class="flex items-center gap-2 border rounded-lg p-2 bg-gray-50 relative">
+                        <label for="date-picker" class="p-2 cursor-pointer"><i class="fas fa-calendar-alt"></i></label>
+                        <input type="text" id="date-picker" placeholder="Chọn tuần..." class="bg-transparent font-semibold text-center w-48 border-0 focus:ring-0">
                     </div>
                     <!-- Room Selector -->
                     <select id="room-selector" class="p-3 border border-gray-300 rounded-lg shadow-sm w-full sm:w-auto md:w-64"></select>
@@ -145,6 +133,7 @@
             <p id="booking-info" class="mb-4 p-3 bg-gray-100 rounded-md"></p>
             <form id="booking-form" class="space-y-4">
                 <input type="hidden" id="booking-date">
+                <input type="hidden" id="booking-room-id">
                 
                 <div class="grid grid-cols-2 gap-4">
                     <div>
@@ -191,6 +180,36 @@
             </div>
         </div>
     </div>
+    
+    <!-- Modal Tùy chọn In -->
+    <div id="print-options-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" onclick="closeModal('print-options-modal')">&times;</span>
+            <h3 class="text-xl font-bold mb-4">Tùy chọn In Lịch</h3>
+            <div class="space-y-4">
+                <div>
+                    <input type="radio" id="print-current" name="print-option" value="current" class="mr-2">
+                    <label for="print-current">In phòng đang chọn: <span id="print-current-room-name" class="font-semibold"></span></label>
+                </div>
+                <div>
+                    <input type="radio" id="print-all" name="print-option" value="all" class="mr-2">
+                    <label for="print-all">In tất cả các phòng</label>
+                </div>
+                <div>
+                    <input type="radio" id="print-multiple" name="print-option" value="multiple" class="mr-2">
+                    <label for="print-multiple">In các phòng được chọn</label>
+                    <div id="print-room-selection-list" class="mt-2 pl-6 max-h-40 overflow-y-auto border rounded-md p-2 hidden">
+                        <!-- Checkbox list of rooms will be rendered here -->
+                    </div>
+                </div>
+            </div>
+            <div class="flex justify-end pt-4 mt-4 border-t">
+                <button id="confirm-print-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg">
+                    <i class="fas fa-print mr-2"></i>Xác nhận In
+                </button>
+            </div>
+        </div>
+    </div>
 
     <!-- Alert & Confirm Modals -->
     <div id="alert-modal" class="modal">
@@ -213,7 +232,11 @@
             </div>
         </div>
     </div>
-
+    
+    <!-- Flatpickr JS -->
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://npmcdn.com/flatpickr/dist/l10n/vn.js"></script>
+    
     <script type="module" src="js/dang-ky-lich-thuc-hanh.js"></script>
 </body>
 </html>
