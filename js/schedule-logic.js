@@ -60,7 +60,6 @@ const lecturerSchedulesList = document.getElementById('lecturer-schedules-list')
 
 const newScheduleBtn = document.getElementById('new-schedule-btn');
 const deleteScheduleBtn = document.getElementById('delete-schedule-btn');
-// [NEW] Get the new "Save As" button
 const saveAsNewBtn = document.getElementById('save-as-new-btn');
 
 
@@ -219,6 +218,49 @@ function generateScheduleRows() {
 }
 
 /**
+ * [NEW] Re-calculates and updates the dates in the details table without clearing other content.
+ */
+function resyncScheduleDates() {
+    const startDateValue = document.getElementById('auto-start-date').value;
+    if (!startDateValue) return; // Don't do anything if there's no start date
+
+    const startDate = new Date(startDateValue);
+    const dayOfWeek = parseInt(document.getElementById('auto-day-of-week').value, 10);
+
+    if (isNaN(startDate.getTime())) return;
+
+    const rows = scheduleBody.querySelectorAll('tr');
+    if (rows.length === 0) return; // No rows to update
+
+    let currentDate = new Date(startDate);
+    while (currentDate.getDay() !== dayOfWeek) {
+        currentDate.setDate(currentDate.getDate() + 1);
+    }
+
+    rows.forEach((row, index) => {
+        const teachingDate = new Date(currentDate);
+        teachingDate.setDate(teachingDate.getDate() + (index * 7));
+
+        const weekStartDate = new Date(teachingDate);
+        weekStartDate.setDate(weekStartDate.getDate() - (teachingDate.getDay() - 1 + 7) % 7);
+        const weekEndDate = new Date(weekStartDate);
+        weekEndDate.setDate(weekEndDate.getDate() + 6);
+
+        // Find the input fields within the current row
+        const tuNgayInput = row.querySelector('[data-field="tuNgay"]');
+        const denNgayInput = row.querySelector('[data-field="denNgay"]');
+        const thuInput = row.querySelector('[data-field="thu"]');
+        const ngayGiangDayInput = row.querySelector('[data-field="ngayGiangDay"]');
+
+        if (tuNgayInput) tuNgayInput.value = weekStartDate.toLocaleDateString('vi-VN');
+        if (denNgayInput) denNgayInput.value = weekEndDate.toLocaleDateString('vi-VN');
+        if (thuInput) thuInput.value = `Thứ ${dayOfWeek === 0 ? 'CN' : dayOfWeek + 1}`;
+        if (ngayGiangDayInput) ngayGiangDayInput.value = teachingDate.toLocaleDateString('vi-VN');
+    });
+}
+
+
+/**
  * Saves the current schedule data to Firebase.
  */
 async function saveScheduleData() {
@@ -275,7 +317,9 @@ async function saveScheduleData() {
     }
 }
 
-// [NEW] Function to save the current form data as a new schedule
+/**
+ * Saves the current form data as a new schedule.
+ */
 async function saveScheduleAsNew() {
     if (!currentUserId) {
         alert('Bạn phải đăng nhập để lưu dữ liệu.');
@@ -681,10 +725,10 @@ function updateUIPermissions() {
     if (!scheduleId) { // New schedule
         canEdit = true;
         canDelete = false;
-        canSaveAsNew = false; // Cannot "save as new" from a new, unsaved schedule
+        canSaveAsNew = false;
         saveDataBtn.title = 'Lưu lịch trình mới';
     } else { // Existing schedule
-        canSaveAsNew = true; // Anyone can use a loaded schedule as a template
+        canSaveAsNew = true;
         const currentSchedule = allSchedulesCache.find(s => s.id === scheduleId);
         if (currentUserRole === 'admin') {
             canEdit = true;
@@ -796,6 +840,15 @@ signatoriesListBody.addEventListener('click', (e) => {
             deleteSignatory(deleteBtn.dataset.id);
         }
     }
+});
+
+// [NEW] Add event listeners for the auto-generation fields to trigger date resyncing
+const autoGenInputs = [
+    document.getElementById('auto-start-date'),
+    document.getElementById('auto-day-of-week')
+];
+autoGenInputs.forEach(input => {
+    input.addEventListener('change', resyncScheduleDates);
 });
 
 

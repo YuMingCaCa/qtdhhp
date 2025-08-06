@@ -845,7 +845,7 @@ function generatePrintableView() {
         });
         tableBodyHtml += '</tbody>';
 
-        const pageDate = new Date();
+        const pageDate = startDate; // MODIFIED: Use the first day of the selected week
         const formattedPageDate = `ngày ${pageDate.getDate()} tháng ${pageDate.getMonth() + 1} năm ${pageDate.getFullYear()}`;
 
         contentHtml = `
@@ -892,7 +892,7 @@ function generatePrintableView() {
                 tableBodyHtml += `<td><div class="booking-container">${bookingsHtml || ''}</div></td>`;
             });
 
-            const pageDate = new Date();
+            const pageDate = startDate; // MODIFIED: Use the first day of the selected week
             const formattedPageDate = `ngày ${pageDate.getDate()} tháng ${pageDate.getMonth() + 1} năm ${pageDate.getFullYear()}`;
 
             contentHtml += `
