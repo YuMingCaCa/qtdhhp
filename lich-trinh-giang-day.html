@@ -27,7 +27,7 @@
                 <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRjTnSBGofmGpcMY_uEoXhgAB-FeeLjVslu1A&s" alt="Logo Trường Đại học Hải Phòng" class="h-16 md:h-20">
                 <div class="text-center">
                     <h1 class="text-xl md:text-3xl font-bold text-blue-800">Hệ thống Quản lý Lịch trình Giảng dạy</h1>
-                    <p class="text-md md:text-lg text-gray-600">&copy; Khoa Công Nghệ Thông Tin - Trường Đại học Hải Phòng</p>
+                    <p class="text-md md:text-lg text-gray-600">Khoa Công Nghệ Thông Tin - Trường Đại học Hải Phòng</p>
                 </div>
                 <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQpzh7trviplRC5G2r75APp6H3wcTnXVixU-Q&s" alt="Logo Khoa Công nghệ Thông tin" class="h-16 md:h-20">
             </div>
@@ -65,16 +65,18 @@
                         <select id="department-head-select" class="form-input"></select>
                     </div>
                 </div>
-                <div class="flex gap-2 self-end flex-shrink-0">
+                <div class="flex gap-2 self-end flex-shrink-0 flex-wrap">
                     <button id="new-schedule-btn" class="btn btn-secondary"><i class="fas fa-plus mr-2"></i>Tạo mới</button>
                     <button id="manage-signatures-btn" class="btn btn-info hidden"><i class="fas fa-signature mr-2"></i>QL Chữ ký</button>
                     <button id="save-data-btn" class="btn btn-success"><i class="fas fa-save mr-2"></i>Lưu</button>
+                    <!-- [NEW] Save As New Button -->
+                    <button id="save-as-new-btn" class="btn btn-primary"><i class="fas fa-copy mr-2"></i>Lưu bản mới</button>
                     <button id="delete-schedule-btn" class="btn btn-warning"><i class="fas fa-trash-alt mr-2"></i>Xóa</button>
                     <button id="export-pdf-btn" class="btn btn-danger"><i class="fas fa-print mr-2"></i>In Lịch</button>
                 </div>
             </div>
 
-            <!-- [REVISED] Admin/Viewer Filter Section -->
+            <!-- Admin/Viewer Filter Section -->
             <div id="admin-filter-section" class="hidden items-start gap-4 mb-6 border-b pb-6">
                 <div class="flex-grow" style="flex-basis: 40%;">
                     <label for="lecturer-search-input" class="block text-sm font-medium text-gray-700 mb-1">Lọc lịch trình theo tên giảng viên:</label>

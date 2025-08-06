@@ -26,7 +26,8 @@ let currentUserRole = 'viewer';
 let schedulesColPath = '';
 let settingsDocPath = '';
 let signatories = [];
-let allSchedulesCache = null; // null: not loaded, []: loaded but empty, [...]: loaded with data
+let allSchedulesCache = null; 
+let isCacheLoaded = false;
 
 // --- DOM Elements ---
 const addWeekBtn = document.getElementById('add-week-btn');
@@ -59,6 +60,8 @@ const lecturerSchedulesList = document.getElementById('lecturer-schedules-list')
 
 const newScheduleBtn = document.getElementById('new-schedule-btn');
 const deleteScheduleBtn = document.getElementById('delete-schedule-btn');
+// [NEW] Get the new "Save As" button
+const saveAsNewBtn = document.getElementById('save-as-new-btn');
 
 
 // --- Initial State ---
@@ -257,9 +260,9 @@ async function saveScheduleData() {
         await setDoc(scheduleDocRef, dataToSave);
         alert(`Đã lưu thành công lịch trình: ${scheduleId}`);
         
-        allSchedulesCache = null; // Invalidate cache
-        await loadAllSchedulesForCache(); // Re-fetch all data
-        filterAndDisplayLecturerSchedules(); // Re-display lists
+        allSchedulesCache = null; 
+        await loadAllSchedulesForCache();
+        filterAndDisplayLecturerSchedules();
 
         schedulesSearchInput.value = scheduleId;
         selectedScheduleIdInput.value = scheduleId;
@@ -272,13 +275,57 @@ async function saveScheduleData() {
     }
 }
 
+// [NEW] Function to save the current form data as a new schedule
+async function saveScheduleAsNew() {
+    if (!currentUserId) {
+        alert('Bạn phải đăng nhập để lưu dữ liệu.');
+        return;
+    }
+
+    const hocPhan = document.getElementById('hoc-phan').value || 'Bansao';
+    const lop = document.getElementById('lop').value || 'LopMoi';
+    const defaultName = `Bansao_${hocPhan.replace(/\s/g, '_')}-${lop.replace(/\s/g, '_')}-${Date.now()}`;
+    
+    const newScheduleId = prompt("Nhập tên cho bản sao lịch trình MỚI:", defaultName);
+    if (!newScheduleId) {
+        alert('Đã hủy lưu.');
+        return;
+    }
+
+    loader.style.display = 'block';
+    const dataToSave = getScheduleData();
+    dataToSave.ownerId = currentUserId; // The new owner is the current user
+    dataToSave.lecturerName = dataToSave.general.giang_vien;
+
+    try {
+        const scheduleDocRef = doc(db, schedulesColPath, newScheduleId);
+        await setDoc(scheduleDocRef, dataToSave);
+        alert(`Đã sao chép và lưu thành công lịch trình mới: ${newScheduleId}`);
+        
+        allSchedulesCache = null; 
+        await loadAllSchedulesForCache();
+        filterAndDisplayLecturerSchedules();
+
+        // Update the UI to reflect the newly created schedule
+        schedulesSearchInput.value = newScheduleId;
+        selectedScheduleIdInput.value = newScheduleId;
+        updateUIPermissions();
+    } catch (error) {
+        console.error("Error saving as new data: ", error);
+        alert(`Lỗi khi lưu dữ liệu: ${error.message}`);
+    } finally {
+        loader.style.display = 'none';
+    }
+}
+
+
 // --- Searchable Schedule & Filter Functions ---
 
 /**
- * [REVISED] Loads all schedules into a local cache ONCE per session.
+ * Loads all schedules into a local cache ONCE per session.
  */
 async function loadAllSchedulesForCache() {
-    if (allSchedulesCache !== null) return; // Already loaded
+    if (allSchedulesCache !== null) return;
 
     loader.style.display = 'block';
     try {
@@ -294,7 +341,7 @@ async function loadAllSchedulesForCache() {
 }
 
 /**
- * [REVISED] Filters and displays schedules based on the lecturer search input.
+ * Filters and displays schedules based on the lecturer search input.
  */
 function filterAndDisplayLecturerSchedules() {
     if (allSchedulesCache === null) return;
@@ -628,13 +675,16 @@ function updateUIPermissions() {
 
     let canEdit = false;
     let canDelete = false;
+    let canSaveAsNew = false;
     const scheduleId = selectedScheduleIdInput.value;
 
     if (!scheduleId) { // New schedule
         canEdit = true;
         canDelete = false;
+        canSaveAsNew = false; // Cannot "save as new" from a new, unsaved schedule
         saveDataBtn.title = 'Lưu lịch trình mới';
     } else { // Existing schedule
+        canSaveAsNew = true; // Anyone can use a loaded schedule as a template
         const currentSchedule = allSchedulesCache.find(s => s.id === scheduleId);
         if (currentUserRole === 'admin') {
             canEdit = true;
@@ -656,6 +706,7 @@ function updateUIPermissions() {
     
     saveDataBtn.disabled = !canEdit;
     deleteScheduleBtn.disabled = !canDelete;
+    saveAsNewBtn.disabled = !canSaveAsNew;
     setFormInteractivity(canEdit);
 }
 
@@ -711,6 +762,7 @@ saveDataBtn.addEventListener('click', saveScheduleData);
 generateScheduleBtn.addEventListener('click', generateScheduleRows);
 newScheduleBtn.addEventListener('click', resetFormForNewSchedule);
 deleteScheduleBtn.addEventListener('click', deleteSchedule);
+saveAsNewBtn.addEventListener('click', saveScheduleAsNew);
 
 
 schedulesSearchInput.addEventListener('input', filterAndShowSchedules);
@@ -721,7 +773,6 @@ document.addEventListener('click', (e) => {
     }
 });
 
-// [REVISED] Event listener for the lecturer search input
 lecturerSearchInput.addEventListener('input', () => {
     filterAndDisplayLecturerSchedules();
 });
@@ -767,8 +818,8 @@ onAuthStateChanged(auth, async (user) => {
 
         updateUIPermissions();
         await loadSignatories();
-        await loadAllSchedulesForCache(); // Load cache for everyone on startup
-        filterAndDisplayLecturerSchedules(); // Display initial (empty) list
+        await loadAllSchedulesForCache();
+        filterAndDisplayLecturerSchedules();
         
         setInitialDate();
 
