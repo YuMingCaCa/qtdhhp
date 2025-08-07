@@ -40,6 +40,7 @@ let currentWeekStartDate = null;
 let selectedRoomId = null;
 let scheduleListener = null; // To hold the unsubscribe function for the schedule listener
 let datePickerInstance = null;
+let printLecturerDatePickerInstance = null; // Date picker for lecturer printing
 let selectedBookings = new Set();
 
 // --- UI ELEMENTS ---
@@ -161,7 +162,7 @@ window.openTab = (evt, tabName) => {
 function updateUIForRole() {
     const isAdmin = currentUserInfo && currentUserInfo.role === 'admin';
     document.querySelectorAll('.admin-only').forEach(el => {
-        el.style.display = isAdmin ? 'flex' : 'none';
+        el.style.display = isAdmin ? 'block' : 'none'; // Use 'block' for divs
     });
 }
 
@@ -746,6 +747,7 @@ function openPrintOptionsModal() {
     const currentRoomNameSpan = document.getElementById('print-current-room-name');
     const printCurrentRadio = document.getElementById('print-current');
     
+    // Setup for printing by room
     if (selectedRoomId && selectedRoomId !== 'all') {
         const currentRoom = allRooms.find(r => r.id === selectedRoomId);
         currentRoomNameSpan.textContent = currentRoom ? currentRoom.name : 'N/A';
@@ -764,10 +766,37 @@ function openPrintOptionsModal() {
             radio.dispatchEvent(event);
         }
     });
-
     renderPrintRoomSelectionList();
+
+    // Setup for printing by lecturer (admin only)
+    if (currentUserInfo && currentUserInfo.role === 'admin') {
+        const lecturerSelect = document.getElementById('print-lecturer-select');
+        lecturerSelect.innerHTML = '<option value="">-- Chọn giảng viên --</option>';
+        allLecturers.forEach(lecturer => {
+            lecturerSelect.innerHTML += `<option value="${lecturer.value}">${lecturer.value}</option>`;
+        });
+
+        if (!printLecturerDatePickerInstance) {
+            printLecturerDatePickerInstance = flatpickr("#print-lecturer-start-week", {
+                weekNumbers: true,
+                defaultDate: currentWeekStartDate,
+                 onChange: (selectedDates, dateStr, instance) => {
+                    const { startDate, weekNumber } = getWeekInfo(selectedDates[0]);
+                    const endDate = new Date(new Date(startDate).setDate(startDate.getDate() + 6));
+                    instance.input.value = `Tuần ${weekNumber} (${formatDateToDDMMYYYY(startDate)})`;
+                },
+                onReady: (selectedDates, dateStr, instance) => {
+                     const { startDate, weekNumber } = getWeekInfo(instance.now);
+                     instance.input.value = `Tuần ${weekNumber} (${formatDateToDDMMYYYY(startDate)})`;
+                }
+            });
+        }
+        printLecturerDatePickerInstance.set('defaultDate', currentWeekStartDate);
+    }
+
     document.getElementById('print-options-modal').style.display = 'flex';
 }
+
 function renderPrintRoomSelectionList() {
     const container = document.getElementById('print-room-selection-list');
     container.innerHTML = '';
@@ -780,7 +809,8 @@ function renderPrintRoomSelectionList() {
         `;
     });
 }
-function generatePrintableView() {
+
+async function generatePrintableViewByRoom() {
     const printOption = document.querySelector('input[name="print-option"]:checked').value;
     let roomsToPrint = [];
 
@@ -845,7 +875,7 @@ function generatePrintableView() {
         });
         tableBodyHtml += '</tbody>';
 
-        const pageDate = startDate; // MODIFIED: Use the first day of the selected week
+        const pageDate = startDate;
         const formattedPageDate = `ngày ${pageDate.getDate()} tháng ${pageDate.getMonth() + 1} năm ${pageDate.getFullYear()}`;
 
         contentHtml = `
@@ -892,7 +922,7 @@ function generatePrintableView() {
                 tableBodyHtml += `<td><div class="booking-container">${bookingsHtml || ''}</div></td>`;
             });
 
-            const pageDate = startDate; // MODIFIED: Use the first day of the selected week
+            const pageDate = startDate;
             const formattedPageDate = `ngày ${pageDate.getDate()} tháng ${pageDate.getMonth() + 1} năm ${pageDate.getFullYear()}`;
 
             contentHtml += `
@@ -926,9 +956,138 @@ function generatePrintableView() {
         });
     }
 
-    const printHtml = `
+    openPrintWindow(contentHtml, `Lịch thực hành tuần ${weekNumber}`);
+    closeModal('print-options-modal');
+}
+
+async function generatePrintableViewByLecturer() {
+    const lecturerName = document.getElementById('print-lecturer-select').value;
+    const numWeeks = parseInt(document.getElementById('print-lecturer-num-weeks').value) || 1;
+    const selectedStartDate = printLecturerDatePickerInstance.selectedDates[0];
+
+    if (!lecturerName) {
+        showAlert("Vui lòng chọn một giảng viên để in lịch.");
+        return;
+    }
+    if (!selectedStartDate) {
+        showAlert("Vui lòng chọn tuần bắt đầu.");
+        return;
+    }
+
+    showAlert("Đang chuẩn bị dữ liệu in, vui lòng chờ...");
+
+    try {
+        let allBookings = [];
+        let currentWeekStart = getWeekInfo(selectedStartDate).startDate;
+
+        for (let i = 0; i < numWeeks; i++) {
+            const weekId = formatDateToYYYYMMDD(currentWeekStart);
+            const q = query(schedulesCol, where("weekId", "==", weekId), where("lecturerName", "==", lecturerName));
+            const querySnapshot = await getDocs(q);
+            querySnapshot.forEach(doc => {
+                allBookings.push({ id: doc.id, ...doc.data() });
+            });
+            // Move to the next week
+            currentWeekStart.setDate(currentWeekStart.getDate() + 7);
+        }
+
+        if (allBookings.length === 0) {
+            showAlert(`Không tìm thấy lịch thực hành nào cho giảng viên "${lecturerName}" trong ${numWeeks} tuần đã chọn.`);
+            return;
+        }
+
+        // Sort bookings by date and time
+        allBookings.sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime));
+
+        // Group bookings by week
+        const bookingsByWeek = allBookings.reduce((acc, booking) => {
+            const weekInfo = getWeekInfo(new Date(booking.date));
+            const weekKey = `Tuần ${weekInfo.weekNumber} (từ ${formatDateToDDMMYYYY(weekInfo.startDate)} đến ${formatDateToDDMMYYYY(new Date(new Date(weekInfo.startDate).setDate(weekInfo.startDate.getDate() + 6)))})`;
+            if (!acc[weekKey]) {
+                acc[weekKey] = [];
+            }
+            acc[weekKey].push(booking);
+            return acc;
+        }, {});
+
+        const daysOfWeek = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
+        let contentHtml = '';
+        const pageDate = new Date();
+        const formattedPageDate = `ngày ${pageDate.getDate()} tháng ${pageDate.getMonth() + 1} năm ${pageDate.getFullYear()}`;
+
+        for (const weekKey in bookingsByWeek) {
+            const weekBookings = bookingsByWeek[weekKey];
+            let tableBodyHtml = '';
+            weekBookings.forEach(booking => {
+                const date = new Date(booking.date);
+                const room = allRooms.find(r => r.id === booking.roomId);
+                tableBodyHtml += `
+                    <tr>
+                        <td>${daysOfWeek[date.getUTCDay()]}</td>
+                        <td>${formatDateToDDMMYYYY(date)}</td>
+                        <td>${booking.startTime} - ${booking.endTime}</td>
+                        <td>${room?.name || 'N/A'}</td>
+                        <td>${booking.className}</td>
+                        <td>${booking.content}</td>
+                    </tr>
+                `;
+            });
+
+            contentHtml += `
+                <div class="page">
+                    <div class="print-header">
+                        <div class="school-info">
+                             <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRjTnSBGofmGpcMY_uEoXhgAB-FeeLjVslu1A&s" alt="Logo HPU">
+                             <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQpzh7trviplRC5G2r75APp6H3wcTnXVixU-Q&s" alt="Logo FIT">
+                        </div>
+                        <div class="motto">
+                            <p><strong>CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</strong></p>
+                            <p><strong>Độc lập - Tự do - Hạnh phúc</strong></p>
+                            <hr>
+                        </div>
+                    </div>
+                    <h1 class="title">LỊCH GIẢNG DẠY THỰC HÀNH<br>
+                        Giảng viên: ${lecturerName}<br>
+                        ${weekKey}
+                    </h1>
+                    <p style="text-align: right; font-style: italic; margin-bottom: 15px;">Hải Phòng, ${formattedPageDate}</p>
+                    <table class="schedule-table lecturer-print">
+                        <thead>
+                            <tr>
+                                <th>Thứ</th>
+                                <th>Ngày</th>
+                                <th>Thời gian</th>
+                                <th>Phòng</th>
+                                <th>Lớp học phần</th>
+                                <th>Nội dung</th>
+                            </tr>
+                        </thead>
+                        <tbody>${tableBodyHtml}</tbody>
+                    </table>
+                    <div class="footer-container">
+                        <div class="signature-block"><h4 contenteditable="true">BAN CHỦ NHIỆM KHOA</h4><p contenteditable="true"></p></div>
+                        <div class="signature-block"><h4 contenteditable="true">TỔ BỘ MÔN</h4><p contenteditable="true"></p></div>
+                        <div class="signature-block"><h4 contenteditable="true">NGƯỜI LẬP</h4><p contenteditable="true"></p></div>
+                    </div>
+                </div>
+            `;
+        }
+
+        openPrintWindow(contentHtml, `Lịch giảng dạy của ${lecturerName}`);
+        closeModal('print-options-modal');
+        closeModal('alert-modal'); // Close the "loading" alert
+
+    } catch (error) {
+        console.error("Error generating lecturer print view:", error);
+        showAlert("Đã có lỗi xảy ra khi tạo bản in. Vui lòng thử lại.");
+    }
+}
+
+
+function openPrintWindow(contentHtml, title) {
+     const printHtml = `
         <!DOCTYPE html><html lang="vi"><head><meta charset="UTF-8">
-        <title>Lịch thực hành tuần ${weekNumber}</title>
+        <title>${title}</title>
         <style>
             body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; margin: 0; }
             .page { padding: 2cm; width: 29.7cm; min-height: 20.9cm; box-sizing: border-box; page-break-after: always; margin: 0 auto; display: flex; flex-direction: column; }
@@ -943,6 +1102,7 @@ function generatePrintableView() {
             .schedule-table th, .schedule-table td { border: 1px solid black; text-align: center; padding: 5px; vertical-align: top; }
             .schedule-table th { font-weight: bold; }
             .schedule-table.all-rooms-print .room-name-cell { font-weight: bold; text-align: left; padding-left: 8px; vertical-align: middle; width: 12%;}
+            .schedule-table.lecturer-print td { text-align: left; padding-left: 8px; }
             .booking-container { min-height: 100px; height: 100%; overflow: hidden; display: flex; flex-direction: column; gap: 4px; }
             .schedule-booking { border: 1px solid #ccc; padding: 4px; border-radius: 4px; font-size: 10pt; text-align: left; margin-bottom: 2px; }
             .schedule-booking .font-bold { font-weight: bold; }
@@ -959,7 +1119,6 @@ function generatePrintableView() {
     const printWindow = window.open('', '_blank');
     printWindow.document.write(printHtml);
     printWindow.document.close();
-    closeModal('print-options-modal');
 }
 
 
@@ -1000,7 +1159,9 @@ function addEventListeners() {
 
     // Print Listeners
     document.getElementById('print-schedule-btn').addEventListener('click', openPrintOptionsModal);
-    document.getElementById('confirm-print-btn').addEventListener('click', generatePrintableView);
+    document.getElementById('confirm-print-by-room-btn').addEventListener('click', generatePrintableViewByRoom);
+    document.getElementById('confirm-print-by-lecturer-btn').addEventListener('click', generatePrintableViewByLecturer);
+    
     document.querySelectorAll('input[name="print-option"]').forEach(radio => {
         radio.addEventListener('change', (e) => {
             document.getElementById('print-room-selection-list').style.display = e.target.value === 'multiple' ? 'block' : 'none';

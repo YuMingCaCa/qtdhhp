@@ -302,30 +302,61 @@
     
     <!-- Modal Tùy chọn In -->
     <div id="print-options-modal" class="modal">
-        <div class="modal-content">
+        <div class="modal-content !max-w-xl">
             <span class="close-button" onclick="closeModal('print-options-modal')">&times;</span>
             <h3 class="text-xl font-bold mb-4">Tùy chọn In Lịch</h3>
-            <div class="space-y-4">
-                <div>
-                    <input type="radio" id="print-current" name="print-option" value="current" class="mr-2">
-                    <label for="print-current">In phòng đang chọn: <span id="print-current-room-name" class="font-semibold"></span></label>
-                </div>
-                <div>
-                    <input type="radio" id="print-all" name="print-option" value="all" class="mr-2">
-                    <label for="print-all">In tất cả các phòng</label>
-                </div>
-                <div>
-                    <input type="radio" id="print-multiple" name="print-option" value="multiple" class="mr-2">
-                    <label for="print-multiple">In các phòng được chọn</label>
-                    <div id="print-room-selection-list" class="mt-2 pl-6 max-h-40 overflow-y-auto border rounded-md p-2 hidden">
-                        <!-- Checkbox list of rooms will be rendered here -->
+            
+            <!-- In theo phòng -->
+            <div class="p-4 border rounded-lg">
+                <h4 class="font-semibold text-lg mb-3">In lịch theo phòng</h4>
+                <div class="space-y-4">
+                    <div>
+                        <input type="radio" id="print-current" name="print-option" value="current" class="mr-2">
+                        <label for="print-current">In phòng đang chọn: <span id="print-current-room-name" class="font-semibold"></span></label>
+                    </div>
+                    <div>
+                        <input type="radio" id="print-all" name="print-option" value="all" class="mr-2">
+                        <label for="print-all">In tất cả các phòng</label>
+                    </div>
+                    <div>
+                        <input type="radio" id="print-multiple" name="print-option" value="multiple" class="mr-2">
+                        <label for="print-multiple">In các phòng được chọn</label>
+                        <div id="print-room-selection-list" class="mt-2 pl-6 max-h-40 overflow-y-auto border rounded-md p-2 hidden">
+                            <!-- Checkbox list of rooms will be rendered here -->
+                        </div>
                     </div>
                 </div>
+                <div class="flex justify-end pt-4 mt-4 border-t">
+                    <button id="confirm-print-by-room-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">
+                        <i class="fas fa-print mr-2"></i>In theo Phòng
+                    </button>
+                </div>
             </div>
-            <div class="flex justify-end pt-4 mt-4 border-t">
-                <button id="confirm-print-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg">
-                    <i class="fas fa-print mr-2"></i>Xác nhận In
-                </button>
+
+            <!-- In theo giảng viên (ADMIN ONLY) -->
+            <div class="admin-only mt-6 p-4 border rounded-lg">
+                <h4 class="font-semibold text-lg mb-3">In lịch theo giảng viên</h4>
+                <div class="space-y-4">
+                    <div>
+                        <label for="print-lecturer-select" class="block text-sm font-medium text-gray-700">Chọn giảng viên</label>
+                        <select id="print-lecturer-select" class="mt-1 block w-full p-2 border border-gray-300 rounded-md"></select>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="print-lecturer-start-week" class="block text-sm font-medium text-gray-700">In từ tuần</label>
+                            <input type="text" id="print-lecturer-start-week" placeholder="Chọn tuần bắt đầu" class="mt-1 block w-full p-2 border border-gray-300 rounded-md">
+                        </div>
+                        <div>
+                            <label for="print-lecturer-num-weeks" class="block text-sm font-medium text-gray-700">Số tuần cần in</label>
+                            <input type="number" id="print-lecturer-num-weeks" min="1" value="1" class="mt-1 block w-full p-2 border border-gray-300 rounded-md">
+                        </div>
+                    </div>
+                </div>
+                <div class="flex justify-end pt-4 mt-4 border-t">
+                    <button id="confirm-print-by-lecturer-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg">
+                        <i class="fas fa-print mr-2"></i>In theo Giảng viên
+                    </button>
+                </div>
             </div>
         </div>
     </div>
