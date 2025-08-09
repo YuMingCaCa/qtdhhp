@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quản lý Ngân hàng Đề thi - ĐHHP</title>
+    <link rel="icon" type="image/png" href="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRjTnSBGofmGpcMY_uEoXhgAB-FeeLjVslu1A&s">
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Custom Styles -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8;
+        }
+        .modal {
+            display: none; position: fixed; z-index: 50;
+            left: 0; top: 0; width: 100%; height: 100%;
+            overflow: auto; background-color: rgba(0,0,0,0.5);
+            animation: fadeIn 0.4s;
+        }
+        .modal-content {
+            background-color: #fefefe; margin: 5% auto; padding: 24px;
+            border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            width: 90%; max-width: 800px;
+            animation: slideIn 0.4s;
+        }
+        @keyframes slideIn { from {margin-top: -5%; opacity: 0} to {margin-top: 5%; opacity: 1} }
+        @keyframes fadeIn { from {opacity: 0} to {opacity: 1} }
+        .close-button {
+            color: #aaa; float: right; font-size: 28px; font-weight: bold;
+            cursor: pointer;
+        }
+        .form-input {
+            width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 8px;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .form-input:focus {
+            outline: none; border-color: #3b82f6; box-shadow: 0 0 0 2px #bfdbfe;
+        }
+        .btn {
+            padding: 10px 16px; border-radius: 8px; font-weight: 600;
+            display: inline-flex; align-items: center; justify-content: center;
+            transition: all 0.2s;
+        }
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .btn-primary { background-color: #3b82f6; color: white; }
+        .btn-primary:hover:not(:disabled) { background-color: #2563eb; }
+        .btn-secondary { background-color: #6b7280; color: white; }
+        .btn-secondary:hover:not(:disabled) { background-color: #4b5563; }
+        .btn-danger { background-color: #ef4444; color: white; }
+        .btn-danger:hover:not(:disabled) { background-color: #dc2626; }
+        .btn-success { background-color: #22c55e; color: white; }
+        .btn-success:hover:not(:disabled) { background-color: #16a34a; }
+        .file-upload-label {
+            border: 2px dashed #d1d5db; padding: 1rem; text-align: center;
+            cursor: pointer; border-radius: 8px;
+        }
+        .file-upload-label:hover { border-color: #3b82f6; background-color: #f9fafb; }
+        #auth-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(255, 255, 255, 0.9); z-index: 100;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .auth-message { font-size: 1.2rem; color: #374151; font-weight: 500;}
+    </style>
+</head>
+<body class="p-4 sm:p-6 md:p-8">
+
+    <div id="auth-overlay">
+        <div class="auth-message">Vui lòng đăng nhập để tiếp tục...</div>
+    </div>
+
+    <main id="main-content" class="hidden">
+        <!-- Header -->
+        <div class="max-w-7xl mx-auto bg-white p-6 rounded-2xl shadow-lg mb-8">
+            <div class="flex items-center justify-between">
+                <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRjTnSBGofmGpcMY_uEoXhgAB-FeeLjVslu1A&s" alt="Logo Trường Đại học Hải Phòng" class="h-16 md:h-20">
+                <div class="text-center">
+                    <h1 class="text-xl md:text-3xl font-bold text-blue-800">Hệ thống Quản lý Ngân hàng Đề thi</h1>
+                    <p class="text-md md:text-lg text-gray-600">&copy; Khoa Công Nghệ Thông Tin - Trường Đại học Hải Phòng</p>
+                </div>
+                <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQpzh7trviplRC5G2r75APp6H3wcTnXVixU-Q&s" alt="Logo Khoa Công nghệ Thông tin" class="h-16 md:h-20">
+            </div>
+        </div>
+
+        <!-- Main Dashboard -->
+        <div class="max-w-7xl mx-auto bg-white p-6 rounded-2xl shadow-lg">
+            <!-- Toolbar -->
+            <div class="flex flex-col sm:flex-row items-center justify-between mb-6 pb-4 border-b">
+                <div class="flex items-center gap-4">
+                    <i class="fas fa-file-signature text-3xl text-rose-600"></i>
+                    <h1 class="text-2xl font-bold text-gray-800">Bảng điều khiển Đề thi</h1>
+                </div>
+                <div class="flex items-center gap-4 mt-4 sm:mt-0">
+                     <button id="add-exam-btn" class="btn btn-primary"><i class="fas fa-plus mr-2"></i>Thêm Đề thi mới</button>
+                     <a href="/" class="btn btn-secondary"><i class="fas fa-arrow-left mr-2"></i>Quay lại</a>
+                </div>
+            </div>
+
+            <!-- Filters -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div>
+                    <label for="filter-subject" class="block text-sm font-medium text-gray-700 mb-1">Lọc theo Môn học:</label>
+                    <select id="filter-subject" class="form-input">
+                        <option value="all">Tất cả môn học</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="filter-year" class="block text-sm font-medium text-gray-700 mb-1">Lọc theo Năm học:</label>
+                    <input type="text" id="filter-year" class="form-input" placeholder="VD: 2024-2025">
+                </div>
+            </div>
+
+            <!-- Exams Table -->
+            <div class="overflow-x-auto">
+                <table class="min-w-full border border-gray-300 text-sm">
+                    <thead class="bg-gray-200 text-gray-700">
+                        <tr>
+                            <th class="p-2 border">Tên/Mã đề</th>
+                            <th class="p-2 border">Môn học</th>
+                            <th class="p-2 border">Năm học</th>
+                            <th class="p-2 border">Hình thức</th>
+                            <th class="p-2 border">Người tạo</th>
+                            <th class="p-2 border">Ngày tạo</th>
+                            <th class="p-2 border">Hành động</th>
+                        </tr>
+                    </thead>
+                    <tbody id="exams-list-body">
+                        <!-- Exam rows will be injected here by JS -->
+                        <tr><td colspan="7" class="text-center p-4 text-gray-500">Đang tải dữ liệu...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- ====== NEW: Pagination Controls ====== -->
+            <div id="pagination-container" class="mt-6 flex justify-between items-center text-sm">
+                <p id="results-count" class="text-gray-600">Đang tải...</p>
+                <div class="flex items-center gap-2">
+                    <button id="prev-page-btn" class="btn btn-secondary"><i class="fas fa-chevron-left"></i></button>
+                    <span id="page-indicator" class="font-semibold">Trang 1</span>
+                    <button id="next-page-btn" class="btn btn-secondary"><i class="fas fa-chevron-right"></i></button>
+                </div>
+            </div>
+            <!-- ===================================== -->
+        </div>
+    </main>
+
+    <!-- Add/Edit Exam Modal -->
+    <div id="exam-modal" class="modal">
+        <div class="modal-content">
+            <span id="close-exam-modal" class="close-button">&times;</span>
+            <h3 id="exam-modal-title" class="text-2xl font-bold mb-6 text-gray-800">Thêm Đề thi mới</h3>
+            <form id="exam-form" class="space-y-4">
+                <input type="hidden" id="exam-id">
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="exam-subject" class="block text-sm font-medium text-gray-700">Môn học <span class="text-red-500">*</span></label>
+                        <select id="exam-subject" class="form-input mt-1" required></select>
+                    </div>
+                    <div>
+                        <label for="exam-name" class="block text-sm font-medium text-gray-700">Tên/Mã đề thi <span class="text-red-500">*</span></label>
+                        <input type="text" id="exam-name" class="form-input mt-1" placeholder="VD: Đề cuối kỳ" required>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                     <div>
+                        <label for="exam-academic-year" class="block text-sm font-medium text-gray-700">Năm học</label>
+                        <input type="text" id="exam-academic-year" class="form-input mt-1" placeholder="VD: 2024-2025">
+                    </div>
+                    <div>
+                        <label for="exam-semester" class="block text-sm font-medium text-gray-700">Học kỳ</label>
+                        <select id="exam-semester" class="form-input mt-1">
+                            <option value="I">Học kỳ I</option>
+                            <option value="II">Học kỳ II</option>
+                            <option value="Hè">Học kỳ Hè</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="exam-duration" class="block text-sm font-medium text-gray-700">Thời gian (phút)</label>
+                        <input type="number" id="exam-duration" class="form-input mt-1" placeholder="VD: 90">
+                    </div>
+                </div>
+
+                <div>
+                    <label for="exam-format" class="block text-sm font-medium text-gray-700">Hình thức thi</label>
+                    <select id="exam-format" class="form-input mt-1">
+                        <option>Tự luận</option>
+                        <option>Trắc nghiệm</option>
+                        <option>Vấn đáp</option>
+                        <option>Bài tập lớn</option>
+                        <option>Tiểu luận</option>
+                        <option>Thực hành</option>
+                        <option>Khác</option>
+                    </select>
+                </div>
+                
+                <!-- File Uploads -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">File Đề thi</label>
+                        <label for="exam-file-input" class="file-upload-label">
+                            <i class="fas fa-cloud-upload-alt text-3xl text-gray-400"></i>
+                            <p id="exam-file-name" class="mt-2 text-sm text-gray-600">Nhấn để chọn file (PDF, DOCX)</p>
+                        </label>
+                        <input type="file" id="exam-file-input" class="hidden" accept=".pdf,.doc,.docx">
+                        <div id="exam-file-progress-container" class="mt-2 hidden">
+                            <div class="w-full bg-gray-200 rounded-full h-2.5">
+                                <div id="exam-file-progress-bar" class="bg-blue-600 h-2.5 rounded-full" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+                     <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">File Đáp án (nếu có)</label>
+                        <label for="answer-file-input" class="file-upload-label">
+                            <i class="fas fa-cloud-upload-alt text-3xl text-gray-400"></i>
+                            <p id="answer-file-name" class="mt-2 text-sm text-gray-600">Nhấn để chọn file (PDF, DOCX)</p>
+                        </label>
+                        <input type="file" id="answer-file-input" class="hidden" accept=".pdf,.doc,.docx">
+                        <div id="answer-file-progress-container" class="mt-2 hidden">
+                            <div class="w-full bg-gray-200 rounded-full h-2.5">
+                                <div id="answer-file-progress-bar" class="bg-blue-600 h-2.5 rounded-full" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <label for="exam-notes" class="block text-sm font-medium text-gray-700">Ghi chú</label>
+                    <textarea id="exam-notes" rows="3" class="form-input mt-1"></textarea>
+                </div>
+
+                <div class="flex justify-end pt-4 gap-3">
+                    <button type="button" id="cancel-exam-btn" class="btn btn-secondary">Hủy</button>
+                    <button type="submit" id="save-exam-btn" class="btn btn-success"><i class="fas fa-save mr-2"></i>Lưu Đề thi</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Alert & Confirm Modals -->
+    <div id="alert-modal" class="modal">
+        <div class="modal-content !max-w-md">
+             <h3 id="alert-title" class="text-lg font-bold mb-4">Thông báo</h3>
+            <p id="alert-message" class="mb-6"></p>
+            <div class="flex justify-end">
+                <button id="alert-ok-btn" class="btn btn-primary">OK</button>
+            </div>
+        </div>
+    </div>
+    <div id="confirm-modal" class="modal">
+        <div class="modal-content !max-w-md">
+            <h3 class="text-lg font-bold mb-4">Xác nhận</h3>
+            <p id="confirm-message" class="mb-6"></p>
+            <div class="flex justify-end gap-3">
+                <button id="confirm-btn-no" class="btn btn-secondary">Hủy</button>
+                <button id="confirm-btn-yes" class="btn btn-danger">Xác nhận</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="js/quan-ly-de-thi.js"></script>
+</body>
+</html>

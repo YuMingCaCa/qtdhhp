@@ -1,6 +1,7 @@
 // File: js/login.js
 // Handles logic for the main index.html page (Login and Module Selection).
 // TỐI ƯU HÓA: Chỉ đọc quyền người dùng một lần và lưu vào sessionStorage.
+// CẬP NHẬT: Thêm storageBucket vào config để hỗ trợ các module tải file.
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import {
@@ -164,7 +165,7 @@ async function initializeFirebase() {
       // =======================================================
       // ============ CẬP NHẬT THEO YÊU CẦU CỦA BẠN ============
       // =======================================================
-      storageBucket: "qlylaodongbdhhp.firebasestorage.app",
+      storageBucket: "qlylaodongbdhhp.appspot.com", // Đã thêm/sửa bucket để hỗ trợ upload file
       // =======================================================
       // =======================================================
       messagingSenderId: "462439202995",
