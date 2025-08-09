@@ -1,24 +1,9 @@
 // File: js/schedule-logic.js
 // Handles all logic for the Teaching Schedule Management page, including Firebase integration.
 
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+import { auth, db, appId } from './portal-config.js';
+import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import { getFirestore, doc, setDoc, getDoc, collection, getDocs, query, where, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-// --- Firebase Configuration ---
-const firebaseConfig = {
-  apiKey: "AIzaSyCJcTMUwO-w7V0YsGUKWeaW-zl42Ww7fxo",
-  authDomain: "qlylaodongbdhhp.firebaseapp.com",
-  projectId: "qlylaodongbdhhp",
-  storageBucket: "qlylaodongbdhhp.appspot.com",
-  messagingSenderId: "462439202995",
-  appId: "1:462439202995:web:06bc11042efb9b99d4f0c6"
-};
-
-// --- Firebase Initialization ---
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
 
 // --- Global Variables ---
 let currentUserId = null;
@@ -856,7 +841,6 @@ autoGenInputs.forEach(input => {
 onAuthStateChanged(auth, async (user) => {
     if (user) {
         currentUserId = user.uid;
-        const appId = firebaseConfig.projectId || 'default-app-id';
         
         schedulesColPath = `artifacts/${appId}/public/data/schedules`;
         settingsDocPath = `artifacts/${appId}/public/data/settings/scheduleModule`;

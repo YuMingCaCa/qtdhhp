@@ -2,10 +2,8 @@
 // Logic for the Workload Management module.
 // This file was created from the original main.js.
 
-// Import Firebase modules
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+import { auth, db, appId } from './portal-config.js'; // Import từ file config chung
 import {
-    getAuth,
     onAuthStateChanged,
     sendPasswordResetEmail,
     updatePassword,
@@ -172,7 +170,6 @@ let state = {
 };
 
 // Firebase variables
-let db, auth;
 let usersCol, departmentsCol, lecturersCol, tasksCol, entriesCol, settingsCol;
 const SETTINGS_DOC_ID = 'appSettings';
 
@@ -1252,21 +1249,7 @@ function setupOnSnapshotListeners() {
 }
 
 async function initializeFirebase() {
-    const firebaseConfig = {
-      apiKey: "AIzaSyCJcTMUwO-w7V0YsGUKWeaW-zl42Ww7fxo",
-      authDomain: "qlylaodongbdhhp.firebaseapp.com",
-      projectId: "qlylaodongbdhhp",
-      storageBucket: "qlylaodongbdhhp.appspot.com",
-      messagingSenderId: "462439202995",
-      appId: "1:462439202995:web:06bc11042efb9b99d4f0c6"
-    };
-
     try {
-        const app = initializeApp(firebaseConfig);
-        db = getFirestore(app);
-        auth = getAuth(app);
-
-        const appId = firebaseConfig.projectId || 'hpu-workload-tracker-app';
         const basePath = `artifacts/${appId}/public/data`;
 
         usersCol = collection(db, `${basePath}/users`);

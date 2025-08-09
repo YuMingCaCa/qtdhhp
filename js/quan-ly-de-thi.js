@@ -6,14 +6,14 @@
 // FEATURE: Added optional payment summary to the print report with more details.
 // FEATURE: Added configurable print options (date, signatory, content).
 
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+import { auth, db, storage, appId } from './portal-config.js';
+import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import { 
-    getFirestore, collection, onSnapshot, addDoc, doc, setDoc, getDoc, 
+    collection, onSnapshot, addDoc, doc, setDoc, getDoc, 
     updateDoc, deleteDoc, query, where, Timestamp, orderBy, limit, startAfter, getDocs, getCountFromServer, increment
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { 
-    getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject 
+    ref, uploadBytesResumable, getDownloadURL, deleteObject 
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
 // --- Constants ---
@@ -30,18 +30,7 @@ const PAYMENT_RATES = {
 };
 const ITEMS_PER_PAGE = 15;
 
-// --- Firebase Configuration ---
-const firebaseConfig = {
-  apiKey: "AIzaSyCJcTMUwO-w7V0YsGUKWeaW-zl42Ww7fxo",
-  authDomain: "qlylaodongbdhhp.firebaseapp.com",
-  projectId: "qlylaodongbdhhp",
-  storageBucket: "qlylaodongbdhhp.firebasestorage.app",
-  messagingSenderId: "462439202995",
-  appId: "1:462439202995:web:06bc11042efb9b99d4f0c6"
-};
-
 // --- Firebase Services & State ---
-let db, auth, storage;
 let examsCol, subjectsCol, storageMetadataCol, examAssignmentsCol;
 let currentUser = null;
 let currentUserRole = 'viewer';
@@ -118,12 +107,6 @@ function setButtonLoading(button, isLoading, loadingText = "Đang xử lý...") 
 // --- Firebase Initialization ---
 function initializeFirebase() {
     try {
-        const app = initializeApp(firebaseConfig);
-        db = getFirestore(app);
-        auth = getAuth(app);
-        storage = getStorage(app);
-
-        const appId = firebaseConfig.projectId || 'default-app-id';
         const basePath = `artifacts/${appId}/public/data`; 
         
         examsCol = collection(db, `${basePath}/exams`);
@@ -563,6 +546,55 @@ function openExamFileModal(examId = null) {
     modal.style.display = 'block';
 }
 
+/**
+ * Handles the upload of a single file to Firebase Storage and returns its metadata.
+ * @param {File} file - The file object to upload.
+ * @param {string} subjectId - The ID of the subject for folder organization.
+ * @param {string} progressBarId - The ID of the progress bar element.
+ * @param {string} progressContainerId - The ID of the progress bar's container.
+ * @returns {Promise<Object|null>} A promise that resolves with file metadata or null if no file.
+ */
+function handleFileUpload(file, subjectId, progressBarId, progressContainerId) {
+    if (!file) {
+        return Promise.resolve(null);
+    }
+
+    const progressBar = document.getElementById(progressBarId);
+    const progressContainer = document.getElementById(progressContainerId);
+
+    const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024; // 20MB
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+        return Promise.reject(new Error(`Kích thước tệp "${file.name}" không được vượt quá 20MB.`));
+    }
+
+    const filePath = `de_thi/${subjectId}/${Date.now()}_${file.name}`;
+    const storageRef = ref(storage, filePath);
+    const uploadTask = uploadBytesResumable(storageRef, file);
+
+    progressContainer.style.display = 'block';
+    progressBar.style.width = '0%';
+
+    return new Promise((resolve, reject) => {
+        uploadTask.on('state_changed',
+            (snapshot) => {
+                const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                progressBar.style.width = progress + '%';
+            },
+            (error) => {
+                console.error("Upload failed:", error);
+                progressContainer.style.display = 'none';
+                reject(new Error(`Tải lên tệp "${file.name}" thất bại.`));
+            },
+            async () => {
+                const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+                await setDoc(doc(storageMetadataCol, 'main_bucket'), { totalSizeInBytes: increment(file.size) }, { merge: true });
+                progressContainer.style.display = 'none';
+                resolve({ url: downloadURL, name: file.name, path: filePath, size: file.size });
+            }
+        );
+    });
+}
+
 async function saveExamFile(event) {
     event.preventDefault();
     const saveBtn = document.getElementById('save-exam-btn');
@@ -583,8 +615,8 @@ async function saveExamFile(event) {
     }
 
     try {
-        const examFileData = await handleFileUpload(examFile, subjectId, 'exam-file-progress-bar', 'exam-file-progress-container', 'exam-file-name');
-        const answerFileData = await handleFileUpload(answerFile, subjectId, 'answer-file-progress-bar', 'answer-file-progress-container', 'answer-file-name');
+        const examFileData = await handleFileUpload(examFile, subjectId, 'exam-file-progress-bar', 'exam-file-progress-container');
+        const answerFileData = await handleFileUpload(answerFile, subjectId, 'answer-file-progress-bar', 'answer-file-progress-container');
 
         const selectedSubject = allSubjects.find(s => s.id === subjectId);
         const data = {

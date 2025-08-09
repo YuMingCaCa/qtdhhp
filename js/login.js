@@ -1,11 +1,10 @@
 // File: js/login.js
 // Handles logic for the main index.html page (Login and Module Selection).
 // TỐI ƯU HÓA: Chỉ đọc quyền người dùng một lần và lưu vào sessionStorage.
-// CẬP NHẬT: Thêm storageBucket vào config để hỗ trợ các module tải file.
+// REFACTORED: Sử dụng cấu hình Firebase tập trung từ portal-config.js
 
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+import { auth, db, appId } from './portal-config.js'; // Import từ file config chung
 import {
-    getAuth,
     onAuthStateChanged,
     createUserWithEmailAndPassword,
     signInWithEmailAndPassword,
@@ -15,7 +14,6 @@ import {
     linkWithCredential
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import {
-    getFirestore,
     doc,
     getDoc,
     setDoc
@@ -29,9 +27,7 @@ const loginFormContainer = document.getElementById('login-form').parentElement;
 const registerFormContainer = document.getElementById('register-form-container');
 
 // --- Firebase variables ---
-let auth;
-let db;
-let usersColPath;
+const usersColPath = `artifacts/${appId}/public/data/users`;
 
 /**
  * Injects all necessary CSS styles into the document's head.
@@ -158,28 +154,7 @@ function setButtonLoading(button, isLoading) {
  * Initializes Firebase and sets up authentication state listeners.
  */
 async function initializeFirebase() {
-    const firebaseConfig = {
-      apiKey: "AIzaSyCJcTMUwO-w7V0YsGUKWeaW-zl42Ww7fxo",
-      authDomain: "qlylaodongbdhhp.firebaseapp.com",
-      projectId: "qlylaodongbdhhp",
-      // =======================================================
-      // ============ CẬP NHẬT THEO YÊU CẦU CỦA BẠN ============
-      // =======================================================
-      storageBucket: "qlylaodongbdhhp.appspot.com", // Đã thêm/sửa bucket để hỗ trợ upload file
-      // =======================================================
-      // =======================================================
-      messagingSenderId: "462439202995",
-      appId: "1:462439202995:web:06bc11042efb9b99d4f0c6"
-    };
-
     try {
-        const app = initializeApp(firebaseConfig);
-        auth = getAuth(app);
-        db = getFirestore(app);
-
-        const appId = firebaseConfig.projectId || 'hpu-workload-tracker-app';
-        usersColPath = `artifacts/${appId}/public/data/users`;
-
         onAuthStateChanged(auth, async (user) => {
             if (user) {
                 // TỐI ƯU HÓA: Đây là nơi duy nhất chúng ta đọc thông tin người dùng từ Firestore

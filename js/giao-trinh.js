@@ -17,10 +17,10 @@
 // NEW FEATURE: Added a collapsible accordion view for ALL uploaded documents, grouped by subject.
 
 // Import Firebase modules
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+import { auth, db, storage, appId } from './portal-config.js';
+import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import { getFirestore, collection, onSnapshot, addDoc, deleteDoc, query, where, doc, serverTimestamp, getDoc, setDoc, increment, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
 /**
  * Injects all necessary CSS styles into the document's head.
@@ -66,7 +66,6 @@ let state = {
 };
 
 // Firebase variables
-let db, auth, storage;
 let facultiesCol, curriculumSubjectsCol, syllabusCol, storageMetadataCol;
 let documentsUnsubscribe = null; // To detach listener when changing subjects
 let subjectsUnsubscribe = null; // To detach listener for subjects table
@@ -417,22 +416,7 @@ function renderAllDocumentsAccordion() {
 
 // --- Firebase Initialization and Auth State ---
 async function initializeFirebase() {
-    const firebaseConfig = {
-      apiKey: "AIzaSyCJcTMUwO-w7V0YsGUKWeaW-zl42Ww7fxo",
-      authDomain: "qlylaodongbdhhp.firebaseapp.com",
-      projectId: "qlylaodongbdhhp",
-      storageBucket: "qlylaodongbdhhp.firebasestorage.app", // Corrected storage bucket
-      messagingSenderId: "462439202995",
-      appId: "1:462439202995:web:06bc11042efb9b99d4f0c6"
-    };
-
     try {
-        const app = initializeApp(firebaseConfig);
-        db = getFirestore(app);
-        auth = getAuth(app);
-        storage = getStorage(app);
-
-        const appId = firebaseConfig.projectId || 'hpu-workload-tracker-app';
         const basePath = `artifacts/${appId}/public/data`;
         
         facultiesCol = collection(db, `${basePath}/faculties`);
