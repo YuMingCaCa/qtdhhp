@@ -177,15 +177,15 @@
             </div>
         </div>
         
-        <!-- Nút Quay lại (Đã được thiết kế lại và di chuyển ra ngoài) -->
-        <a href="/" class="mb-6 bg-white hover:bg-gray-100 border border-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg inline-flex items-center transition-colors no-underline">
-            <i class="fas fa-arrow-left mr-2"></i>
-            <span>Quay lại trang chủ</span>
-        </a>
-
         <!-- Nội dung chính của trang -->
         <div class="bg-white p-6 md:p-8 rounded-2xl shadow-lg">
             
+            <!-- Nút Quay lại (Đã được di chuyển vào trong) -->
+            <a href="/" class="mb-8 bg-gray-100 hover:bg-gray-200 border border-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg inline-flex items-center transition-colors no-underline">
+                <i class="fas fa-arrow-left mr-2"></i>
+                <span>Quay lại trang chủ</span>
+            </a>
+
             <div class="text-center mb-8">
                 <h2 class="text-2xl font-bold text-gray-800">Bảng điều khiển</h2>
                 <p class="text-gray-600 mt-1">Công cụ quản lý dữ liệu và sắp xếp thời khóa biểu.</p>
@@ -217,43 +217,47 @@
                 </button>
             </div>
 
-            <!-- Giao diện xếp lịch -->
+            <!-- Giao diện xếp lịch (Đã được cấu trúc lại) -->
             <div class="border-t pt-8">
-                <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                    <h2 class="text-2xl font-semibold text-gray-700 mb-2 md:mb-0">Xem & Sắp xếp Thời khóa biểu</h2>
-                    <div class="flex flex-col md:flex-row items-start md:items-center gap-4 w-full md:w-auto">
-                        <!-- START: CẢI TIẾN - Thêm bộ lọc Học kỳ -->
-                        <div class="w-full md:w-auto">
+                <!-- Hàng 1: Tiêu đề và các bộ lọc -->
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
+                    <h2 class="text-2xl font-semibold text-gray-700 mb-2 md:mb-0 shrink-0">Xem & Sắp xếp Thời khóa biểu</h2>
+                    <div class="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full md:w-auto">
+                        <!-- Bộ lọc Học kỳ -->
+                        <div class="w-full sm:w-auto">
                             <label for="main-semester-select" class="block text-sm font-medium text-gray-700">Chọn Học kỳ:</label>
-                            <select id="main-semester-select" class="mt-1 block w-full md:w-60 p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"></select>
+                            <select id="main-semester-select" class="mt-1 block w-full md:w-52 p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"></select>
                         </div>
-                        <!-- END: CẢI TIẾN -->
-                        <div class="w-full md:w-auto">
+                        <!-- Bộ lọc Khoa -->
+                        <div class="w-full sm:w-auto">
                             <label for="department-filter-select" class="block text-sm font-medium text-gray-700">Chọn Khoa:</label>
-                            <select id="department-filter-select" class="mt-1 block w-full md:w-60 p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"></select>
+                            <select id="department-filter-select" class="mt-1 block w-full md:w-52 p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"></select>
                         </div>
-                        <div class="w-full md:w-auto">
+                        <!-- Bộ lọc Lớp -->
+                        <div class="w-full sm:w-auto">
                             <label for="class-filter-select" class="block text-sm font-medium text-gray-700">Chọn Lớp:</label>
-                            <select id="class-filter-select" class="mt-1 block w-full md:w-60 p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"></select>
-                        </div>
-                        <div class="flex gap-2 w-full md:w-auto self-end flex-wrap">
-                            <button id="manual-schedule-btn" class="admin-action flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">
-                                <i class="fas fa-plus-circle mr-2"></i>Thủ công
-                            </button>
-                             <button id="lecturer-preference-btn" class="admin-action priority-admin-only flex-1 bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-lg">
-                                <i class="fas fa-star mr-2"></i>Đặt ưu tiên
-                            </button>
-                            <button id="auto-schedule-btn" class="admin-action flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg">
-                                <i class="fas fa-magic mr-2"></i>Tự động
-                            </button>
-                            <button id="conflict-check-btn" class="admin-action flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg">
-                                <i class="fas fa-exclamation-triangle mr-2"></i>Kiểm tra
-                            </button>
-                            <button id="print-schedule-btn" class="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg">
-                                <i class="fas fa-print mr-2"></i>In Lịch
-                            </button>
+                            <select id="class-filter-select" class="mt-1 block w-full md:w-52 p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"></select>
                         </div>
                     </div>
+                </div>
+
+                <!-- Hàng 2: Các nút hành động -->
+                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 mb-8">
+                    <button id="manual-schedule-btn" class="admin-action w-full flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-all">
+                        <i class="fas fa-plus-circle mr-2"></i><span>Thủ công</span>
+                    </button>
+                     <button id="lecturer-preference-btn" class="admin-action priority-admin-only w-full flex items-center justify-center bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-3 px-4 rounded-lg transition-all">
+                        <i class="fas fa-star mr-2"></i><span>Đặt ưu tiên</span>
+                    </button>
+                    <button id="auto-schedule-btn" class="admin-action w-full flex items-center justify-center bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition-all">
+                        <i class="fas fa-magic mr-2"></i><span>Tự động</span>
+                    </button>
+                    <button id="conflict-check-btn" class="admin-action w-full flex items-center justify-center bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg transition-all">
+                        <i class="fas fa-exclamation-triangle mr-2"></i><span>Kiểm tra</span>
+                    </button>
+                    <button id="print-schedule-btn" class="w-full flex items-center justify-center bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-lg transition-all">
+                        <i class="fas fa-print mr-2"></i><span>In Lịch</span>
+                    </button>
                 </div>
 
                 <!-- NEW: Department-wide Schedule View -->
