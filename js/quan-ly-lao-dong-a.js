@@ -5,6 +5,7 @@
 // FIXED: Repopulated edit assignment modal data correctly.
 // FIXED: Moved populateAvailableClasses to global scope to fix ReferenceError.
 // UPDATED: Changed the logic for calculating practice groups.
+// NEW: Set default department and academic year on page load.
 
 // Import Firebase modules
 import { auth, db, appId } from './portal-config.js';
@@ -62,6 +63,11 @@ let state = {
     selectedDepartmentId: 'all',
     selectedYear: null,
 };
+
+// --- START: Variables for setting default values ---
+let initialDefaultsSet = false;
+// --- END: Variables for setting default values ---
+
 
 // Firebase variables
 let usersCol, departmentsCol, lecturersCol, semestersCol, assignmentsCol, curriculumSubjectsCol, teachingClassesCol, settingsCol, guidanceCol, managementCol;
@@ -139,12 +145,19 @@ function updateUIForRole() {
 
 function renderDepartmentSelect() {
     const select = document.getElementById('department-select');
+    const currentVal = select.value;
     select.innerHTML = '<option value="all">-- Tất cả các Khoa --</option>';
     state.departments.forEach(dep => {
         select.innerHTML += `<option value="${dep.id}">${dep.name}</option>`;
     });
-    select.value = state.selectedDepartmentId;
+    // Restore previous selection if it exists
+    if (state.departments.some(d => d.id === currentVal)) {
+        select.value = currentVal;
+    } else {
+        select.value = state.selectedDepartmentId;
+    }
 }
+
 
 function getYearsForSelect() {
     const yearsFromSemesters = new Set(state.semesters.map(s => s.namHoc));
@@ -163,13 +176,10 @@ function renderYearSelect() {
         select.innerHTML += `<option value="${year}">Năm học ${year}</option>`;
     });
 
-    if (state.selectedYear) {
+    if (state.selectedYear && years.includes(state.selectedYear)) {
         select.value = state.selectedYear;
     } else if (currentVal && years.includes(currentVal)) {
         select.value = currentVal;
-    } else if (years.length > 0) {
-        state.selectedYear = years[0];
-        select.value = state.selectedYear;
     }
 }
 
@@ -544,15 +554,76 @@ window.editAssignment = (assignmentId) => {
 };
 
 window.deleteAssignment = (assignmentId) => {
-    if (confirm('Bạn có chắc chắn muốn xóa phân công này không?')) {
+    showConfirm('Bạn có chắc chắn muốn xóa phân công này không?', () => {
         deleteDoc(doc(assignmentsCol, assignmentId))
             .then(() => {
                 showAlert('Xóa phân công thành công!', true);
                 closeModal('details-modal');
             })
             .catch(error => showAlert(`Lỗi khi xóa: ${error.message}`));
-    }
+    });
 };
+
+// --- START: Functions to set default selections ---
+
+/**
+ * Gets the current academic year string (e.g., "2023-2024").
+ * Assumes the academic year starts in August.
+ * @returns {string} The current academic year.
+ */
+function getCurrentAcademicYear() {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth(); // 0-11 (Jan-Dec)
+
+    // School year usually starts in August (index 7)
+    if (currentMonth >= 7) {
+        return `${currentYear}-${currentYear + 1}`;
+    } else {
+        return `${currentYear - 1}-${currentYear}`;
+    }
+}
+
+/**
+ * Sets the default department and year selections on initial page load.
+ * This function is called whenever the base data (departments, semesters) is loaded.
+ * It ensures that it only runs once when all necessary data is available.
+ */
+function setInitialSelections() {
+    // Exit if defaults are already set, or if we don't have the necessary data yet.
+    if (initialDefaultsSet || state.departments.length === 0 || state.semesters.length === 0) {
+        return;
+    }
+
+    // 1. Set default department to "Khoa Công nghệ Thông tin"
+    const itDepartment = state.departments.find(d => d.name.toLowerCase().includes('công nghệ thông tin'));
+    if (itDepartment) {
+        state.selectedDepartmentId = itDepartment.id;
+        document.getElementById('department-select').value = itDepartment.id;
+    }
+
+    // 2. Set default year to the current academic year
+    const availableYears = getYearsForSelect();
+    const currentAcademicYear = getCurrentAcademicYear();
+
+    if (availableYears.includes(currentAcademicYear)) {
+        state.selectedYear = currentAcademicYear;
+    } else if (availableYears.length > 0) {
+        state.selectedYear = availableYears[0]; // Fallback to the latest available year
+    }
+
+    if (state.selectedYear) {
+        document.getElementById('year-select').value = state.selectedYear;
+        // 3. Fetch data for the selected year
+        fetchDataForView();
+    }
+
+    // 4. Mark as done to prevent this from running again
+    initialDefaultsSet = true;
+}
+
+// --- END: Functions to set default selections ---
+
 
 // --- Firebase Initialization and Auth State ---
 let baseListenersAttached = false;
@@ -578,8 +649,10 @@ function attachBaseListeners() {
             
             if (c.name === 'semesters') renderYearSelect();
             if (c.name === 'departments') renderDepartmentSelect();
-            // Re-render table if lecturers list changes
             if (c.name === 'lecturers') renderLecturerTable();
+
+            // Attempt to set the initial default selections after data is loaded
+            setInitialSelections();
         }, snapshotErrorHandler(c.name));
     });
 
@@ -591,6 +664,8 @@ function attachBaseListeners() {
             state.customYears = [];
         }
         renderYearSelect();
+        // Attempt to set the initial default selections after custom years are loaded
+        setInitialSelections();
     }, snapshotErrorHandler('Cài đặt'));
 
     baseListenersAttached = true;
@@ -632,6 +707,9 @@ function fetchDataForView() {
             renderLecturerTable();
         }, snapshotErrorHandler('Phân công'));
         dynamicUnsubscribes.push(unsubAssignments);
+    } else {
+        // If no semesters found for the year, still need to render the table
+        renderLecturerTable();
     }
 
     // Query for Guidance Tasks
@@ -652,7 +730,7 @@ function fetchDataForView() {
     }, snapshotErrorHandler('Định mức'));
     dynamicUnsubscribes.push(unsubManagement);
     
-    // Initial render in case there's no data
+    // Initial render in case there's no data from listeners yet
     renderLecturerTable();
 }
 
@@ -681,14 +759,8 @@ async function initializeFirebase() {
                 document.getElementById('app-content').classList.remove('hidden');
 
                 updateUIForRole();
-                attachBaseListeners(); // Attach listeners for static data
-                
-                // Set initial year and fetch data
-                if (getYearsForSelect().length > 0) {
-                    state.selectedYear = getYearsForSelect()[0];
-                    document.getElementById('year-select').value = state.selectedYear;
-                }
-                fetchDataForView();
+                // This function now handles loading base data and setting initial selections
+                attachBaseListeners(); 
 
             } else {
                 window.location.href = 'index.html';
@@ -918,7 +990,7 @@ async function handleBulkDeleteAssignments() {
         return;
     }
 
-    const semesterName = `${semester.tenHocKy} Năm học ${semester.namHoc}`;
+    const semesterName = `${semester.tenHocKy}`;
     const message = `Bạn có chắc chắn muốn xóa TẤT CẢ phân công giảng dạy của "${semesterName}" không? Hành động này không thể hoàn tác.`;
 
     showConfirm(message, async () => {
@@ -1366,7 +1438,7 @@ function addEventListeners() {
         const deleteSelect = document.getElementById('delete-semester-select');
         deleteSelect.innerHTML = '<option value="">-- Chọn học kỳ để xóa --</option>';
         state.semesters.forEach(s => {
-            deleteSelect.innerHTML += `<option value="${s.id}">${s.tenHocKy} Năm học ${s.namHoc}</option>`;
+            deleteSelect.innerHTML += `<option value="${s.id}">${s.tenHocKy}</option>`;
         });
         
         openModal('import-modal');
@@ -1713,11 +1785,11 @@ window.editGuidanceTask = (id) => {
 };
 
 window.deleteGuidanceTask = (id) => {
-    if (confirm("Bạn có chắc muốn xóa mục hướng dẫn này?")) {
+    showConfirm("Bạn có chắc muốn xóa mục hướng dẫn này?", () => {
         deleteDoc(doc(guidanceCol, id))
             .then(() => showAlert("Xóa thành công!", true))
             .catch(error => showAlert(`Lỗi khi xóa: ${error.message}`));
-    }
+    });
 };
 
 
