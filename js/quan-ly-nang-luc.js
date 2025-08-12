@@ -1,9 +1,21 @@
 // File: js/quan-ly-nang-luc.js
-// Logic for the Teaching Capability Management module.
+// A complete, standalone module for managing departments, lecturers, subjects, and their teaching capabilities.
+// This version is self-contained and does not depend on other modules for data.
 
 import { auth, db, appId } from './portal-config.js';
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-import { collection, onSnapshot, doc, getDoc, setDoc, writeBatch, query, where, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import {
+    collection, onSnapshot, doc, getDoc, setDoc, addDoc, deleteDoc, writeBatch
+} from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+// --- Self-Contained Firestore Collection References ---
+const dataBasePath = `artifacts/${appId}/public/data`;
+const capDepartmentsCol = collection(db, `${dataBasePath}/cap_module_departments`);
+const capLecturersCol = collection(db, `${dataBasePath}/cap_module_lecturers`);
+const capSubjectsCol = collection(db, `${dataBasePath}/cap_module_subjects`);
+const capAssignmentsCol = collection(db, `${dataBasePath}/cap_module_assignments`);
+const usersCol = collection(db, `${dataBasePath}/users`);
+
 
 // --- Global State ---
 const state = {
@@ -11,391 +23,764 @@ const state = {
     departments: [],
     lecturers: [],
     subjects: [],
-    // capabilities is now managed by a real-time listener
-    selectedDepartmentId: null,
-    selectedLecturerId: null,
+    assignments: {}, // { lecturerId: [subjectId1, subjectId2] }
+    editingId: null,
 };
 
-// --- Firebase Collection References ---
-let usersCol, departmentsCol, lecturersCol, curriculumSubjectsCol, capabilitiesCol;
-
 // --- UI Utility Functions ---
-function showAlert(message, isSuccess = false) {
+const showAlert = (message, isSuccess = false) => {
     const modal = document.getElementById('alert-modal');
-    const title = document.getElementById('alert-title');
-    if (!modal || !title) return;
     document.getElementById('alert-message').textContent = message;
-    title.textContent = isSuccess ? "Thành công" : "Lỗi";
-    title.className = `text-lg font-bold mb-4 ${isSuccess ? 'text-green-600' : 'text-red-600'}`;
-    modal.style.display = 'block';
-    document.getElementById('alert-ok-btn').onclick = () => modal.style.display = 'none';
-}
+    document.getElementById('alert-title').textContent = isSuccess ? "Thành công" : "Lỗi";
+    modal.classList.add('active');
+    document.getElementById('alert-ok-btn').onclick = () => modal.classList.remove('active');
+};
 
-function setButtonLoading(button, isLoading) {
-    if (!button) return;
-    if (isLoading) {
-        button.disabled = true;
-        button.dataset.originalHtml = button.innerHTML;
-        button.innerHTML = `<i class="fas fa-spinner fa-spin mr-2"></i>Đang xử lý...`;
-    } else {
-        button.disabled = false;
-        if (button.dataset.originalHtml) {
-            button.innerHTML = button.dataset.originalHtml;
-        }
-    }
-}
+const showFormModal = (title, formHtml, saveCallback) => {
+    const modal = document.getElementById('form-modal');
+    document.getElementById('modal-title').textContent = title;
+    const form = document.getElementById('modal-form');
+    form.innerHTML = formHtml;
+    modal.classList.add('active');
 
-// --- UI Rendering Functions ---
-function updateUIForRole() {
-    if (!state.currentUser) return;
-    const isAdmin = state.currentUser.role === 'admin';
-    const appContent = document.getElementById('app-content');
-    if (!appContent) return;
+    const saveBtn = document.getElementById('modal-save-btn');
+    const cancelBtn = document.getElementById('modal-cancel-btn');
 
-    // Hide the entire page if not admin, as this is an admin-only feature
-    if (!isAdmin) {
-        appContent.innerHTML = `
-            <div class="text-center p-10 bg-white rounded-lg shadow-md">
-                <h1 class="text-2xl font-bold text-red-600">Không có quyền truy cập</h1>
-                <p class="text-gray-600 mt-2">Chức năng này chỉ dành cho Quản trị viên.</p>
-                <a href="quan-ly-lao-dong-a.html" class="mt-4 inline-block bg-blue-500 text-white font-bold py-2 px-4 rounded hover:bg-blue-600">Quay lại</a>
-            </div>
-        `;
-        return; // Stop further rendering if not admin
-    }
-    const roleBadge = document.getElementById('user-role-badge');
-    if (roleBadge) {
-        roleBadge.textContent = isAdmin ? 'Admin' : 'Viewer';
-        roleBadge.className = `ml-2 text-xs font-semibold px-2.5 py-0.5 rounded-full ${isAdmin ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`;
-    }
-}
-
-function renderDepartmentSelect() {
-    const select = document.getElementById('department-select');
-    if (!select) return;
-    select.innerHTML = '<option value="">-- Chọn một khoa --</option>';
-    state.departments.forEach(dep => {
-        select.innerHTML += `<option value="${dep.id}">${dep.name}</option>`;
-    });
-}
-
-function renderLecturerSelect() {
-    const select = document.getElementById('lecturer-select');
-    if (!select) return;
-    select.innerHTML = '<option value="">-- Chọn giảng viên --</option>';
+    const newSaveBtn = saveBtn.cloneNode(true);
+    saveBtn.parentNode.replaceChild(newSaveBtn, saveBtn);
     
-    if (!state.selectedDepartmentId) {
-        select.disabled = true;
-        return;
+    newSaveBtn.addEventListener('click', () => {
+        const formData = new FormData(form);
+        const data = Object.fromEntries(formData.entries());
+        saveCallback(data);
+    });
+    cancelBtn.onclick = () => modal.classList.remove('active');
+};
+
+// --- Render Functions ---
+const renderDepartmentsTable = () => {
+    const tbody = document.getElementById('departments-table-body');
+    if (!tbody) return;
+    tbody.innerHTML = state.departments.map(dept => `
+        <tr class="hover:bg-gray-50">
+            <td class="py-2 px-4 border-b">${dept.code}</td>
+            <td class="py-2 px-4 border-b">${dept.name}</td>
+            <td class="py-2 px-4 border-b">
+                <button data-id="${dept.id}" class="edit-department-btn text-blue-500 hover:text-blue-700 mr-2"><i class="fas fa-edit"></i></button>
+                <button data-id="${dept.id}" class="delete-department-btn text-red-500 hover:text-red-700"><i class="fas fa-trash"></i></button>
+            </td>
+        </tr>
+    `).join('');
+};
+
+const renderLecturersTable = () => {
+    const tbody = document.getElementById('lecturers-table-body');
+    if (!tbody) return;
+    const departmentMap = new Map(state.departments.map(d => [d.id, d.name]));
+    tbody.innerHTML = state.lecturers.map(lect => `
+        <tr class="hover:bg-gray-50">
+            <td class="py-2 px-2 border-b"><input type="checkbox" class="checkbox lecturer-checkbox" data-id="${lect.id}"></td>
+            <td class="py-2 px-4 border-b">${lect.code}</td>
+            <td class="py-2 px-4 border-b">${lect.name}</td>
+            <td class="py-2 px-4 border-b">${departmentMap.get(lect.departmentId) || 'N/A'}</td>
+            <td class="py-2 px-4 border-b">
+                <button data-id="${lect.id}" class="edit-lecturer-btn text-blue-500 hover:text-blue-700 mr-2"><i class="fas fa-edit"></i></button>
+                <button data-id="${lect.id}" class="delete-lecturer-btn text-red-500 hover:text-red-700"><i class="fas fa-trash"></i></button>
+            </td>
+        </tr>
+    `).join('');
+};
+
+const renderSubjectsTable = () => {
+    const tbody = document.getElementById('subjects-table-body');
+    if (!tbody) return;
+    tbody.innerHTML = state.subjects.map(sub => `
+        <tr class="hover:bg-gray-50">
+            <td class="py-2 px-2 border-b"><input type="checkbox" class="checkbox subject-checkbox" data-id="${sub.id}"></td>
+            <td class="py-2 px-4 border-b">${sub.maHocPhan}</td>
+            <td class="py-2 px-4 border-b">${sub.tenMonHoc}</td>
+            <td class="py-2 px-4 border-b">
+                <button data-id="${sub.id}" class="edit-subject-btn text-blue-500 hover:text-blue-700 mr-2"><i class="fas fa-edit"></i></button>
+                <button data-id="${sub.id}" class="delete-subject-btn text-red-500 hover:text-red-700"><i class="fas fa-trash"></i></button>
+            </td>
+        </tr>
+    `).join('');
+};
+
+const updateAssignmentDropdowns = () => {
+    const deptSelect = document.getElementById('assign-department-select');
+    const lectSelect = document.getElementById('assign-lecturer-select');
+    if (!deptSelect || !lectSelect) return;
+
+    const currentDeptId = deptSelect.value;
+    const currentLectId = lectSelect.value;
+
+    deptSelect.innerHTML = '<option value="">-- Chọn Khoa --</option>' + state.departments.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
+    if (state.departments.some(d => d.id === currentDeptId)) {
+        deptSelect.value = currentDeptId;
     }
 
-    const lecturersInDept = state.lecturers.filter(l => l.departmentId === state.selectedDepartmentId);
-    lecturersInDept.forEach(lec => {
-        select.innerHTML += `<option value="${lec.id}">${lec.name} (${lec.code})</option>`;
-    });
-    select.disabled = false;
-}
+    const selectedDeptId = deptSelect.value;
+    const lecturersInDept = state.lecturers.filter(l => l.departmentId === selectedDeptId);
+    
+    if (selectedDeptId) {
+        lectSelect.innerHTML = '<option value="">-- Chọn Giảng viên --</option>' + lecturersInDept.map(l => `<option value="${l.id}">${l.name}</option>`).join('');
+        lectSelect.disabled = false;
+        if (lecturersInDept.some(l => l.id === currentLectId)) {
+            lectSelect.value = currentLectId;
+        }
+    } else {
+        lectSelect.innerHTML = '<option value="">-- Chọn Giảng viên --</option>';
+        lectSelect.disabled = true;
+    }
+    renderSubjectsForAssignment();
+};
 
-async function renderSubjectsList() {
+
+const renderSubjectsForAssignment = () => {
     const container = document.getElementById('subjects-list-container');
     const placeholder = document.getElementById('subjects-placeholder');
     const saveBtn = document.getElementById('save-capabilities-btn');
+    if (!container || !placeholder || !saveBtn) return;
+    
+    const lecturerId = document.getElementById('assign-lecturer-select').value;
 
-    if (!container || !placeholder || !saveBtn) {
-        return;
-    }
-
-    if (!state.selectedLecturerId || !state.selectedDepartmentId) {
+    if (!lecturerId) {
         container.innerHTML = '';
-        placeholder.classList.remove('hidden');
-        placeholder.textContent = 'Vui lòng chọn khoa và giảng viên để xem danh sách học phần.';
+        placeholder.style.display = 'block';
         saveBtn.disabled = true;
         return;
     }
 
-    placeholder.classList.add('hidden');
-    container.innerHTML = '<div class="text-center text-gray-500 py-16"><i class="fas fa-spinner fa-spin mr-2"></i>Đang tải dữ liệu...</div>';
-
-    // Data is now sourced from the real-time listener state
-    const assignedSubjectIds = state.capabilities[state.selectedLecturerId] || [];
-
-    const subjectsInDept = state.subjects.filter(s => s.departmentId === state.selectedDepartmentId);
-    if (subjectsInDept.length === 0) {
-        container.innerHTML = '<p class="text-center text-gray-500 py-16">Khoa này chưa có học phần nào trong chương trình đào tạo.</p>';
-        saveBtn.disabled = true;
-        return;
-    }
-
-    let listHtml = '<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">';
-    subjectsInDept.forEach(sub => {
-        const isChecked = assignedSubjectIds.includes(sub.id);
-        listHtml += `
-            <label class="flex items-center p-3 bg-white border rounded-lg hover:bg-gray-50 cursor-pointer">
-                <input type="checkbox" data-subject-id="${sub.id}" class="h-5 w-5 rounded border-gray-300 text-teal-600 focus:ring-teal-500" ${isChecked ? 'checked' : ''}>
-                <span class="ml-3 text-sm text-gray-700">${sub.subjectName} (${sub.subjectCode})</span>
-            </label>
-        `;
-    });
-    listHtml += '</div>';
-
-    container.innerHTML = listHtml;
+    placeholder.style.display = 'none';
+    const assignedSubjectIds = state.assignments[lecturerId] || [];
+    container.innerHTML = '<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">' +
+        state.subjects.map(sub => {
+            const isChecked = assignedSubjectIds.includes(sub.id);
+            return `
+                <label class="flex items-center p-3 bg-white border rounded-lg hover:bg-gray-50 cursor-pointer">
+                    <input type="checkbox" data-subject-id="${sub.id}" class="h-5 w-5 rounded border-gray-300 text-teal-600 focus:ring-teal-500" ${isChecked ? 'checked' : ''}>
+                    <span class="ml-3 text-sm text-gray-700">${sub.tenMonHoc} (${sub.maHocPhan})</span>
+                </label>
+            `;
+        }).join('') + '</div>';
     saveBtn.disabled = false;
-}
+};
 
+const renderOverviewPanel = () => {
+    const container = document.getElementById('overview-container');
+    if (!container) return;
 
-// --- Data Handling Functions ---
-async function saveCapabilities() {
-    const btn = document.getElementById('save-capabilities-btn');
-    if (!state.selectedLecturerId) {
-        showAlert("Vui lòng chọn một giảng viên trước khi lưu.");
+    const lecturerMap = new Map(state.lecturers.map(l => [l.id, l.name]));
+    const subjectMap = new Map(state.subjects.map(s => [s.id, s]));
+
+    if (Object.keys(state.assignments).length === 0) {
+        container.innerHTML = `<p class="text-center text-gray-500">Chưa có năng lực nào được gán.</p>`;
         return;
     }
-    setButtonLoading(btn, true);
 
-    const checkedBoxes = document.querySelectorAll('#subjects-list-container input[type="checkbox"]:checked');
-    const selectedSubjectIds = Array.from(checkedBoxes).map(box => box.dataset.subjectId);
+    let html = '';
+    for (const lecturerId in state.assignments) {
+        const lecturerName = lecturerMap.get(lecturerId);
+        if (!lecturerName) continue;
+
+        const subjectIds = state.assignments[lecturerId];
+        if (!subjectIds || subjectIds.length === 0) continue;
+
+        html += `
+            <div class="bg-gray-50 p-4 rounded-lg">
+                <h4 class="font-bold text-teal-700">${lecturerName}</h4>
+                <ul class="list-disc list-inside mt-2 text-sm text-gray-600">
+                    ${subjectIds.map(id => {
+                        const subject = subjectMap.get(id);
+                        return subject ? `<li>${subject.tenMonHoc} (${subject.maHocPhan})</li>` : '';
+                    }).join('')}
+                </ul>
+            </div>
+        `;
+    }
+    container.innerHTML = html || `<p class="text-center text-gray-500">Chưa có năng lực nào được gán.</p>`;
+};
+
+
+// --- CRUD, Import, and Cleanup Functions ---
+
+// Generic delete function
+const deleteItems = async (collectionRef, itemIds, itemName) => {
+    if (itemIds.length === 0) {
+        showAlert(`Vui lòng chọn ít nhất một ${itemName} để xóa.`);
+        return;
+    }
+    if (!confirm(`Bạn có chắc muốn xóa ${itemIds.length} ${itemName} đã chọn?`)) return;
 
     try {
-        const lecturerDocRef = doc(capabilitiesCol, state.selectedLecturerId);
-        await setDoc(lecturerDocRef, { subjectIds: selectedSubjectIds });
-        showAlert("Cập nhật năng lực giảng dạy thành công!", true);
-    } catch (error) {
-        console.error("Error saving capabilities: ", error);
-        showAlert(`Đã xảy ra lỗi: ${error.message}`);
-    } finally {
-        setButtonLoading(btn, false);
+        const batch = writeBatch(db);
+        itemIds.forEach(id => batch.delete(doc(collectionRef, id)));
+        await batch.commit();
+        showAlert(`Đã xóa ${itemIds.length} ${itemName}.`, true);
+    } catch (e) {
+        showAlert(`Lỗi khi xóa: ${e.message}`);
     }
-}
+};
 
-// --- Import Logic ---
-function downloadCapabilityTemplate() {
-    const filename = "Mau_Import_NangLuc.xlsx";
-    const data = [{
-        maGiangVien: "0214",
-        maHocPhan: "INF101"
-    },
-    {
-        maGiangVien: "0214",
-        maHocPhan: "INF205"
-    },
-    {
-        maGiangVien: "0219",
-        maHocPhan: "INF101"
-    }
-    ];
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Data");
-    XLSX.writeFile(wb, filename);
-}
+// Generic deduplication function
+const deduplicateItems = async (collectionRef, codeField, itemName) => {
+    if (!confirm(`Hành động này sẽ quét và xóa tất cả ${itemName} bị trùng lặp dựa trên mã. Bạn có chắc chắn?`)) return;
 
-async function handleCapabilityImport() {
-    const btn = document.getElementById('start-import-btn');
-    setButtonLoading(btn, true);
+    const items = [...(itemName === 'học phần' ? state.subjects : state.lecturers)];
+    const codeMap = new Map();
+    const duplicates = [];
 
-    const fileInput = document.getElementById('import-file-input');
-    const logContainer = document.getElementById('import-log');
-    
-    document.getElementById('import-results-container').classList.remove('hidden');
-    logContainer.innerHTML = 'Bắt đầu quá trình import...<br>';
+    items.forEach(item => {
+        const code = item[codeField];
+        if (codeMap.has(code)) {
+            codeMap.get(code).push(item.id);
+        } else {
+            codeMap.set(code, [item.id]);
+        }
+    });
 
-    if (!fileInput.files.length) {
-        showAlert("Vui lòng chọn một file Excel.");
-        setButtonLoading(btn, false);
+    codeMap.forEach(ids => {
+        if (ids.length > 1) {
+            duplicates.push(...ids.slice(1)); // Keep the first one, mark others as duplicates
+        }
+    });
+
+    if (duplicates.length === 0) {
+        showAlert(`Không tìm thấy ${itemName} nào bị trùng lặp.`, true);
         return;
     }
 
-    const file = fileInput.files[0];
-    const reader = new FileReader();
+    try {
+        const batch = writeBatch(db);
+        duplicates.forEach(id => batch.delete(doc(collectionRef, id)));
+        await batch.commit();
+        showAlert(`Đã xóa ${duplicates.length} ${itemName} bị trùng lặp.`, true);
+    } catch (e) {
+        showAlert(`Lỗi khi dọn dẹp: ${e.message}`);
+    }
+};
 
+// Departments
+const saveDepartment = async (data) => {
+    if (!data.code || !data.name) {
+        showAlert("Mã khoa và Tên khoa là bắt buộc.");
+        return;
+    }
+    try {
+        const docRef = state.editingId ? doc(capDepartmentsCol, state.editingId) : doc(capDepartmentsCol);
+        await setDoc(docRef, data, { merge: true });
+        showAlert("Lưu khoa thành công!", true);
+        document.getElementById('form-modal').classList.remove('active');
+    } catch (e) {
+        showAlert("Lỗi lưu khoa: " + e.message);
+    }
+};
+
+// Lecturers
+const saveLecturer = async (data) => {
+    if (!data.code || !data.name || !data.departmentId) {
+        showAlert("Mã, Tên và Khoa là bắt buộc.");
+        return;
+    }
+    try {
+        const docRef = state.editingId ? doc(capLecturersCol, state.editingId) : doc(capLecturersCol);
+        await setDoc(docRef, data, { merge: true });
+        showAlert("Lưu giảng viên thành công!", true);
+        document.getElementById('form-modal').classList.remove('active');
+    } catch (e) {
+        showAlert("Lỗi lưu giảng viên: " + e.message);
+    }
+};
+
+const downloadLecturerTemplate = () => {
+    const filename = "Mau_Import_GiangVien.xlsx";
+    const data = [{
+        maGiangVien: "GV001",
+        tenGiangVien: "Nguyễn Văn A",
+        maKhoa: "CNTT" // Mã khoa này phải tồn tại trong tab Quản lý Khoa
+    }];
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "GiangVien");
+    XLSX.writeFile(wb, filename);
+};
+
+const handleImportLecturers = (file) => {
+    const reader = new FileReader();
     reader.onload = async (e) => {
         try {
             const data = new Uint8Array(e.target.result);
             const workbook = XLSX.read(data, { type: 'array' });
             const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
-
+            
             if (jsonData.length === 0) throw new Error("File không có dữ liệu.");
 
-            logContainer.innerHTML += `Đã đọc ${jsonData.length} dòng từ file. Đang xử lý...<br>`;
+            const departmentCodeMap = new Map(state.departments.map(d => [d.code, d.id]));
+            const existingLecturerCodes = new Set(state.lecturers.map(l => l.code));
+            const batch = writeBatch(db);
+            let count = 0;
+            let skipped = 0;
+            let errors = [];
 
-            // Step 1: Group subjects by lecturer code
-            const capabilitiesMap = new Map();
             for (const row of jsonData) {
                 const lecturerCode = String(row.maGiangVien || '').trim();
-                const subjectCode = String(row.maHocPhan || '').trim();
-                if (!lecturerCode || !subjectCode) continue;
+                const lecturerName = String(row.tenGiangVien || '').trim();
+                const departmentCode = String(row.maKhoa || '').trim();
 
-                if (!capabilitiesMap.has(lecturerCode)) {
-                    capabilitiesMap.set(lecturerCode, new Set());
-                }
-                capabilitiesMap.get(lecturerCode).add(subjectCode);
-            }
-
-            const batch = writeBatch(db);
-            let successCount = 0;
-            let errorCount = 0;
-
-            // Step 2: Process each lecturer in the map
-            for (const [lecturerCode, subjectCodesSet] of capabilitiesMap.entries()) {
-                const lecturer = state.lecturers.find(l => l.code === lecturerCode);
-                if (!lecturer) {
-                    logContainer.innerHTML += `<span class="text-orange-500">- Lỗi: Không tìm thấy giảng viên có mã "${lecturerCode}".</span><br>`;
-                    errorCount++;
-                    continue;
-                }
-
-                const subjectIds = [];
-                let hasError = false;
-                for (const subjectCode of subjectCodesSet) {
-                    const subject = state.subjects.find(s => s.subjectCode === subjectCode);
-                    if (subject) {
-                        subjectIds.push(subject.id);
+                if (lecturerCode && lecturerName && departmentCode) {
+                    if (existingLecturerCodes.has(lecturerCode)) {
+                        skipped++;
+                        continue;
+                    }
+                    const departmentId = departmentCodeMap.get(departmentCode);
+                    if (departmentId) {
+                        const docRef = doc(capLecturersCol);
+                        batch.set(docRef, { 
+                            code: lecturerCode, 
+                            name: lecturerName,
+                            departmentId: departmentId 
+                        });
+                        existingLecturerCodes.add(lecturerCode); // Prevent duplicates within the same file
+                        count++;
                     } else {
-                        logContainer.innerHTML += `<span class="text-orange-500">- Lỗi: Không tìm thấy môn học có mã "${subjectCode}" cho giảng viên ${lecturer.name}.</span><br>`;
-                        hasError = true;
+                        errors.push(`Không tìm thấy khoa với mã '${departmentCode}' cho GV '${lecturerName}'.`);
                     }
                 }
-
-                if (!hasError) {
-                    const docRef = doc(capabilitiesCol, lecturer.id);
-                    batch.set(docRef, { subjectIds: subjectIds });
-                    successCount++;
-                } else {
-                    errorCount++;
-                }
-            }
-
-            if (successCount > 0) {
-                await batch.commit();
             }
             
-            logContainer.innerHTML += `<hr class="my-2"><strong class="text-green-600">Hoàn thành!</strong><br>Cập nhật năng lực cho ${successCount} giảng viên, Lỗi: ${errorCount}.<br>`;
+            if (count > 0) await batch.commit();
+            
+            let resultMsg = `Kết quả import:\n- Thêm mới: ${count} giảng viên.\n- Bỏ qua: ${skipped} giảng viên đã tồn tại.`;
+            if(errors.length > 0) {
+                resultMsg += `\n- Lỗi: ${errors.length} dòng.\n` + errors.join('\n');
+            }
+            showAlert(resultMsg, true);
 
         } catch (error) {
-            logContainer.innerHTML += `<span class="text-red-500">Đã xảy ra lỗi nghiêm trọng: ${error.message}</span><br>`;
+            showAlert("Lỗi import: " + error.message);
         } finally {
-            setButtonLoading(btn, false);
-            fileInput.value = '';
+            document.getElementById('lecturer-import-modal').classList.remove('active');
         }
     };
     reader.readAsArrayBuffer(file);
-}
-
-// --- Initialization and Event Listeners ---
-function addEventListeners() {
-    const logoutBtn = document.getElementById('logout-btn');
-    if (logoutBtn) logoutBtn.addEventListener('click', () => signOut(auth));
-
-    const deptSelect = document.getElementById('department-select');
-    if (deptSelect) deptSelect.addEventListener('change', (e) => {
-        state.selectedDepartmentId = e.target.value;
-        state.selectedLecturerId = null; // Reset lecturer selection
-        renderLecturerSelect();
-        renderSubjectsList(); // Clear subjects list
-    });
-
-    const lecturerSelect = document.getElementById('lecturer-select');
-    if(lecturerSelect) lecturerSelect.addEventListener('change', (e) => {
-        state.selectedLecturerId = e.target.value;
-        renderSubjectsList();
-    });
-
-    const saveBtn = document.getElementById('save-capabilities-btn');
-    if (saveBtn) saveBtn.addEventListener('click', saveCapabilities);
-
-    // Import Modal Listeners
-    const importModalBtn = document.getElementById('open-import-modal-btn');
-    if (importModalBtn) importModalBtn.addEventListener('click', () => {
-        document.getElementById('import-file-input').value = '';
-        document.getElementById('import-log').innerHTML = '';
-        document.getElementById('import-results-container').classList.add('hidden');
-        document.getElementById('import-modal').style.display = 'block';
-    });
-    
-    const downloadBtn = document.getElementById('download-template-btn');
-    if(downloadBtn) downloadBtn.addEventListener('click', downloadCapabilityTemplate);
-    
-    const startImportBtn = document.getElementById('start-import-btn');
-    if(startImportBtn) startImportBtn.addEventListener('click', handleCapabilityImport);
-}
-
-function attachBaseListeners() {
-    const snapshotErrorHandler = (name) => (error) => console.error(`Error loading ${name}:`, error);
-    
-    const collectionsToLoad = [
-        { name: 'departments', col: departmentsCol, state: state.departments, sort: (a, b) => a.name.localeCompare(b.name) },
-        { name: 'lecturers', col: lecturersCol, state: state.lecturers, sort: (a, b) => a.name.localeCompare(b.name) },
-        { name: 'subjects', col: curriculumSubjectsCol, state: state.subjects, sort: (a, b) => a.subjectName.localeCompare(b.subjectName) },
-    ];
-
-    collectionsToLoad.forEach(c => {
-        onSnapshot(c.col, (snapshot) => {
-            c.state.length = 0; // Clear previous state
-            snapshot.docs.forEach(doc => c.state.push({ id: doc.id, ...doc.data() }));
-            if (c.sort) c.state.sort(c.sort);
-            
-            if (c.name === 'departments') renderDepartmentSelect();
-            if (state.selectedDepartmentId && c.name === 'lecturers') renderLecturerSelect();
-            if (state.selectedLecturerId && c.name === 'subjects') renderSubjectsList();
-
-        }, snapshotErrorHandler(c.name));
-    });
-
-    // *** NEW: Real-time listener for capabilities ***
-    onSnapshot(capabilitiesCol, (snapshot) => {
-        state.capabilities = {}; // Reset capabilities
-        snapshot.docs.forEach(doc => {
-            state.capabilities[doc.id] = doc.data().subjectIds || [];
-        });
-        // If a lecturer is currently selected, refresh their view
-        if (state.selectedLecturerId) {
-            renderSubjectsList();
-        }
-    }, snapshotErrorHandler('năng lực giảng dạy'));
-}
+};
 
 
-async function initializeApp() {
-    try {
-        const basePath = `artifacts/${appId}/public/data`;
-        
-        // Define collection references
-        usersCol = collection(db, `${basePath}/users`);
-        departmentsCol = collection(db, `${basePath}/departments`);
-        lecturersCol = collection(db, `${basePath}/lecturers`);
-        curriculumSubjectsCol = collection(db, `${basePath}/curriculum_subjects`);
-        capabilitiesCol = collection(db, `${basePath}/lecturer_capabilities`);
-
-        onAuthStateChanged(auth, async (user) => {
-            const appContent = document.getElementById('app-content');
-            if (user) {
-                const userDoc = await getDoc(doc(usersCol, user.uid));
-                state.currentUser = userDoc.exists() ? { uid: user.uid, ...userDoc.data() } : { uid: user.uid, email: user.email, role: 'viewer' };
-                
-                if (document.getElementById('user-email')) {
-                    document.getElementById('user-email').textContent = state.currentUser.email;
-                }
-                
-                appContent.classList.remove('hidden');
-                updateUIForRole();
-
-                // Only attach listeners if user is an admin
-                if (state.currentUser.role === 'admin') {
-                    addEventListeners();
-                    attachBaseListeners();
-                }
-
-            } else {
-                window.location.href = 'index.html';
-            }
-        });
-    } catch (error) {
-        console.error("Firebase initialization error:", error);
-        document.body.innerHTML = `<div class="text-center p-10">Lỗi khởi tạo. Vui lòng tải lại trang.</div>`;
+// Subjects
+const saveSubject = async (data) => {
+    if (!data.maHocPhan || !data.tenMonHoc) {
+        showAlert("Mã và Tên học phần là bắt buộc.");
+        return;
     }
-}
+    try {
+        const docRef = state.editingId ? doc(capSubjectsCol, state.editingId) : doc(capSubjectsCol);
+        await setDoc(docRef, data, { merge: true });
+        showAlert("Lưu học phần thành công!", true);
+        document.getElementById('form-modal').classList.remove('active');
+    } catch (e) {
+        showAlert("Lỗi lưu học phần: " + e.message);
+    }
+};
 
-// --- Initial Load ---
-document.addEventListener('DOMContentLoaded', () => {
-    initializeApp();
-});
+const downloadSubjectTemplate = () => {
+    const filename = "Mau_Import_HocPhan.xlsx";
+    const data = [{
+        maHocPhan: "IT101",
+        tenMonHoc: "Nhập môn Lập trình"
+    }];
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "HocPhan");
+    XLSX.writeFile(wb, filename);
+};
+
+const handleImportSubjects = (file) => {
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+        try {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+            
+            if (jsonData.length === 0) throw new Error("File không có dữ liệu.");
+
+            const existingSubjectCodes = new Set(state.subjects.map(s => s.maHocPhan));
+            const batch = writeBatch(db);
+            let count = 0;
+            let skipped = 0;
+
+            for (const row of jsonData) {
+                const code = String(row.maHocPhan || '').trim();
+                const name = String(row.tenMonHoc || '').trim();
+                if (code && name) {
+                    if (existingSubjectCodes.has(code)) {
+                        skipped++;
+                        continue;
+                    }
+                    const docRef = doc(capSubjectsCol);
+                    batch.set(docRef, { maHocPhan: code, tenMonHoc: name });
+                    existingSubjectCodes.add(code); // Prevent duplicates within the same file
+                    count++;
+                }
+            }
+            if (count > 0) await batch.commit();
+            showAlert(`Kết quả import:\n- Thêm mới: ${count} học phần.\n- Bỏ qua: ${skipped} học phần đã tồn tại.`, true);
+        } catch (error) {
+            showAlert("Lỗi import: " + error.message);
+        } finally {
+            document.getElementById('subject-import-modal').classList.remove('active');
+        }
+    };
+    reader.readAsArrayBuffer(file);
+};
+
+// Capabilities
+const saveCapabilities = async () => {
+    const lecturerId = document.getElementById('assign-lecturer-select').value;
+    if (!lecturerId) return;
+
+    const checkedBoxes = document.querySelectorAll('#subjects-list-container input:checked');
+    const subjectIds = Array.from(checkedBoxes).map(box => box.dataset.subjectId);
+
+    try {
+        await setDoc(doc(capAssignmentsCol, lecturerId), { subjectIds });
+        showAlert("Lưu năng lực thành công!", true);
+    } catch (e) {
+        showAlert("Lỗi lưu năng lực: " + e.message);
+    }
+};
+
+const downloadCapabilityTemplate = () => {
+    const filename = "Mau_Import_NangLuc.xlsx";
+    const data = [{
+        maGiangVien: "GV001",
+        maHocPhan: "IT101"
+    }];
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "NangLuc");
+    XLSX.writeFile(wb, filename);
+};
+
+const handleImportCapabilities = (file) => {
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+        try {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+            
+            if (jsonData.length === 0) throw new Error("File không có dữ liệu.");
+
+            const lecturerCodeMap = new Map(state.lecturers.map(l => [l.code, l.id]));
+            const subjectCodeMap = new Map(state.subjects.map(s => [s.maHocPhan, s.id]));
+            
+            const assignmentsToImport = new Map();
+            let errors = [];
+
+            for (const row of jsonData) {
+                const lecturerCode = String(row.maGiangVien || '').trim();
+                const subjectCode = String(row.maHocPhan || '').trim();
+
+                if (lecturerCode && subjectCode) {
+                    const lecturerId = lecturerCodeMap.get(lecturerCode);
+                    const subjectId = subjectCodeMap.get(subjectCode);
+
+                    if (lecturerId && subjectId) {
+                        if (!assignmentsToImport.has(lecturerId)) {
+                            // Import overwrites old capabilities for that lecturer
+                            assignmentsToImport.set(lecturerId, new Set());
+                        }
+                        assignmentsToImport.get(lecturerId).add(subjectId);
+                    } else {
+                        if (!lecturerId) errors.push(`Không tìm thấy giảng viên mã '${lecturerCode}'.`);
+                        if (!subjectId) errors.push(`Không tìm thấy học phần mã '${subjectCode}'.`);
+                    }
+                }
+            }
+            
+            if (assignmentsToImport.size > 0) {
+                const batch = writeBatch(db);
+                for (const [lecturerId, subjectIdsSet] of assignmentsToImport.entries()) {
+                    const docRef = doc(capAssignmentsCol, lecturerId);
+                    batch.set(docRef, { subjectIds: Array.from(subjectIdsSet) });
+                }
+                await batch.commit();
+                
+                let successMsg = `Import thành công năng lực cho ${assignmentsToImport.size} giảng viên!`;
+                if (errors.length > 0) {
+                    successMsg += `\nCác lỗi sau đã bị bỏ qua:\n` + [...new Set(errors)].join('\n');
+                }
+                showAlert(successMsg, true);
+            } else {
+                 showAlert("Không có dữ liệu hợp lệ để import. Vui lòng kiểm tra lại mã GV và mã HP trong file.\n" + [...new Set(errors)].join('\n'));
+            }
+
+        } catch (error) {
+            showAlert("Lỗi import: " + error.message);
+        } finally {
+            document.getElementById('capability-import-modal').classList.remove('active');
+        }
+    };
+    reader.readAsArrayBuffer(file);
+};
+
+
+// --- Event Listeners Setup ---
+const addEventListeners = () => {
+    // Tab switching
+    document.querySelectorAll('.tab-button').forEach(button => {
+        button.addEventListener('click', () => {
+            const tabName = button.dataset.tab;
+            document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.remove('active'));
+            button.classList.add('active');
+            document.getElementById(`tab-panel-${tabName}`).classList.add('active');
+        });
+    });
+
+    // Department actions
+    document.getElementById('add-department-btn').onclick = () => {
+        state.editingId = null;
+        const formHtml = `
+            <div><label class="block text-sm">Mã Khoa</label><input name="code" class="w-full p-2 border rounded"></div>
+            <div><label class="block text-sm">Tên Khoa</label><input name="name" class="w-full p-2 border rounded"></div>
+        `;
+        showFormModal("Thêm Khoa mới", formHtml, saveDepartment);
+    };
+
+    document.getElementById('departments-table-body').addEventListener('click', e => {
+        const editBtn = e.target.closest('.edit-department-btn');
+        const deleteBtn = e.target.closest('.delete-department-btn');
+        if (editBtn) {
+            state.editingId = editBtn.dataset.id;
+            const dept = state.departments.find(d => d.id === state.editingId);
+            const formHtml = `
+                <div><label class="block text-sm">Mã Khoa</label><input name="code" value="${dept.code}" class="w-full p-2 border rounded"></div>
+                <div><label class="block text-sm">Tên Khoa</label><input name="name" value="${dept.name}" class="w-full p-2 border rounded"></div>
+            `;
+            showFormModal("Chỉnh sửa Khoa", formHtml, saveDepartment);
+        }
+        if (deleteBtn) {
+            if (confirm("Bạn có chắc muốn xóa khoa này?")) {
+                deleteDoc(doc(capDepartmentsCol, deleteBtn.dataset.id));
+            }
+        }
+    });
+
+    // Lecturer actions
+    document.getElementById('add-lecturer-btn').onclick = () => {
+        state.editingId = null;
+        const deptOptions = state.departments.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
+        const formHtml = `
+            <div><label class="block text-sm">Mã Giảng viên</label><input name="code" class="w-full p-2 border rounded"></div>
+            <div><label class="block text-sm">Tên Giảng viên</label><input name="name" class="w-full p-2 border rounded"></div>
+            <div><label class="block text-sm">Khoa</label><select name="departmentId" class="w-full p-2 border rounded">${deptOptions}</select></div>
+        `;
+        showFormModal("Thêm Giảng viên mới", formHtml, saveLecturer);
+    };
+    
+     document.getElementById('lecturers-table-body').addEventListener('click', e => {
+        const editBtn = e.target.closest('.edit-lecturer-btn');
+        const deleteBtn = e.target.closest('.delete-lecturer-btn');
+        if (editBtn) {
+            state.editingId = editBtn.dataset.id;
+            const lect = state.lecturers.find(l => l.id === state.editingId);
+            const deptOptions = state.departments.map(d => `<option value="${d.id}" ${d.id === lect.departmentId ? 'selected' : ''}>${d.name}</option>`).join('');
+            const formHtml = `
+                <div><label class="block text-sm">Mã Giảng viên</label><input name="code" value="${lect.code}" class="w-full p-2 border rounded"></div>
+                <div><label class="block text-sm">Tên Giảng viên</label><input name="name" value="${lect.name}" class="w-full p-2 border rounded"></div>
+                <div><label class="block text-sm">Khoa</label><select name="departmentId" class="w-full p-2 border rounded">${deptOptions}</select></div>
+            `;
+            showFormModal("Chỉnh sửa Giảng viên", formHtml, saveLecturer);
+        }
+        if (deleteBtn) {
+            if (confirm("Bạn có chắc muốn xóa giảng viên này?")) {
+                deleteDoc(doc(capLecturersCol, deleteBtn.dataset.id));
+            }
+        }
+    });
+
+    document.getElementById('open-lecturer-import-modal-btn').onclick = () => {
+        document.getElementById('lecturer-import-modal').classList.add('active');
+    };
+    document.getElementById('lecturer-import-cancel-btn').onclick = () => {
+        document.getElementById('lecturer-import-modal').classList.remove('active');
+    };
+    document.getElementById('lecturer-import-start-btn').onclick = () => {
+        const fileInput = document.getElementById('lecturer-import-file-input');
+        if (fileInput.files.length > 0) {
+            handleImportLecturers(fileInput.files[0]);
+        } else {
+            showAlert("Vui lòng chọn một file.");
+        }
+    };
+    document.getElementById('download-lecturer-template-btn').onclick = downloadLecturerTemplate;
+    document.getElementById('deduplicate-lecturers-btn').onclick = () => deduplicateItems(capLecturersCol, 'code', 'giảng viên');
+    document.getElementById('delete-selected-lecturers-btn').onclick = () => {
+        const selectedIds = [...document.querySelectorAll('.lecturer-checkbox:checked')].map(cb => cb.dataset.id);
+        deleteItems(capLecturersCol, selectedIds, 'giảng viên');
+    };
+
+
+    // Subject actions
+    document.getElementById('add-subject-btn').onclick = () => {
+        state.editingId = null;
+        const formHtml = `
+            <div><label class="block text-sm">Mã Học phần</label><input name="maHocPhan" class="w-full p-2 border rounded"></div>
+            <div><label class="block text-sm">Tên Học phần</label><input name="tenMonHoc" class="w-full p-2 border rounded"></div>
+        `;
+        showFormModal("Thêm Học phần mới", formHtml, saveSubject);
+    };
+    
+    document.getElementById('subjects-table-body').addEventListener('click', e => {
+        const editBtn = e.target.closest('.edit-subject-btn');
+        const deleteBtn = e.target.closest('.delete-subject-btn');
+        if (editBtn) {
+            state.editingId = editBtn.dataset.id;
+            const sub = state.subjects.find(s => s.id === state.editingId);
+            const formHtml = `
+                <div><label class="block text-sm">Mã Học phần</label><input name="maHocPhan" value="${sub.maHocPhan}" class="w-full p-2 border rounded"></div>
+                <div><label class="block text-sm">Tên Học phần</label><input name="tenMonHoc" value="${sub.tenMonHoc}" class="w-full p-2 border rounded"></div>
+            `;
+            showFormModal("Chỉnh sửa Học phần", formHtml, saveSubject);
+        }
+        if (deleteBtn) {
+            if (confirm("Bạn có chắc muốn xóa học phần này?")) {
+                deleteDoc(doc(capSubjectsCol, deleteBtn.dataset.id));
+            }
+        }
+    });
+    
+    document.getElementById('open-subject-import-modal-btn').onclick = () => {
+        document.getElementById('subject-import-modal').classList.add('active');
+    };
+    document.getElementById('subject-import-cancel-btn').onclick = () => {
+        document.getElementById('subject-import-modal').classList.remove('active');
+    };
+    document.getElementById('subject-import-start-btn').onclick = () => {
+        const fileInput = document.getElementById('subject-import-file-input');
+        if (fileInput.files.length > 0) {
+            handleImportSubjects(fileInput.files[0]);
+        } else {
+            showAlert("Vui lòng chọn một file.");
+        }
+    };
+    document.getElementById('download-subject-template-btn').onclick = downloadSubjectTemplate;
+    document.getElementById('deduplicate-subjects-btn').onclick = () => deduplicateItems(capSubjectsCol, 'maHocPhan', 'học phần');
+    document.getElementById('delete-selected-subjects-btn').onclick = () => {
+        const selectedIds = [...document.querySelectorAll('.subject-checkbox:checked')].map(cb => cb.dataset.id);
+        deleteItems(capSubjectsCol, selectedIds, 'học phần');
+    };
+
+    
+    // Capability actions
+    document.getElementById('open-capability-import-modal-btn').onclick = () => {
+        document.getElementById('capability-import-modal').classList.add('active');
+    };
+    document.getElementById('capability-import-cancel-btn').onclick = () => {
+        document.getElementById('capability-import-modal').classList.remove('active');
+    };
+    document.getElementById('capability-import-start-btn').onclick = () => {
+        const fileInput = document.getElementById('capability-import-file-input');
+        if (fileInput.files.length > 0) {
+            handleImportCapabilities(fileInput.files[0]);
+        } else {
+            showAlert("Vui lòng chọn một file.");
+        }
+    };
+    document.getElementById('download-capability-template-btn').onclick = downloadCapabilityTemplate;
+
+    document.getElementById('save-capabilities-btn').onclick = saveCapabilities;
+    
+    // Bulk selection listeners
+    document.getElementById('select-all-subjects').addEventListener('change', e => {
+        document.querySelectorAll('.subject-checkbox').forEach(cb => cb.checked = e.target.checked);
+        document.getElementById('delete-selected-subjects-btn').classList.toggle('hidden', !e.target.checked);
+    });
+     document.getElementById('select-all-lecturers').addEventListener('change', e => {
+        document.querySelectorAll('.lecturer-checkbox').forEach(cb => cb.checked = e.target.checked);
+        document.getElementById('delete-selected-lecturers-btn').classList.toggle('hidden', !e.target.checked);
+    });
+
+    document.getElementById('subjects-table-body').addEventListener('change', e => {
+        if(e.target.classList.contains('subject-checkbox')) {
+            const anyChecked = [...document.querySelectorAll('.subject-checkbox')].some(cb => cb.checked);
+            document.getElementById('delete-selected-subjects-btn').classList.toggle('hidden', !anyChecked);
+        }
+    });
+    document.getElementById('lecturers-table-body').addEventListener('change', e => {
+        if(e.target.classList.contains('lecturer-checkbox')) {
+            const anyChecked = [...document.querySelectorAll('.lecturer-checkbox')].some(cb => cb.checked);
+            document.getElementById('delete-selected-lecturers-btn').classList.toggle('hidden', !anyChecked);
+        }
+    });
+
+    // Assignment dropdown listeners
+    document.getElementById('assign-department-select').addEventListener('change', updateAssignmentDropdowns);
+    document.getElementById('assign-lecturer-select').addEventListener('change', renderSubjectsForAssignment);
+
+    // Logout
+    document.getElementById('logout-btn').onclick = () => signOut(auth);
+};
+
+// --- Data Subscription ---
+const attachBaseListeners = () => {
+    const sortByName = (a, b) => (a.name || a.tenMonHoc || '').localeCompare(b.name || b.tenMonHoc || '');
+
+    onSnapshot(capDepartmentsCol, snapshot => {
+        state.departments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort(sortByName);
+        renderDepartmentsTable();
+        updateAssignmentDropdowns();
+    });
+    onSnapshot(capLecturersCol, snapshot => {
+        state.lecturers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort(sortByName);
+        renderLecturersTable();
+        updateAssignmentDropdowns();
+    });
+    onSnapshot(capSubjectsCol, snapshot => {
+        state.subjects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort(sortByName);
+        renderSubjectsTable();
+        renderOverviewPanel();
+        if (document.getElementById('tab-panel-nang-luc').classList.contains('active')) {
+            renderSubjectsForAssignment();
+        }
+    });
+    onSnapshot(capAssignmentsCol, snapshot => {
+        state.assignments = {};
+        snapshot.docs.forEach(doc => {
+            state.assignments[doc.id] = doc.data().subjectIds || [];
+        });
+        renderOverviewPanel();
+        if (document.getElementById('tab-panel-nang-luc').classList.contains('active')) {
+            renderSubjectsForAssignment();
+        }
+    });
+};
+
+// --- Initialization ---
+const initializeApp = () => {
+    onAuthStateChanged(auth, async (user) => {
+        document.getElementById('main-spinner').style.display = 'none';
+        if (user) {
+            const userDoc = await getDoc(doc(usersCol, user.uid));
+            state.currentUser = userDoc.exists() ? { uid: user.uid, ...userDoc.data() } : { uid: user.uid, email: user.email, role: 'viewer' };
+            
+            if (state.currentUser.role !== 'admin') {
+                 document.body.innerHTML = `<div class="text-center p-10"><h1>Không có quyền truy cập</h1></div>`;
+                 return;
+            }
+            
+            document.getElementById('user-email').textContent = state.currentUser.email;
+            document.getElementById('app-content').classList.remove('hidden');
+            
+            addEventListeners();
+            attachBaseListeners();
+        } else {
+            window.location.href = 'index.html';
+        }
+    });
+};
+
+document.addEventListener('DOMContentLoaded', initializeApp);

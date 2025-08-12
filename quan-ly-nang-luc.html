@@ -4,7 +4,7 @@
     <link rel="icon" type="image/png" href="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRjTnSBGofmGpcMY_uEoXhgAB-FeeLjVslu1A&s">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Quản lý Năng lực Giảng dạy - ĐHHP</title>
+    <title>Quản lý Năng lực (Độc lập) - ĐHHP</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Google Fonts -->
@@ -14,126 +14,241 @@
     <!-- SheetJS for Excel file reading -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
-        /* Simple modal style */
-        .modal {
-            display: none; position: fixed; z-index: 50;
-            left: 0; top: 0; width: 100%; height: 100%;
-            overflow: auto; background-color: rgba(0,0,0,0.5);
-            -webkit-animation-name: fadeIn; -webkit-animation-duration: 0.4s;
-            animation-name: fadeIn; animation-duration: 0.4s
+        body { font-family: 'Inter', sans-serif; }
+        .modal { display: none; }
+        .modal.active { display: flex; }
+        .tab-button.active {
+            border-color: #0d9488;
+            color: #0d9488;
+            background-color: #f0fdfa;
         }
-        .modal-content {
-            background-color: #fefefe; margin: 10% auto; padding: 24px;
-            border: 1px solid #888; width: 90%; max-width: 500px;
-            border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-            -webkit-animation-name: slideIn; -webkit-animation-duration: 0.4s;
-            animation-name: slideIn; animation-duration: 0.4s
+        .tab-panel { display: none; }
+        .tab-panel.active { display: block; }
+        th .checkbox, td .checkbox {
+            width: 1.25rem;
+            height: 1.25rem;
         }
-        @-webkit-keyframes slideIn { from {top: -300px; opacity: 0} to {top: 0; opacity: 1} }
-        @keyframes slideIn { from {margin-top: -5%; opacity: 0} to {margin-top: 10%; opacity: 1} }
-        @-webkit-keyframes fadeIn { from {opacity: 0} to {opacity: 1} }
-        @keyframes fadeIn { from {opacity: 0} to {opacity: 1} }
     </style>
 </head>
-<body class="p-4 md:p-8 bg-gray-100 font-['Inter',_sans-serif]">
+<body class="p-4 md:p-8 bg-gray-100">
 
-    <!-- Main App Content -->
+    <!-- Main App Container -->
     <div id="app-content" class="hidden">
-        <div class="max-w-4xl mx-auto">
-            <!-- Back to modules button -->
+        <div class="max-w-7xl mx-auto">
+             <!-- Back to modules button -->
             <a href="quan-ly-lao-dong-a.html" class="mb-4 bg-white hover:bg-gray-100 text-gray-800 font-bold py-2 px-4 rounded-lg inline-flex items-center transition-colors no-underline shadow-sm border">
                 <i class="fas fa-arrow-left mr-2"></i>
                 <span>Quay lại trang Lao động A</span>
             </a>
-            
+
             <div class="bg-white p-6 rounded-2xl shadow-lg">
                 <!-- Header -->
-                <div class="flex justify-between items-start mb-6">
-                    <div class="text-left">
-                        <h1 class="text-xl md:text-3xl font-bold text-teal-700">Quản lý Năng lực Giảng dạy</h1>
-                        <p class="text-md text-gray-600">Gán các học phần mà giảng viên có thể đảm nhận</p>
-                    </div>
-                    <button id="open-import-modal-btn" class="bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-2 px-4 rounded-lg shadow-md flex items-center gap-2">
-                        <i class="fas fa-file-import"></i> Import Năng lực
-                    </button>
-                </div>
-
-                <!-- User Info and Logout -->
-                <div class="flex justify-between items-center mb-6 border-t border-b py-2">
+                <div class="flex justify-between items-start mb-4">
                     <div>
-                        <span class="text-sm text-gray-600">Xin chào, <strong id="user-email" class="text-teal-700"></strong>!</span>
-                        <span id="user-role-badge" class="ml-2 text-xs font-semibold px-2.5 py-0.5 rounded-full"></span>
+                        <h1 class="text-xl md:text-3xl font-bold text-teal-700">Module Quản lý Năng lực Giảng dạy</h1>
+                        <p class="text-md text-gray-600">Quản lý tập trung Khoa, Giảng viên, Học phần và Năng lực giảng dạy.</p>
                     </div>
-                    <button id="logout-btn" class="bg-red-500 hover:bg-red-600 text-white font-bold py-1 px-3 rounded-lg text-sm">
-                        <i class="fas fa-sign-out-alt mr-1"></i>Đăng xuất
-                    </button>
-                </div>
-
-                <!-- Filters -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                    <div>
-                        <label for="department-select" class="block text-sm font-medium text-gray-700 mb-1">1. Chọn Khoa:</label>
-                        <select id="department-select" class="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-teal-500 focus:border-teal-500"></select>
-                    </div>
-                    <div>
-                        <label for="lecturer-select" class="block text-sm font-medium text-gray-700 mb-1">2. Chọn Giảng viên:</label>
-                        <select id="lecturer-select" class="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-teal-500 focus:border-teal-500" disabled>
-                            <option value="">-- Vui lòng chọn khoa trước --</option>
-                        </select>
-                    </div>
-                </div>
-
-                <!-- Main Content: Subjects List -->
-                <div id="main-content">
-                    <h2 class="text-xl font-bold text-gray-800 mb-4">Danh sách Học phần có thể đảm nhận</h2>
-                    <div id="subjects-list-container" class="p-4 border-2 border-dashed rounded-lg bg-gray-50 min-h-[200px]">
-                        <p id="subjects-placeholder" class="text-center text-gray-500 pt-16">Vui lòng chọn khoa và giảng viên để xem danh sách học phần.</p>
-                        <!-- Checkboxes will be populated by JS -->
-                    </div>
-                    <div class="mt-6 text-right">
-                        <button id="save-capabilities-btn" class="bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 px-6 rounded-lg shadow-md flex items-center gap-2 ml-auto" disabled>
-                            <i class="fas fa-save"></i> Lưu thay đổi
+                     <div class="flex items-center">
+                        <span class="text-sm text-gray-600 mr-4">Xin chào, <strong id="user-email" class="text-teal-700"></strong>!</span>
+                        <button id="logout-btn" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-3 rounded-lg text-sm">
+                            <i class="fas fa-sign-out-alt mr-1"></i>Đăng xuất
                         </button>
                     </div>
+                </div>
+
+                <!-- Tabs -->
+                <div class="border-b border-gray-200 mb-6">
+                    <nav class="flex space-x-4" aria-label="Tabs">
+                        <button data-tab="nang-luc" class="tab-button active font-medium text-gray-500 hover:text-teal-700 whitespace-nowrap py-3 px-4 border-b-2 border-transparent text-sm">
+                            <i class="fas fa-check-double mr-2"></i>Gán Năng lực
+                        </button>
+                         <button data-tab="tong-quan" class="tab-button font-medium text-gray-500 hover:text-teal-700 whitespace-nowrap py-3 px-4 border-b-2 border-transparent text-sm">
+                            <i class="fas fa-eye mr-2"></i>Tổng quan Năng lực
+                        </button>
+                        <button data-tab="giang-vien" class="tab-button font-medium text-gray-500 hover:text-teal-700 whitespace-nowrap py-3 px-4 border-b-2 border-transparent text-sm">
+                            <i class="fas fa-chalkboard-teacher mr-2"></i>Quản lý Giảng viên
+                        </button>
+                        <button data-tab="khoa" class="tab-button font-medium text-gray-500 hover:text-teal-700 whitespace-nowrap py-3 px-4 border-b-2 border-transparent text-sm">
+                            <i class="fas fa-building mr-2"></i>Quản lý Khoa
+                        </button>
+                        <button data-tab="hoc-phan" class="tab-button font-medium text-gray-500 hover:text-teal-700 whitespace-nowrap py-3 px-4 border-b-2 border-transparent text-sm">
+                            <i class="fas fa-book mr-2"></i>Quản lý Học phần
+                        </button>
+                    </nav>
+                </div>
+
+                <!-- Tab Panels -->
+                <div>
+                    <!-- 1. Capability Assignment Panel -->
+                    <div id="tab-panel-nang-luc" class="tab-panel active">
+                        <div class="flex justify-between items-center mb-4">
+                             <h3 class="text-lg font-bold text-gray-800">Gán năng lực cho Giảng viên</h3>
+                             <button id="open-capability-import-modal-btn" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg"><i class="fas fa-file-import mr-2"></i>Import Năng lực</button>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6 p-4 border rounded-md bg-gray-50">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">1. Chọn Khoa:</label>
+                                <select id="assign-department-select" class="w-full p-2 border rounded-md shadow-sm"></select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">2. Chọn Giảng viên:</label>
+                                <select id="assign-lecturer-select" class="w-full p-2 border rounded-md shadow-sm" disabled></select>
+                            </div>
+                        </div>
+                        <h3 class="text-lg font-bold text-gray-800 mb-4">Danh sách Học phần có thể đảm nhận</h3>
+                        <div id="subjects-list-container" class="p-4 border-2 border-dashed rounded-lg bg-gray-50 min-h-[200px]">
+                            <p id="subjects-placeholder" class="text-center text-gray-500 pt-16">Vui lòng chọn khoa và giảng viên để gán thủ công, hoặc dùng chức năng Import.</p>
+                        </div>
+                        <div class="mt-6 text-right">
+                            <button id="save-capabilities-btn" class="bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 px-6 rounded-lg shadow-md" disabled>
+                                <i class="fas fa-save mr-2"></i>Lưu Năng lực
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- 2. Overview Panel -->
+                    <div id="tab-panel-tong-quan" class="tab-panel">
+                        <h3 class="text-lg font-bold text-gray-800 mb-4">Tổng quan Năng lực đã gán</h3>
+                        <div id="overview-container" class="space-y-4">
+                           <!-- JS will populate this -->
+                        </div>
+                    </div>
+
+                    <!-- 3. Lecturer Management Panel -->
+                    <div id="tab-panel-giang-vien" class="tab-panel">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-lg font-bold text-gray-800">Danh sách Giảng viên</h3>
+                             <div>
+                                <button id="delete-selected-lecturers-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg mr-2 hidden"><i class="fas fa-trash-alt mr-2"></i>Xóa đã chọn</button>
+                                <button id="deduplicate-lecturers-btn" class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-lg mr-2"><i class="fas fa-magic mr-2"></i>Loại bỏ trùng lặp</button>
+                                <button id="open-lecturer-import-modal-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg mr-2"><i class="fas fa-file-import mr-2"></i>Import</button>
+                                <button id="add-lecturer-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg"><i class="fas fa-plus mr-2"></i>Thêm mới</button>
+                            </div>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full bg-white border">
+                                <thead class="bg-gray-50"><tr>
+                                    <th class="py-2 px-2 border-b"><input type="checkbox" id="select-all-lecturers" class="checkbox"></th>
+                                    <th class="py-2 px-4 border-b">Mã GV</th><th class="py-2 px-4 border-b">Tên Giảng viên</th><th class="py-2 px-4 border-b">Khoa</th><th class="py-2 px-4 border-b">Hành động</th>
+                                </tr></thead>
+                                <tbody id="lecturers-table-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- 4. Department Management Panel -->
+                    <div id="tab-panel-khoa" class="tab-panel">
+                         <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-lg font-bold text-gray-800">Danh sách Khoa</h3>
+                            <button id="add-department-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg"><i class="fas fa-plus mr-2"></i>Thêm Khoa</button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full bg-white border">
+                                <thead class="bg-gray-50"><tr>
+                                    <th class="py-2 px-4 border-b">Mã Khoa</th><th class="py-2 px-4 border-b">Tên Khoa</th><th class="py-2 px-4 border-b">Hành động</th>
+                                </tr></thead>
+                                <tbody id="departments-table-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- 5. Subject Management Panel -->
+                    <div id="tab-panel-hoc-phan" class="tab-panel">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-lg font-bold text-gray-800">Danh sách Học phần</h3>
+                            <div>
+                                <button id="delete-selected-subjects-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg mr-2 hidden"><i class="fas fa-trash-alt mr-2"></i>Xóa đã chọn</button>
+                                <button id="deduplicate-subjects-btn" class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-lg mr-2"><i class="fas fa-magic mr-2"></i>Loại bỏ trùng lặp</button>
+                                <button id="open-subject-import-modal-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg mr-2"><i class="fas fa-file-import mr-2"></i>Import</button>
+                                <button id="add-subject-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg"><i class="fas fa-plus mr-2"></i>Thêm mới</button>
+                            </div>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full bg-white border">
+                                <thead class="bg-gray-50"><tr>
+                                    <th class="py-2 px-2 border-b"><input type="checkbox" id="select-all-subjects" class="checkbox"></th>
+                                    <th class="py-2 px-4 border-b">Mã Học phần</th><th class="py-2 px-4 border-b">Tên Học phần</th><th class="py-2 px-4 border-b">Hành động</th>
+                                </tr></thead>
+                                <tbody id="subjects-table-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div id="form-modal" class="modal fixed inset-0 bg-gray-600 bg-opacity-50 items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+            <h3 id="modal-title" class="text-xl font-bold mb-4"></h3>
+            <form id="modal-form" class="space-y-4"></form>
+            <div class="mt-6 flex justify-end space-x-3">
+                <button id="modal-cancel-btn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-lg">Hủy</button>
+                <button id="modal-save-btn" class="bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-lg">Lưu</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="subject-import-modal" class="modal fixed inset-0 bg-gray-600 bg-opacity-50 items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+            <h3 class="text-xl font-bold mb-4">Import Học phần từ Excel</h3>
+            <p class="text-sm text-gray-600 mb-4">File cần có 2 cột: 'maHocPhan' và 'tenMonHoc'. Các học phần đã có mã sẽ được bỏ qua.</p>
+             <input type="file" id="subject-import-file-input" accept=".xlsx" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+            <div class="mt-6 flex justify-between items-center">
+                 <button id="download-subject-template-btn" class="text-blue-600 hover:underline text-sm"><i class="fas fa-download mr-1"></i> Tải file mẫu</button>
+                <div>
+                    <button id="subject-import-cancel-btn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-lg mr-2">Hủy</button>
+                    <button id="subject-import-start-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg">Bắt đầu Import</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="lecturer-import-modal" class="modal fixed inset-0 bg-gray-600 bg-opacity-50 items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+            <h3 class="text-xl font-bold mb-4">Import Giảng viên từ Excel</h3>
+            <p class="text-sm text-gray-600 mb-4">File cần có 3 cột: 'maGiangVien', 'tenGiangVien', và 'maKhoa'. Các giảng viên đã có mã sẽ được bỏ qua.</p>
+             <input type="file" id="lecturer-import-file-input" accept=".xlsx" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+            <div class="mt-6 flex justify-between items-center">
+                 <button id="download-lecturer-template-btn" class="text-blue-600 hover:underline text-sm"><i class="fas fa-download mr-1"></i> Tải file mẫu</button>
+                <div>
+                    <button id="lecturer-import-cancel-btn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-lg mr-2">Hủy</button>
+                    <button id="lecturer-import-start-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg">Bắt đầu Import</button>
                 </div>
             </div>
         </div>
     </div>
     
-    <!-- Import Capabilities Modal -->
-    <div id="import-modal" class="modal">
-        <div class="modal-content">
-            <span class="close-button" onclick="document.getElementById('import-modal').style.display='none'">&times;</span>
+    <div id="capability-import-modal" class="modal fixed inset-0 bg-gray-600 bg-opacity-50 items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
             <h3 class="text-xl font-bold mb-4">Import Năng lực Giảng dạy</h3>
-            <p class="text-sm text-gray-600 mb-4">Tải lên file Excel để gán hàng loạt các môn học mà giảng viên có thể dạy. File import sẽ ghi đè lên năng lực cũ của các giảng viên có trong file.</p>
-            <div class="p-4 border rounded-lg bg-gray-50 space-y-4">
+            <p class="text-sm text-gray-600 mb-4">File cần có 2 cột: 'maGiangVien' và 'maHocPhan'. Dữ liệu import sẽ ghi đè lên năng lực cũ của giảng viên có trong file.</p>
+             <input type="file" id="capability-import-file-input" accept=".xlsx" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+            <div class="mt-6 flex justify-between items-center">
+                 <button id="download-capability-template-btn" class="text-blue-600 hover:underline text-sm"><i class="fas fa-download mr-1"></i> Tải file mẫu</button>
                 <div>
-                     <label for="import-file-input" class="block text-sm font-medium text-gray-700">Chọn file Excel (.xlsx)</label>
-                     <input type="file" id="import-file-input" accept=".xlsx" class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                    <button id="capability-import-cancel-btn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-lg mr-2">Hủy</button>
+                    <button id="capability-import-start-btn" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg">Bắt đầu Import</button>
                 </div>
-                <div class="flex justify-between items-center">
-                    <button id="download-template-btn" type="button" class="text-blue-600 hover:underline text-sm"><i class="fas fa-download mr-1"></i> Tải file mẫu</button>
-                    <button id="start-import-btn" class="bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-2 px-4 rounded-lg">
-                        <i class="fas fa-rocket mr-2"></i>Bắt đầu Import
-                    </button>
-                </div>
-            </div>
-             <div id="import-results-container" class="mt-4 hidden">
-                <h4 class="font-semibold text-gray-800 mb-2">Kết quả Import:</h4>
-                <div id="import-log" class="max-h-60 overflow-y-auto border rounded-md p-3 bg-gray-50 text-sm"></div>
             </div>
         </div>
     </div>
 
     <!-- Alert Modal -->
-    <div id="alert-modal" class="modal">
-        <div class="modal-content">
-             <h3 id="alert-title" class="text-lg font-bold mb-4">Thông báo</h3>
-            <p id="alert-message" class="mb-6"></p>
+    <div id="alert-modal" class="modal fixed inset-0 bg-gray-600 bg-opacity-50 items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm">
+            <h3 id="alert-title" class="text-lg font-bold mb-4">Thông báo</h3>
+            <p id="alert-message" class="mb-6 whitespace-pre-wrap"></p>
             <div class="flex justify-end">
                 <button id="alert-ok-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">OK</button>
             </div>
         </div>
+    </div>
+
+    <!-- Loading Spinner -->
+    <div id="main-spinner" class="fixed inset-0 bg-gray-100 bg-opacity-75 flex items-center justify-center z-50">
+        <i class="fas fa-spinner fa-spin text-teal-600 text-4xl"></i>
     </div>
 
     <!-- JavaScript File -->
