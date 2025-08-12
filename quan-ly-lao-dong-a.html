@@ -50,11 +50,13 @@
 
                 <!-- Admin Panel -->
                 <div id="admin-panel" class="admin-only mb-6 p-4 border-2 border-dashed rounded-lg bg-gray-50">
-                    <h3 class="text-lg font-bold text-gray-700 mb-2">Bảng điều khiển của Admin</h3>
-                    <p class="text-sm text-gray-600 mb-4">Khu vực để thêm mới, import và quản lý các phân công giảng dạy.</p>
-                    <div class="flex flex-wrap gap-3">
+                    <h3 class="text-lg font-bold text-gray-700 mb-4">Bảng điều khiển của Admin</h3>
+                    <div class="flex flex-wrap gap-3 items-center">
+                        <a href="quan-ly-nang-luc.html" class="bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-lg shadow-md flex items-center gap-2 no-underline">
+                            <i class="fas fa-chalkboard-teacher"></i> Quản lý Năng lực
+                        </a>
                         <button id="add-assignment-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-md flex items-center gap-2">
-                            <i class="fas fa-plus-circle"></i> Thêm Phân công mới
+                            <i class="fas fa-plus-circle"></i> Thêm Phân công
                         </button>
                         <button id="manage-guidance-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md flex items-center gap-2">
                             <i class="fas fa-graduation-cap"></i> Quản lý TTTN, ĐATN
@@ -63,7 +65,7 @@
                             <i class="fas fa-tasks"></i> Định mức & Giảm trừ
                         </button>
                         <button id="import-data-btn" class="bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-2 px-4 rounded-lg shadow-md flex items-center gap-2">
-                            <i class="fas fa-file-import"></i> Import từ Excel
+                            <i class="fas fa-file-import"></i> Import & Quản lý
                         </button>
                     </div>
                 </div>
@@ -192,7 +194,7 @@
     <div id="import-modal" class="modal">
         <div class="modal-content max-w-2xl">
             <span class="close-button no-print" onclick="closeModal('import-modal')">&times;</span>
-            <h3 class="text-xl font-bold mb-4">Import Dữ liệu hàng loạt</h3>
+            <h3 class="text-xl font-bold mb-4">Import & Quản lý Dữ liệu</h3>
             <div class="p-4 border rounded-lg bg-gray-50 space-y-4">
                 <div>
                     <label for="import-type-select" class="block text-sm font-medium text-gray-700">1. Chọn loại dữ liệu để import</label>
@@ -216,6 +218,17 @@
              <div id="import-results-container" class="mt-4 hidden">
                 <h4 class="font-semibold text-gray-800 mb-2">Kết quả Import:</h4>
                 <div id="import-log" class="max-h-60 overflow-y-auto border rounded-md p-3 bg-gray-50 text-sm"></div>
+            </div>
+            <!-- Bulk Delete Section -->
+            <div class="mt-6 border-t pt-4">
+                <h4 class="font-semibold text-gray-800 mb-2">Xóa dữ liệu phân công hàng loạt</h4>
+                <p class="text-sm text-gray-500 mb-2">Lưu ý: Chức năng này sẽ xóa TOÀN BỘ phân công giảng dạy của học kỳ đã chọn. Chỉ thực hiện khi bạn chắc chắn muốn nhập lại dữ liệu từ đầu cho học kỳ đó.</p>
+                <div class="flex flex-col sm:flex-row gap-2 items-center">
+                    <select id="delete-semester-select" class="flex-grow p-2 border rounded-md w-full sm:w-auto"></select>
+                    <button id="start-delete-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg w-full sm:w-auto">
+                        <i class="fas fa-trash-alt mr-2"></i>Xóa Toàn bộ Phân công
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -373,6 +386,18 @@
             <p id="alert-message" class="mb-6"></p>
             <div class="flex justify-end">
                 <button id="alert-ok-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirm Modal -->
+    <div id="confirm-modal" class="modal">
+        <div class="modal-content max-w-sm">
+             <h3 id="confirm-title" class="text-lg font-bold mb-4 text-yellow-600">Yêu cầu xác nhận</h3>
+            <p id="confirm-message" class="mb-6"></p>
+            <div class="flex justify-end gap-3">
+                <button id="confirm-no-btn" class="bg-gray-200 hover:bg-gray-300 text-black font-bold py-2 px-4 rounded-lg">Không</button>
+                <button id="confirm-yes-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg">Có, Xóa</button>
             </div>
         </div>
     </div>

@@ -1,6 +1,10 @@
 // File: js/quan-ly-lao-dong-a.js
 // Logic for the Workload 'A' (Teaching Hours) Calculation module.
 // REFACTORED to optimize Firestore reads by fetching data on demand with queries.
+// FIXED: Corrected the semester lookup logic during import.
+// FIXED: Repopulated edit assignment modal data correctly.
+// FIXED: Moved populateAvailableClasses to global scope to fix ReferenceError.
+// UPDATED: Changed the logic for calculating practice groups.
 
 // Import Firebase modules
 import { auth, db, appId } from './portal-config.js';
@@ -76,6 +80,26 @@ function showAlert(message, isSuccess = false) {
     document.getElementById('alert-ok-btn').onclick = () => modal.style.display = 'none';
 }
 
+function showConfirm(message, onConfirm) {
+    const modal = document.getElementById('confirm-modal');
+    document.getElementById('confirm-message').textContent = message;
+    modal.style.display = 'block';
+
+    const oldYesBtn = document.getElementById('confirm-yes-btn');
+    const newYesBtn = oldYesBtn.cloneNode(true);
+    oldYesBtn.parentNode.replaceChild(newYesBtn, oldYesBtn);
+
+    newYesBtn.onclick = () => {
+        modal.style.display = 'none';
+        onConfirm();
+    };
+
+    document.getElementById('confirm-no-btn').onclick = () => {
+        modal.style.display = 'none';
+    };
+}
+
+
 function setButtonLoading(button, isLoading) {
     if (!button) return;
     if (isLoading) {
@@ -149,7 +173,6 @@ function renderYearSelect() {
     }
 }
 
-// ... (The rest of the UI functions like getStudentCountCoefficient, calculateStandardHours, etc. remain the same)
 /**
  * Calculates the class coefficient based on student count.
  * @param {number} studentCount The number of students in the class.
@@ -164,6 +187,36 @@ function getStudentCountCoefficient(studentCount) {
     if (studentCount <= 150) return 1.6;
     return 1.7;
 }
+
+/**
+ * Calculates the number of practice groups based on student count.
+ * New Rule: 25 students/group. A new group is added only if the remainder is > 5.
+ * @param {number} studentCount The number of students.
+ * @returns {number} The calculated number of groups.
+ */
+function calculatePracticeGroups(studentCount) {
+    if (studentCount <= 0) {
+        return 0;
+    }
+    
+    const baseGroups = Math.floor(studentCount / 25);
+    const remainder = studentCount % 25;
+    
+    let extraGroup = 0;
+    if (remainder > 5) {
+        extraGroup = 1;
+    }
+
+    const totalGroups = baseGroups + extraGroup;
+
+    // A class with any students must count as at least one group.
+    if (totalGroups === 0 && studentCount > 0) {
+        return 1;
+    }
+
+    return totalGroups;
+}
+
 
 /**
  * Calculates standard hours based on assignment data from the modal form.
@@ -184,8 +237,8 @@ function calculateStandardHours() {
     // Calculate total periods
     const totalPeriods = periodsTheory + periodsExercise + periodsDiscussion + periodsPractice;
 
-    // Calculate number of practice groups (max 20 students per group)
-    const numGroups = studentCount > 0 ? Math.ceil(studentCount / 20) : 0;
+    // Calculate number of practice groups based on the new rule
+    const numGroups = calculatePracticeGroups(studentCount);
 
     // Apply the new formula
     const part1 = totalPeriods * classCoefficient;
@@ -276,6 +329,49 @@ function renderLecturerTable() {
     });
 }
 
+// --- NEW LOCATION for populateAvailableClasses ---
+function populateAvailableClasses(classToInclude = null) {
+    const classSelect = document.getElementById('assignment-class');
+    const semesterId = document.getElementById('assignment-semester').value;
+    const subjectId = document.getElementById('assignment-subject').value;
+    
+    classSelect.innerHTML = '<option value="">-- Chọn lớp --</option>';
+    if (!semesterId || !subjectId) {
+        classSelect.disabled = true;
+        return;
+    }
+
+    const selectedSemester = state.semesters.find(s => s.id === semesterId);
+    if (!selectedSemester) {
+        classSelect.disabled = true;
+        return;
+    }
+
+    const academicYear = selectedSemester.namHoc;
+    const allSemesterIdsInYear = state.semesters
+        .filter(s => s.namHoc === academicYear)
+        .map(s => s.id);
+
+    const assignedClassIds = new Set(
+        state.assignments
+            .filter(a => 
+                allSemesterIdsInYear.includes(a.semesterId) && 
+                a.subjectId === subjectId && 
+                a.classId !== classToInclude
+            )
+            .map(a => a.classId)
+    );
+
+    const availableClasses = state.teachingClasses.filter(c => 
+        c.academicYear === selectedSemester.namHoc && !assignedClassIds.has(c.id)
+    );
+
+    availableClasses.forEach(c => {
+        classSelect.innerHTML += `<option value="${c.id}">${c.className}</option>`;
+    });
+    classSelect.disabled = false;
+}
+
 // --- Global Functions (for inline onclick) ---
 window.openModal = (modalId) => document.getElementById(modalId).style.display = 'block';
 window.closeModal = (modalId) => document.getElementById(modalId).style.display = 'none';
@@ -283,7 +379,6 @@ window.onclick = (event) => {
     if (event.target.classList.contains('modal')) event.target.style.display = "none";
 };
 
-// ... (showDetails, editAssignment, deleteAssignment remain largely the same, as they operate on the filtered state data)
 window.showDetails = (lecturerId) => {
     const lecturer = state.lecturers.find(l => l.id === lecturerId);
     if (!lecturer || !state.selectedYear) return;
@@ -378,40 +473,74 @@ window.showDetails = (lecturerId) => {
 
 window.editAssignment = (assignmentId) => {
     const assignment = state.assignments.find(a => a.id === assignmentId);
-    if (!assignment) return;
-    
+    if (!assignment) {
+        showAlert("Không tìm thấy thông tin phân công để sửa.");
+        return;
+    }
+
+    // --- 1. Basic Modal Setup ---
     closeModal('details-modal');
-    openModal('assignment-modal');
-    
+    document.getElementById('assignment-form').reset(); // Clear previous data
     document.getElementById('assignment-modal-title').textContent = 'Chỉnh sửa Phân công Giảng dạy';
     document.getElementById('assignment-id').value = assignment.id;
-    
-    // Set the selected year based on the assignment being edited
+
+    // --- 2. Populate and Set Semester ---
     const semesterOfAssignment = state.semesters.find(s => s.id === assignment.semesterId);
-    if (semesterOfAssignment) {
-        state.selectedYear = semesterOfAssignment.namHoc;
-    }
-    // Repopulate semester dropdown based on the correct year
+    const academicYear = semesterOfAssignment ? semesterOfAssignment.namHoc : state.selectedYear;
+    
     const semesterSelect = document.getElementById('assignment-semester');
-    const semestersInYear = state.semesters.filter(s => s.namHoc === state.selectedYear);
     semesterSelect.innerHTML = '<option value="">-- Chọn học kỳ --</option>';
-    semestersInYear.forEach(s => semesterSelect.innerHTML += `<option value="${s.id}">${s.tenHocKy}</option>`);
+    state.semesters
+        .filter(s => s.namHoc === academicYear)
+        .forEach(s => semesterSelect.innerHTML += `<option value="${s.id}">${s.tenHocKy}</option>`);
     semesterSelect.value = assignment.semesterId;
-    
+
+    // --- 3. Populate and Set Department ---
     const departmentSelect = document.getElementById('assignment-department');
+    departmentSelect.innerHTML = '<option value="">-- Chọn khoa --</option>';
+    state.departments.forEach(d => departmentSelect.innerHTML += `<option value="${d.id}">${d.name}</option>`);
     departmentSelect.value = assignment.departmentId;
-    departmentSelect.dispatchEvent(new Event('change')); 
+
+    // --- 4. Populate and Set Lecturer and Subject based on Department ---
+    const lecturerSelect = document.getElementById('assignment-lecturer');
+    const subjectSelect = document.getElementById('assignment-subject');
+    lecturerSelect.innerHTML = '<option value="">-- Chọn giảng viên --</option>';
+    subjectSelect.innerHTML = '<option value="">-- Chọn học phần --</option>';
     
-    setTimeout(() => {
-        document.getElementById('assignment-subject').value = assignment.subjectId;
-        document.getElementById('assignment-subject').dispatchEvent(new Event('change'));
-        document.getElementById('assignment-lecturer').value = assignment.lecturerId;
+    if (assignment.departmentId) {
+        // Populate Lecturers
+        state.lecturers
+            .filter(l => l.departmentId === assignment.departmentId)
+            .forEach(l => lecturerSelect.innerHTML += `<option value="${l.id}">${l.name}</option>`);
+        lecturerSelect.disabled = false;
         
-        // Repopulate classes for editing, including the currently assigned one
-        populateAvailableClasses(assignment.classId);
-        document.getElementById('assignment-class').value = assignment.classId;
-        document.getElementById('assignment-class').dispatchEvent(new Event('change'));
-    }, 150);
+        // Populate Subjects
+        state.curriculumSubjects
+            .filter(s => s.departmentId === assignment.departmentId)
+            .forEach(s => subjectSelect.innerHTML += `<option value="${s.id}">${s.subjectName}</option>`);
+        subjectSelect.disabled = false;
+    }
+    
+    // Set values after populating
+    lecturerSelect.value = assignment.lecturerId;
+    subjectSelect.value = assignment.subjectId;
+
+    // --- 5. Populate and Set Class ---
+    // This function depends on semester and subject being set, which they now are.
+    populateAvailableClasses(assignment.classId);
+    document.getElementById('assignment-class').value = assignment.classId;
+
+    // --- 6. Set remaining fields ---
+    document.getElementById('assignment-student-count').value = assignment.studentCount;
+    document.getElementById('assignment-coefficient').value = assignment.coefficient;
+    document.getElementById('periods-theory').value = assignment.periodsTheory;
+    document.getElementById('periods-exercise').value = assignment.periodsExercise;
+    document.getElementById('periods-discussion').value = assignment.periodsDiscussion;
+    document.getElementById('periods-practice').value = assignment.periodsPractice;
+    
+    // --- 7. Final calculation and display ---
+    updateCalculatedHoursDisplay();
+    openModal('assignment-modal');
 };
 
 window.deleteAssignment = (assignmentId) => {
@@ -571,28 +700,45 @@ async function initializeFirebase() {
     }
 }
 
-// --- Import Logic and Report Generation (no changes needed here) ---
-// ... (The code for handleFileImport, generateLecturerReportA, etc. is unchanged)
+// --- Import Logic and Report Generation ---
 function downloadTemplate() {
     const type = document.getElementById('import-type-select').value;
-    let headers, filename;
+    let data, filename;
 
     if (type === 'curriculum') {
-        headers = ["tenKhoa", "maHocPhan", "tenHocPhan", "soTinChi", "soTietLyThuyet", "soTietThaoLuan", "soTietThucHanh"];
         filename = "Mau_Import_ChuongTrinhDaoTao.xlsx";
+        data = [{
+            tenKhoa: "Khoa Công nghệ Thông tin",
+            maHocPhan: "INF101",
+            tenHocPhan: "Nhập môn Lập trình",
+            soTinChi: 3,
+            soTietLyThuyet: 30,
+            soTietThaoLuan: 0,
+            soTietThucHanh: 15
+        }];
     } else if (type === 'classes') {
-        headers = ["tenLop", "siSo", "namHoc"];
         filename = "Mau_Import_DanhSachLop.xlsx";
+        data = [{
+            tenLop: "CNTT.K25-1",
+            siSo: 50,
+            namHoc: "2025-2026"
+        }];
     } else { // assignments
-        headers = ["tenHocKy", "maGiangVien", "maHocPhan", "tenLopDay"];
         filename = "Mau_Import_PhanCongGiangDay.xlsx";
+        data = [{
+            tenHocky: "Học kỳ 1 Năm học 2025-2026",
+            maGiangVien: "0123",
+            maHocPhan: "INF101",
+            tenLopDay: "CNTT.K25-1"
+        }];
     }
 
-    const ws = XLSX.utils.json_to_sheet([{}], { header: headers });
+    const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Data");
     XLSX.writeFile(wb, filename);
 }
+
 
 async function handleFileImport() {
     const btn = document.getElementById('start-import-btn');
@@ -625,8 +771,9 @@ async function handleFileImport() {
             logContainer.innerHTML += `Đã đọc ${jsonData.length} dòng từ file. Đang xử lý...<br>`;
 
             const batch = writeBatch(db);
-            let successCount = 0, errorCount = 0;
-            const newLocalData = []; 
+            let successCount = 0;
+            let errorCount = 0;
+            let skippedCount = 0;
 
             for (const [index, row] of jsonData.entries()) {
                 try {
@@ -655,6 +802,7 @@ async function handleFileImport() {
                             const docRef = existing.docs[0].ref;
                             batch.update(docRef, subjectData);
                         }
+                        successCount++;
                     } else if (type === 'classes') {
                         const classData = {
                             className: String(row.tenLop || '').trim(),
@@ -672,46 +820,72 @@ async function handleFileImport() {
                             const docRef = existing.docs[0].ref;
                             batch.update(docRef, classData);
                         }
+                        successCount++;
                     } else { // assignments
-                        const semester = state.semesters.find(s => s.tenHocKy.toLowerCase() === String(row.tenHocKy || '').trim().toLowerCase());
-                        const lecturer = state.lecturers.find(l => l.code.toLowerCase() === String(row.maGiangVien || '').trim().toLowerCase());
-                        const subject = state.curriculumSubjects.find(s => s.subjectCode.toLowerCase() === String(row.maHocPhan || '').trim().toLowerCase());
-                        const teachingClass = state.teachingClasses.find(c => c.className.toLowerCase() === String(row.tenLopDay || '').trim().toLowerCase() && semester.namHoc === c.academicYear);
+                        
+                        // ================== START: FIXED SEMESTER LOOKUP LOGIC ==================
+                        const rawSemesterInput = String(row.tenHocky || '').trim();
+                        // Find semester by matching the full name from Excel with the `tenHocKy` field in the database.
+                        const semester = state.semesters.find(s =>
+                            s.tenHocKy.trim().toLowerCase() === rawSemesterInput.toLowerCase()
+                        );
+                        // =================== END: FIXED SEMESTER LOOKUP LOGIC ===================
 
-                        if (!semester) throw new Error(`Không tìm thấy học kỳ "${row.tenHocKy}"`);
+                        // Placed the check immediately after lookup to prevent crash
+                        if (!semester) throw new Error(`Không tìm thấy học kỳ "${rawSemesterInput}" trong hệ thống. Vui lòng kiểm tra lại tên trong file Excel.`);
+                        
+                        const lecturer = state.lecturers.find(l => l.code.toLowerCase() === String(row.maGiangVien || '').trim().toLowerCase());
                         if (!lecturer) throw new Error(`Không tìm thấy giảng viên có mã "${row.maGiangVien}"`);
+                        
+                        const subject = state.curriculumSubjects.find(s => s.subjectCode.toLowerCase() === String(row.maHocPhan || '').trim().toLowerCase());
                         if (!subject) throw new Error(`Không tìm thấy môn học có mã "${row.maHocPhan}"`);
+                        
+                        // Now it's safe to use semester.namHoc
+                        const teachingClass = state.teachingClasses.find(c => c.className.toLowerCase() === String(row.tenLopDay || '').trim().toLowerCase() && semester.namHoc === c.academicYear);
                         if (!teachingClass) throw new Error(`Không tìm thấy lớp "${row.tenLopDay}" trong năm học ${semester.namHoc}`);
 
-                        const studentCount = teachingClass.studentCount;
-                        const coefficient = getStudentCountCoefficient(studentCount);
-                        
-                        const totalPeriods = subject.periodsTheory + subject.periodsExercise + subject.periodsDiscussion + subject.periodsPractice;
-                        const numGroups = studentCount > 0 ? Math.ceil(studentCount / 20) : 0;
-                        const part1 = totalPeriods * coefficient;
-                        const part2 = subject.periodsPractice * numGroups;
-                        const calculatedStandardHours = Math.round((part1 + part2) * 100) / 100;
+                        // Check for duplicates before adding
+                        const q = query(assignmentsCol,
+                            where("semesterId", "==", semester.id),
+                            where("lecturerId", "==", lecturer.id),
+                            where("subjectId", "==", subject.id),
+                            where("classId", "==", teachingClass.id)
+                        );
+                        const existingAssignment = await getDocs(q);
 
-                        const assignmentData = {
-                            semesterId: semester.id,
-                            subjectId: subject.id,
-                            subjectName: subject.subjectName,
-                            classId: teachingClass.id,
-                            className: teachingClass.className,
-                            lecturerId: lecturer.id,
-                            departmentId: lecturer.departmentId,
-                            studentCount: studentCount,
-                            coefficient: coefficient,
-                            periodsTheory: subject.periodsTheory,
-                            periodsExercise: subject.periodsExercise,
-                            periodsDiscussion: subject.periodsDiscussion,
-                            periodsPractice: subject.periodsPractice,
-                            calculatedStandardHours: calculatedStandardHours,
-                        };
-                        const newDocRef = doc(assignmentsCol);
-                        batch.set(newDocRef, assignmentData);
+                        if (!existingAssignment.empty) {
+                            logContainer.innerHTML += `<span class="text-gray-500">- Dòng ${index + 2}: Bỏ qua - Phân công này đã tồn tại.</span><br>`;
+                            skippedCount++;
+                        } else {
+                            const studentCount = teachingClass.studentCount;
+                            const coefficient = getStudentCountCoefficient(studentCount);
+                            const totalPeriods = subject.periodsTheory + subject.periodsExercise + subject.periodsDiscussion + subject.periodsPractice;
+                            const numGroups = calculatePracticeGroups(studentCount);
+                            const part1 = totalPeriods * coefficient;
+                            const part2 = subject.periodsPractice * numGroups;
+                            const calculatedStandardHours = Math.round((part1 + part2) * 100) / 100;
+
+                            const assignmentData = {
+                                semesterId: semester.id,
+                                subjectId: subject.id,
+                                subjectName: subject.subjectName,
+                                classId: teachingClass.id,
+                                className: teachingClass.className,
+                                lecturerId: lecturer.id,
+                                departmentId: lecturer.departmentId,
+                                studentCount: studentCount,
+                                coefficient: coefficient,
+                                periodsTheory: subject.periodsTheory,
+                                periodsExercise: subject.periodsExercise,
+                                periodsDiscussion: subject.periodsDiscussion,
+                                periodsPractice: subject.periodsPractice,
+                                calculatedStandardHours: calculatedStandardHours,
+                            };
+                            const newDocRef = doc(assignmentsCol);
+                            batch.set(newDocRef, assignmentData);
+                            successCount++;
+                        }
                     }
-                    successCount++;
                 } catch (rowError) {
                     errorCount++;
                     logContainer.innerHTML += `<span class="text-orange-500">- Dòng ${index + 2}: Lỗi - ${rowError.message}</span><br>`;
@@ -722,7 +896,7 @@ async function handleFileImport() {
                 await batch.commit();
             }
             
-            logContainer.innerHTML += `<hr class="my-2"><strong class="text-green-600">Hoàn thành!</strong><br>Thành công: ${successCount}, Lỗi: ${errorCount}.<br>`;
+            logContainer.innerHTML += `<hr class="my-2"><strong class="text-green-600">Hoàn thành!</strong><br>Thêm mới: ${successCount}, Bỏ qua (trùng lặp): ${skippedCount}, Lỗi: ${errorCount}.<br>`;
 
         } catch (error) {
             logContainer.innerHTML += `<span class="text-red-500">Đã xảy ra lỗi nghiêm trọng: ${error.message}</span><br>`;
@@ -733,6 +907,54 @@ async function handleFileImport() {
     };
     reader.readAsArrayBuffer(file);
 }
+
+async function handleBulkDeleteAssignments() {
+    const btn = document.getElementById('start-delete-btn');
+    const semesterId = document.getElementById('delete-semester-select').value;
+    const semester = state.semesters.find(s => s.id === semesterId);
+
+    if (!semesterId || !semester) {
+        showAlert("Vui lòng chọn một học kỳ để xóa.");
+        return;
+    }
+
+    const semesterName = `${semester.tenHocKy} Năm học ${semester.namHoc}`;
+    const message = `Bạn có chắc chắn muốn xóa TẤT CẢ phân công giảng dạy của "${semesterName}" không? Hành động này không thể hoàn tác.`;
+
+    showConfirm(message, async () => {
+        setButtonLoading(btn, true);
+        const logContainer = document.getElementById('import-log');
+        document.getElementById('import-results-container').classList.remove('hidden');
+        logContainer.innerHTML = `Bắt đầu xóa phân công của ${semesterName}...<br>`;
+
+        try {
+            const q = query(assignmentsCol, where("semesterId", "==", semesterId));
+            const snapshot = await getDocs(q);
+
+            if (snapshot.empty) {
+                logContainer.innerHTML += 'Không có phân công nào để xóa.<br>';
+                setButtonLoading(btn, false);
+                return;
+            }
+
+            const batch = writeBatch(db);
+            snapshot.docs.forEach(doc => {
+                batch.delete(doc.ref);
+            });
+
+            await batch.commit();
+            logContainer.innerHTML += `<strong class="text-green-600">Đã xóa thành công ${snapshot.size} phân công.</strong><br>`;
+            showAlert(`Đã xóa thành công ${snapshot.size} phân công của ${semesterName}.`, true);
+
+        } catch (error) {
+            logContainer.innerHTML += `<span class="text-red-500">Lỗi khi xóa: ${error.message}</span><br>`;
+            showAlert(`Lỗi khi xóa: ${error.message}`);
+        } finally {
+            setButtonLoading(btn, false);
+        }
+    });
+}
+
 
 function generateLecturerReportA(lecturerId, academicYear, reportType = 'main') {
     const lecturer = state.lecturers.find(l => l.id === lecturerId);
@@ -777,7 +999,7 @@ function generateLecturerReportA(lecturerId, academicYear, reportType = 'main') 
 
     let totalTeachingHours = 0;
     const teachingRows = assignments.map((a, index) => {
-        const numGroups = a.studentCount > 0 ? Math.ceil(a.studentCount / 20) : 0;
+        const numGroups = calculatePracticeGroups(a.studentCount);
         const semester = state.semesters.find(s => s.id === a.semesterId);
         totalTeachingHours += a.calculatedStandardHours;
         return `
@@ -1065,49 +1287,7 @@ function addEventListeners() {
         }
     });
 
-    function populateAvailableClasses(classToInclude = null) {
-        const classSelect = document.getElementById('assignment-class');
-        const semesterId = document.getElementById('assignment-semester').value;
-        const subjectId = document.getElementById('assignment-subject').value;
-        
-        classSelect.innerHTML = '<option value="">-- Chọn lớp --</option>';
-        if (!semesterId || !subjectId) {
-            classSelect.disabled = true;
-            return;
-        }
-
-        const selectedSemester = state.semesters.find(s => s.id === semesterId);
-        if (!selectedSemester) {
-            classSelect.disabled = true;
-            return;
-        }
-
-        const academicYear = selectedSemester.namHoc;
-        const allSemesterIdsInYear = state.semesters
-            .filter(s => s.namHoc === academicYear)
-            .map(s => s.id);
-
-        const assignedClassIds = new Set(
-            state.assignments
-                .filter(a => 
-                    allSemesterIdsInYear.includes(a.semesterId) && 
-                    a.subjectId === subjectId && 
-                    a.classId !== classToInclude
-                )
-                .map(a => a.classId)
-        );
-
-        const availableClasses = state.teachingClasses.filter(c => 
-            c.academicYear === selectedSemester.namHoc && !assignedClassIds.has(c.id)
-        );
-
-        availableClasses.forEach(c => {
-            classSelect.innerHTML += `<option value="${c.id}">${c.className}</option>`;
-        });
-        classSelect.disabled = false;
-    }
-
-    document.getElementById('assignment-semester').addEventListener('change', populateAvailableClasses);
+    document.getElementById('assignment-semester').addEventListener('change', () => populateAvailableClasses());
     document.getElementById('assignment-subject').addEventListener('change', (e) => {
         const subjectId = e.target.value;
         const subject = state.curriculumSubjects.find(s => s.id === subjectId);
@@ -1182,10 +1362,19 @@ function addEventListeners() {
         document.getElementById('import-file-input').value = '';
         document.getElementById('import-log').innerHTML = '';
         document.getElementById('import-results-container').classList.add('hidden');
+        
+        const deleteSelect = document.getElementById('delete-semester-select');
+        deleteSelect.innerHTML = '<option value="">-- Chọn học kỳ để xóa --</option>';
+        state.semesters.forEach(s => {
+            deleteSelect.innerHTML += `<option value="${s.id}">${s.tenHocKy} Năm học ${s.namHoc}</option>`;
+        });
+        
         openModal('import-modal');
     });
     document.getElementById('download-template-btn').addEventListener('click', downloadTemplate);
     document.getElementById('start-import-btn').addEventListener('click', handleFileImport);
+    document.getElementById('start-delete-btn').addEventListener('click', handleBulkDeleteAssignments);
+
 
     // --- Export Report Listeners ---
     document.getElementById('export-report-btn').addEventListener('click', () => {
@@ -1537,4 +1726,4 @@ document.addEventListener('DOMContentLoaded', () => {
     injectStyles();
     addEventListeners();
     initializeFirebase();
-});
+})
