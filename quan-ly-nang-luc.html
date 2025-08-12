@@ -85,19 +85,28 @@
                              <h3 class="text-lg font-bold text-gray-800">Gán năng lực cho Giảng viên</h3>
                              <button id="open-capability-import-modal-btn" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg"><i class="fas fa-file-import mr-2"></i>Import Năng lực</button>
                         </div>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6 p-4 border rounded-md bg-gray-50">
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">1. Chọn Khoa:</label>
-                                <select id="assign-department-select" class="w-full p-2 border rounded-md shadow-sm"></select>
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">2. Chọn Giảng viên:</label>
-                                <select id="assign-lecturer-select" class="w-full p-2 border rounded-md shadow-sm" disabled></select>
+                        
+                        <!-- NEW: Smart Search Input with View Button -->
+                        <div class="mb-6">
+                            <label for="lecturer-search-input" class="block text-sm font-medium text-gray-700 mb-1">Tìm kiếm và chọn Giảng viên:</label>
+                            <div class="flex items-center space-x-2">
+                                <div class="relative flex-grow" id="lecturer-search-container">
+                                    <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                                    <input type="text" id="lecturer-search-input" placeholder="Nhập tên hoặc mã giảng viên..." class="w-full p-2 pl-10 border rounded-md shadow-sm focus:ring-teal-500 focus:border-teal-500">
+                                    <div id="lecturer-search-results" class="absolute z-10 w-full bg-white border rounded-md mt-1 max-h-60 overflow-y-auto hidden shadow-lg">
+                                        <!-- Search results will be populated here by JS -->
+                                    </div>
+                                </div>
+                                <input type="hidden" id="selected-lecturer-id"> <!-- To store the selected ID -->
+                                <button id="view-capabilities-btn" class="bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-lg shadow-sm disabled:bg-gray-400 disabled:cursor-not-allowed" disabled>
+                                    <i class="fas fa-eye mr-2"></i>Xem
+                                </button>
                             </div>
                         </div>
+
                         <h3 class="text-lg font-bold text-gray-800 mb-4">Danh sách Học phần có thể đảm nhận</h3>
                         <div id="subjects-list-container" class="p-4 border-2 border-dashed rounded-lg bg-gray-50 min-h-[200px]">
-                            <p id="subjects-placeholder" class="text-center text-gray-500 pt-16">Vui lòng chọn khoa và giảng viên để gán thủ công, hoặc dùng chức năng Import.</p>
+                            <p id="subjects-placeholder" class="text-center text-gray-500 pt-16">Vui lòng tìm và chọn một giảng viên, sau đó nhấn "Xem" để gán năng lực.</p>
                         </div>
                         <div class="mt-6 text-right">
                             <button id="save-capabilities-btn" class="bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 px-6 rounded-lg shadow-md" disabled>

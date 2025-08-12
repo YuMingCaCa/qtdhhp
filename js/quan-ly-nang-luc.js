@@ -5,7 +5,7 @@
 import { auth, db, appId } from './portal-config.js';
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import {
-    collection, onSnapshot, doc, getDoc, setDoc, addDoc, deleteDoc, writeBatch
+    collection, onSnapshot, doc, getDoc, setDoc, addDoc, deleteDoc, writeBatch, getDocs
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 // --- Self-Contained Firestore Collection References ---
@@ -58,6 +58,13 @@ const showFormModal = (title, formHtml, saveCallback) => {
 };
 
 // --- Render Functions ---
+const renderAllTables = () => {
+    renderDepartmentsTable();
+    renderLecturersTable();
+    renderSubjectsTable();
+    renderOverviewPanel();
+}
+
 const renderDepartmentsTable = () => {
     const tbody = document.getElementById('departments-table-body');
     if (!tbody) return;
@@ -107,43 +114,13 @@ const renderSubjectsTable = () => {
     `).join('');
 };
 
-const updateAssignmentDropdowns = () => {
-    const deptSelect = document.getElementById('assign-department-select');
-    const lectSelect = document.getElementById('assign-lecturer-select');
-    if (!deptSelect || !lectSelect) return;
-
-    const currentDeptId = deptSelect.value;
-    const currentLectId = lectSelect.value;
-
-    deptSelect.innerHTML = '<option value="">-- Chọn Khoa --</option>' + state.departments.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
-    if (state.departments.some(d => d.id === currentDeptId)) {
-        deptSelect.value = currentDeptId;
-    }
-
-    const selectedDeptId = deptSelect.value;
-    const lecturersInDept = state.lecturers.filter(l => l.departmentId === selectedDeptId);
-    
-    if (selectedDeptId) {
-        lectSelect.innerHTML = '<option value="">-- Chọn Giảng viên --</option>' + lecturersInDept.map(l => `<option value="${l.id}">${l.name}</option>`).join('');
-        lectSelect.disabled = false;
-        if (lecturersInDept.some(l => l.id === currentLectId)) {
-            lectSelect.value = currentLectId;
-        }
-    } else {
-        lectSelect.innerHTML = '<option value="">-- Chọn Giảng viên --</option>';
-        lectSelect.disabled = true;
-    }
-    renderSubjectsForAssignment();
-};
-
-
 const renderSubjectsForAssignment = () => {
     const container = document.getElementById('subjects-list-container');
     const placeholder = document.getElementById('subjects-placeholder');
     const saveBtn = document.getElementById('save-capabilities-btn');
     if (!container || !placeholder || !saveBtn) return;
     
-    const lecturerId = document.getElementById('assign-lecturer-select').value;
+    const lecturerId = document.getElementById('selected-lecturer-id').value;
 
     if (!lecturerId) {
         container.innerHTML = '';
@@ -437,8 +414,11 @@ const handleImportSubjects = (file) => {
 
 // Capabilities
 const saveCapabilities = async () => {
-    const lecturerId = document.getElementById('assign-lecturer-select').value;
-    if (!lecturerId) return;
+    const lecturerId = document.getElementById('selected-lecturer-id').value;
+    if (!lecturerId) {
+        showAlert("Vui lòng chọn một giảng viên trước khi lưu.");
+        return;
+    }
 
     const checkedBoxes = document.querySelectorAll('#subjects-list-container input:checked');
     const subjectIds = Array.from(checkedBoxes).map(box => box.dataset.subjectId);
@@ -717,9 +697,69 @@ const addEventListeners = () => {
         }
     });
 
-    // Assignment dropdown listeners
-    document.getElementById('assign-department-select').addEventListener('change', updateAssignmentDropdowns);
-    document.getElementById('assign-lecturer-select').addEventListener('change', renderSubjectsForAssignment);
+    // --- NEW: Smart Search Event Listeners ---
+    const searchInput = document.getElementById('lecturer-search-input');
+    const searchResults = document.getElementById('lecturer-search-results');
+    const selectedLecturerIdInput = document.getElementById('selected-lecturer-id');
+    const viewBtn = document.getElementById('view-capabilities-btn');
+
+    searchInput.addEventListener('input', () => {
+        const searchTerm = searchInput.value.toLowerCase();
+        
+        // When user types, disable the view button and clear selection
+        selectedLecturerIdInput.value = '';
+        viewBtn.disabled = true;
+
+        if (searchTerm.length < 2) {
+            searchResults.innerHTML = '';
+            searchResults.classList.add('hidden');
+            return;
+        }
+
+        const filtered = state.lecturers.filter(l => 
+            l.name.toLowerCase().includes(searchTerm) || 
+            l.code.toLowerCase().includes(searchTerm)
+        );
+
+        if (filtered.length > 0) {
+            searchResults.innerHTML = filtered.map(l => 
+                `<div class="p-2 hover:bg-teal-100 cursor-pointer search-result-item" data-id="${l.id}" data-name="${l.name}">
+                    ${l.name} (${l.code})
+                 </div>`
+            ).join('');
+            searchResults.classList.remove('hidden');
+        } else {
+            searchResults.innerHTML = '<div class="p-2 text-gray-500">Không tìm thấy giảng viên.</div>';
+            searchResults.classList.remove('hidden');
+        }
+    });
+
+    searchResults.addEventListener('click', (e) => {
+        const item = e.target.closest('.search-result-item');
+        if (!item) return;
+
+        const lecturerId = item.dataset.id;
+        const lecturerName = item.dataset.name;
+
+        searchInput.value = lecturerName;
+        selectedLecturerIdInput.value = lecturerId;
+        
+        searchResults.classList.add('hidden');
+        
+        // **FIX**: Enable the view button after selection
+        viewBtn.disabled = false;
+    });
+    
+    // **FIX**: Add event listener for the view button
+    viewBtn.addEventListener('click', renderSubjectsForAssignment);
+    
+    // Hide results when clicking outside
+    document.addEventListener('click', (e) => {
+        const container = document.getElementById('lecturer-search-container');
+        if (!container.contains(e.target)) {
+            searchResults.classList.add('hidden');
+        }
+    });
 
     // Logout
     document.getElementById('logout-btn').onclick = () => signOut(auth);
@@ -731,44 +771,61 @@ const attachBaseListeners = () => {
 
     onSnapshot(capDepartmentsCol, snapshot => {
         state.departments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort(sortByName);
-        renderDepartmentsTable();
-        updateAssignmentDropdowns();
     });
     onSnapshot(capLecturersCol, snapshot => {
         state.lecturers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort(sortByName);
-        renderLecturersTable();
-        updateAssignmentDropdowns();
     });
     onSnapshot(capSubjectsCol, snapshot => {
         state.subjects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort(sortByName);
-        renderSubjectsTable();
-        renderOverviewPanel();
-        if (document.getElementById('tab-panel-nang-luc').classList.contains('active')) {
-            renderSubjectsForAssignment();
-        }
     });
     onSnapshot(capAssignmentsCol, snapshot => {
         state.assignments = {};
         snapshot.docs.forEach(doc => {
             state.assignments[doc.id] = doc.data().subjectIds || [];
         });
-        renderOverviewPanel();
-        if (document.getElementById('tab-panel-nang-luc').classList.contains('active')) {
-            renderSubjectsForAssignment();
-        }
     });
 };
 
 // --- Initialization ---
-const initializeApp = () => {
+const initializeApp = async () => {
+    // **FIX**: Use Promise.all to wait for all initial data fetches
+    const sortByName = (a, b) => (a.name || a.tenMonHoc || '').localeCompare(b.name || b.tenMonHoc || '');
+    
+    try {
+        const [deptsSnap, lectsSnap, subsSnap, assignsSnap] = await Promise.all([
+            getDocs(capDepartmentsCol),
+            getDocs(capLecturersCol),
+            getDocs(capSubjectsCol),
+            getDocs(capAssignmentsCol)
+        ]);
+
+        state.departments = deptsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort(sortByName);
+        state.lecturers = lectsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort(sortByName);
+        state.subjects = subsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort(sortByName);
+        state.assignments = {};
+        assignsSnap.docs.forEach(doc => {
+            state.assignments[doc.id] = doc.data().subjectIds || [];
+        });
+
+        // Now that all data is loaded, render everything
+        renderAllTables();
+        
+        // Then, attach real-time listeners for subsequent updates
+        attachBaseListeners();
+
+    } catch (error) {
+        console.error("Error loading initial data:", error);
+        showAlert("Không thể tải dữ liệu ban đầu. Vui lòng tải lại trang.");
+    }
+
     onAuthStateChanged(auth, async (user) => {
-        document.getElementById('main-spinner').style.display = 'none';
         if (user) {
             const userDoc = await getDoc(doc(usersCol, user.uid));
             state.currentUser = userDoc.exists() ? { uid: user.uid, ...userDoc.data() } : { uid: user.uid, email: user.email, role: 'viewer' };
             
             if (state.currentUser.role !== 'admin') {
                  document.body.innerHTML = `<div class="text-center p-10"><h1>Không có quyền truy cập</h1></div>`;
+                 document.getElementById('main-spinner').style.display = 'none';
                  return;
             }
             
@@ -776,10 +833,10 @@ const initializeApp = () => {
             document.getElementById('app-content').classList.remove('hidden');
             
             addEventListeners();
-            attachBaseListeners();
         } else {
             window.location.href = 'index.html';
         }
+        document.getElementById('main-spinner').style.display = 'none';
     });
 };
 
