@@ -74,7 +74,13 @@ async function initializeFirebase() {
                 if (!userDoc.empty) {
                     currentUserInfo = { uid: user.uid, ...userDoc.docs[0].data() };
                 } else {
-                    currentUserInfo = { uid: user.uid, email: user.email, role: 'viewer' };
+                    // Fallback for users that might not be in the custom users collection yet
+                    const userDocById = await getDoc(doc(usersCol, user.uid));
+                     if(userDocById.exists()){
+                        currentUserInfo = { uid: user.uid, ...userDocById.data() };
+                    } else {
+                        currentUserInfo = { uid: user.uid, email: user.email, role: 'viewer' };
+                    }
                 }
                 
                 document.getElementById('thesis-module-content').classList.remove('hidden');
@@ -898,11 +904,35 @@ function addEventListeners() {
         const id = document.getElementById('topic-id').value;
         const isAdmin = currentUserInfo.role === 'admin';
         const departmentId = document.getElementById('topic-department-select').value;
-        const selfLecturer = allLecturers.find(l => l.code && currentUserInfo.email && l.code.toLowerCase() === currentUserInfo.email.split('@')[0].toLowerCase());
-        const data = { name: document.getElementById('topic-name').value.trim(), description: document.getElementById('topic-description').value.trim(), academicYear: document.getElementById('topic-year-select').value, departmentId: departmentId, lecturerId: isAdmin ? document.getElementById('topic-lecturer-select').value : (selfLecturer ? selfLecturer.id : null), status: isAdmin ? document.getElementById('topic-status-select').value : 'pending', proposerUid: id ? allTopics.find(t=>t.id === id).proposerUid : currentUserInfo.uid, lastUpdated: new Date().toISOString() };
-        if (!data.name || !data.academicYear || !data.departmentId) { showAlert("Vui lòng điền các trường bắt buộc."); return; }
-        if (isAdmin && !data.lecturerId) { showAlert("Admin phải chọn giảng viên."); return; }
-        if (!isAdmin && !data.lecturerId) { showAlert("Không thể xác định giảng viên đề xuất."); return; }
+        
+        // --- START FIX ---
+        // Find the lecturer based on the linked user ID, not by email prefix.
+        const selfLecturer = allLecturers.find(l => l.linkedUid === currentUserInfo.uid);
+        // --- END FIX ---
+
+        const data = {
+            name: document.getElementById('topic-name').value.trim(),
+            description: document.getElementById('topic-description').value.trim(),
+            academicYear: document.getElementById('topic-year-select').value,
+            departmentId: departmentId,
+            lecturerId: isAdmin ? document.getElementById('topic-lecturer-select').value : (selfLecturer ? selfLecturer.id : null),
+            status: isAdmin ? document.getElementById('topic-status-select').value : 'pending',
+            proposerUid: id ? allTopics.find(t=>t.id === id).proposerUid : currentUserInfo.uid,
+            lastUpdated: new Date().toISOString()
+        };
+
+        if (!data.name || !data.academicYear || !data.departmentId) {
+            showAlert("Vui lòng điền các trường bắt buộc.");
+            return;
+        }
+        if (isAdmin && !data.lecturerId) {
+            showAlert("Admin phải chọn giảng viên.");
+            return;
+        }
+        if (!isAdmin && !data.lecturerId) {
+            showAlert("Không thể xác định giảng viên đề xuất. Vui lòng kiểm tra xem tài khoản của bạn đã được gán cho một giảng viên trong mục 'Quản lý Người dùng' chưa.");
+            return;
+        }
         try {
             if (id) {
                 await updateDoc(doc(topicsCol, id), data);
@@ -913,7 +943,9 @@ function addEventListeners() {
                 showAlert('Đề xuất thành công!', true);
             }
             closeModal('topic-modal');
-        } catch (error) { showAlert(`Lỗi: ${error.message}`); }
+        } catch (error) {
+            showAlert(`Lỗi: ${error.message}`);
+        }
     });
 
     document.getElementById('student-register-form').addEventListener('submit', async (e) => {

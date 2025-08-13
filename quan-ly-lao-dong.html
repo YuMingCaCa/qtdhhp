@@ -217,7 +217,7 @@
 
     <!-- Manage Users Modal -->
     <div id="manage-users-modal" class="modal">
-        <div class="modal-content">
+        <div class="modal-content max-w-4xl"> <!-- Increased width -->
             <span class="close-button no-print" onclick="closeModal('manage-users-modal')">&times;</span>
             <h3 class="text-xl font-bold mb-4">Quản lý Người dùng</h3>
             <div class="overflow-x-auto max-h-96">
@@ -226,12 +226,32 @@
                         <tr>
                             <th class="px-4 py-2 text-left">Email</th>
                             <th class="px-4 py-2 text-left">Vai trò</th>
+                            <th class="px-4 py-2 text-left">Giảng viên liên kết</th> <!-- NEW COLUMN -->
                             <th class="px-4 py-2 text-center">Hành động</th>
                         </tr>
                     </thead>
                     <tbody id="users-list-body"></tbody>
                 </table>
             </div>
+        </div>
+    </div>
+
+    <!-- NEW: Assign Lecturer Modal -->
+    <div id="assign-lecturer-modal" class="modal">
+        <div class="modal-content max-w-lg">
+            <span class="close-button no-print" onclick="closeModal('assign-lecturer-modal')">&times;</span>
+            <h3 id="assign-lecturer-title" class="text-xl font-bold mb-4">Gán Giảng viên</h3>
+            <form id="assign-lecturer-form">
+                <input type="hidden" id="assign-user-id">
+                <div>
+                    <label for="assign-lecturer-select" class="block text-sm font-medium text-gray-700">Chọn giảng viên để gán:</label>
+                    <select id="assign-lecturer-select" required class="mt-1 block w-full p-2 border border-gray-300 rounded-md"></select>
+                    <p id="no-lecturers-message" class="text-sm text-gray-500 mt-2 hidden">Không có giảng viên nào chưa được gán tài khoản.</p>
+                </div>
+                <div class="mt-6 flex justify-end">
+                    <button type="submit" id="assign-lecturer-submit-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Lưu liên kết</button>
+                </div>
+            </form>
         </div>
     </div>
 

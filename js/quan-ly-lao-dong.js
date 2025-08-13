@@ -153,6 +153,7 @@ const DEFAULT_TASKS = [
 // Global state object
 let state = {
     currentUser: null, // { uid, email, role }
+    allUsers: [], // NEW: To store all user data for linking
     departments: [],
     lecturers: [],
     entries: [],
@@ -561,45 +562,72 @@ function clearTaskForm() {
 
 async function renderUsersList() {
     const listBody = document.getElementById('users-list-body');
-    listBody.innerHTML = '<tr><td colspan="3" class="text-center p-4">Đang tải...</td></tr>';
-    try {
-        const usersSnapshot = await getDocs(usersCol);
-        listBody.innerHTML = '';
-        if (usersSnapshot.empty) {
-            listBody.innerHTML = '<tr><td colspan="3" class="text-center p-4">Không có người dùng nào.</td></tr>';
-            return;
-        }
-        usersSnapshot.forEach(userDoc => {
-            const userData = userDoc.data();
-            const isCurrentUser = state.currentUser.uid === userDoc.id;
-            const isPriorityUser = userDoc.id === state.prioritySchedulerUID;
-            const isDisabled = isCurrentUser || isPriorityUser;
-
-            const row = document.createElement('tr');
-            row.className = "border-b";
-            row.innerHTML = `
-                <td class="px-4 py-2">${userData.email} ${isPriorityUser ? '<span class="text-xs font-bold text-teal-600 ml-2">(Ưu tiên)</span>' : ''}</td>
-                <td class="px-4 py-2">
-                    <select data-uid="${userDoc.id}" class="role-select p-1 border rounded-md w-full" ${isDisabled ? 'disabled' : ''}>
-                        <option value="viewer" ${userData.role === 'viewer' ? 'selected' : ''}>Viewer</option>
-                        <option value="admin" ${userData.role === 'admin' ? 'selected' : ''}>Admin</option>
-                    </select>
-                </td>
-                <td class="px-4 py-2 text-center">
-                    <div class="flex justify-center items-center gap-2">
-                        <button data-uid="${userDoc.id}" class="save-role-btn bg-green-500 hover:bg-green-600 text-white text-xs py-1 px-2 rounded" ${isDisabled ? 'disabled' : ''}>Lưu</button>
-                        <button data-email="${userData.email}" class="reset-password-btn bg-blue-500 hover:bg-blue-600 text-white text-xs py-1 px-2 rounded" ${isDisabled ? 'disabled' : ''}>Reset Pass</button>
-                        <button data-uid="${userDoc.id}" class="delete-user-btn bg-red-500 hover:bg-red-600 text-white text-xs py-1 px-2 rounded" ${isDisabled ? 'disabled' : ''}>Xóa</button>
-                    </div>
-                </td>
-            `;
-            listBody.appendChild(row);
-        });
-    } catch (error) {
-        listBody.innerHTML = `<tr><td colspan="3" class="text-center p-4 text-red-500">Lỗi tải danh sách người dùng.</td></tr>`;
-        console.error("Error rendering users list:", error);
+    listBody.innerHTML = '<tr><td colspan="4" class="text-center p-4">Đang tải...</td></tr>';
+    
+    // The user data is now stored in state.allUsers, no need to fetch again unless forced.
+    if (state.allUsers.length === 0) {
+        listBody.innerHTML = '<tr><td colspan="4" class="text-center p-4">Không có người dùng nào.</td></tr>';
+        return;
     }
+
+    listBody.innerHTML = '';
+    state.allUsers.forEach(userData => {
+        const userDocId = userData.id;
+        const isCurrentUser = state.currentUser.uid === userDocId;
+        const isPriorityUser = userDocId === state.prioritySchedulerUID;
+        const isDisabled = isCurrentUser || isPriorityUser;
+
+        // Find if this user is linked to any lecturer
+        const linkedLecturer = state.lecturers.find(l => l.linkedUid === userDocId);
+
+        let lecturerCellHtml = '';
+        if (linkedLecturer) {
+            lecturerCellHtml = `
+                <div class="flex items-center justify-between">
+                    <span>${linkedLecturer.name}</span>
+                    <button 
+                        class="text-red-500 hover:text-red-700 text-xs py-1 px-2 rounded" 
+                        title="Hủy gán giảng viên này"
+                        onclick="window.unassignLecturer('${linkedLecturer.id}')"
+                        ${isDisabled ? 'disabled' : ''}>
+                        <i class="fas fa-unlink"></i>
+                    </button>
+                </div>`;
+        } else {
+            lecturerCellHtml = `
+                <button 
+                    class="bg-blue-100 hover:bg-blue-200 text-blue-700 text-xs font-semibold py-1 px-3 rounded-full w-full" 
+                    onclick="window.openAssignLecturerModal('${userDocId}', '${userData.email}')"
+                    ${isDisabled ? 'disabled' : ''}>
+                    <i class="fas fa-link mr-1"></i> Gán GV
+                </button>`;
+        }
+
+        const row = document.createElement('tr');
+        row.className = "border-b";
+        row.innerHTML = `
+            <td class="px-4 py-2">${userData.email} ${isPriorityUser ? '<span class="text-xs font-bold text-teal-600 ml-2">(Ưu tiên)</span>' : ''}</td>
+            <td class="px-4 py-2">
+                <select data-uid="${userDocId}" class="role-select p-1 border rounded-md w-full" ${isDisabled ? 'disabled' : ''}>
+                    <option value="viewer" ${userData.role === 'viewer' ? 'selected' : ''}>Viewer</option>
+                    <option value="admin" ${userData.role === 'admin' ? 'selected' : ''}>Admin</option>
+                </select>
+            </td>
+            <td class="px-4 py-2">
+                ${lecturerCellHtml}
+            </td>
+            <td class="px-4 py-2 text-center">
+                <div class="flex justify-center items-center gap-2">
+                    <button data-uid="${userDocId}" class="save-role-btn bg-green-500 hover:bg-green-600 text-white text-xs py-1 px-2 rounded" ${isDisabled ? 'disabled' : ''}>Lưu</button>
+                    <button data-email="${userData.email}" class="reset-password-btn bg-blue-500 hover:bg-blue-600 text-white text-xs py-1 px-2 rounded" ${isDisabled ? 'disabled' : ''}>Reset Pass</button>
+                    <button data-uid="${userDocId}" class="delete-user-btn bg-red-500 hover:bg-red-600 text-white text-xs py-1 px-2 rounded" ${isDisabled ? 'disabled' : ''}>Xóa</button>
+                </div>
+            </td>
+        `;
+        listBody.appendChild(row);
+    });
 }
+
 
 function renderResultsList(listDiv, entries) {
     listDiv.innerHTML = '';
@@ -1096,6 +1124,62 @@ window.unlinkLecturer = async (lecturerId) => {
     });
 };
 
+// --- NEW/UPDATED FUNCTIONS FOR USER-LECTURER ASSIGNMENT ---
+
+window.openAssignLecturerModal = (userId, userEmail) => {
+    document.getElementById('assign-user-id').value = userId;
+    document.getElementById('assign-lecturer-title').textContent = `Gán Giảng viên cho: ${userEmail}`;
+
+    const select = document.getElementById('assign-lecturer-select');
+    const message = document.getElementById('no-lecturers-message');
+    const submitBtn = document.getElementById('assign-lecturer-submit-btn');
+    select.innerHTML = '<option value="">-- Chọn một giảng viên --</option>';
+
+    const unlinkedLecturers = state.lecturers.filter(l => !l.linkedUid);
+
+    if (unlinkedLecturers.length === 0) {
+        select.style.display = 'none';
+        message.style.display = 'block';
+        submitBtn.disabled = true;
+    } else {
+        select.style.display = 'block';
+        message.style.display = 'none';
+        submitBtn.disabled = false;
+        unlinkedLecturers.forEach(lecturer => {
+            const option = document.createElement('option');
+            option.value = lecturer.id;
+            option.textContent = `${lecturer.name} (${lecturer.code})`;
+            select.appendChild(option);
+        });
+    }
+
+    openModal('assign-lecturer-modal');
+};
+
+window.unassignLecturer = async (lecturerId) => {
+    const lecturer = state.lecturers.find(l => l.id === lecturerId);
+    if (!lecturer) {
+        showAlert("Không tìm thấy giảng viên để hủy gán.");
+        return;
+    }
+    const user = state.allUsers.find(u => u.id === lecturer.linkedUid);
+    const userEmail = user ? user.email : 'không rõ';
+
+    showConfirm(`Bạn có chắc muốn hủy gán giảng viên "${lecturer.name}" khỏi tài khoản "${userEmail}"?`, async () => {
+        try {
+            await updateDoc(doc(lecturersCol, lecturerId), {
+                linkedUid: deleteField()
+            });
+            showAlert("Hủy gán thành công!", true);
+            // No need to manually re-render, onSnapshot will do it.
+        } catch (error) {
+            console.error("Error un-assigning lecturer:", error);
+            showAlert(`Lỗi khi hủy gán: ${error.message}`);
+        }
+    });
+};
+
+
 // --- Inactivity Logout Logic ---
 let inactivityTimer;
 const activityEvents = ['mousemove', 'mousedown', 'keypress', 'scroll', 'touchstart'];
@@ -1202,6 +1286,14 @@ function setupOnSnapshotListeners() {
         console.error(`Lỗi khi tải dữ liệu ${collectionName}: `, error);
         showAlert(`Không thể tải dữ liệu cho mục "${collectionName}". Vui lòng kiểm tra kết nối mạng và làm mới trang.`);
     };
+    
+    // NEW: Listener for all users, needed for the assignment logic
+    onSnapshot(usersCol, (snapshot) => {
+        state.allUsers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        if (document.getElementById('manage-users-modal').style.display === 'block') {
+            renderUsersList();
+        }
+    }, snapshotErrorHandler('Người dùng'));
 
     onSnapshot(departmentsCol, (snapshot) => {
         state.departments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -1211,6 +1303,10 @@ function setupOnSnapshotListeners() {
     onSnapshot(lecturersCol, (snapshot) => {
         state.lecturers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         render();
+        // If the user management modal is open, re-render it to show linking changes
+        if (document.getElementById('manage-users-modal').style.display === 'block') {
+            renderUsersList();
+        }
     }, snapshotErrorHandler('Giảng viên'));
 
     onSnapshot(entriesCol, (snapshot) => {
@@ -1409,13 +1505,40 @@ function addEventListeners() {
                 try {
                     await deleteDoc(doc(usersCol, uid));
                     showAlert('Đã xóa người dùng khỏi danh sách.', true);
-                    await renderUsersList();
+                    // onSnapshot will handle the re-render
                 } catch (error) {
                     showAlert(`Lỗi xóa người dùng: ${error.message}`);
                 } finally {
                     setButtonLoading(target, false);
                 }
             });
+        }
+    });
+
+    // NEW: Assign lecturer form submission
+    document.getElementById('assign-lecturer-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = e.target.querySelector('button[type="submit"]');
+        setButtonLoading(btn, true);
+
+        const userId = document.getElementById('assign-user-id').value;
+        const lecturerId = document.getElementById('assign-lecturer-select').value;
+
+        if (!userId || !lecturerId) {
+            showAlert("Vui lòng chọn một giảng viên.");
+            setButtonLoading(btn, false);
+            return;
+        }
+
+        try {
+            await updateDoc(doc(lecturersCol, lecturerId), { linkedUid: userId });
+            showAlert("Gán giảng viên thành công!", true);
+            closeModal('assign-lecturer-modal');
+        } catch (error) {
+            console.error("Error assigning lecturer:", error);
+            showAlert(`Lỗi khi gán giảng viên: ${error.message}`);
+        } finally {
+            setButtonLoading(btn, false);
         }
     });
 
