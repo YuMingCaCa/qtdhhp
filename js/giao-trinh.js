@@ -1,25 +1,13 @@
 // File: js/giao-trinh.js
 // Logic for the Syllabus and Teaching Material Management module.
-// FIXED: Corrected the storageBucket name in the firebaseConfig object.
-// UPGRADED: Replaced window.confirm with a custom modal for better UX.
-// ROBUSTNESS: Rewrote renderDocumentsList to prevent DOM-related errors.
-// FEATURE: Added check to prevent uploading files with duplicate names for the same subject.
-// NEW FEATURE: Added subject management with Excel import functionality.
-// NEW FEATURE: Added manual subject addition and Excel template download.
-// NEW FEATURE: Added subject code field and multi-select delete for subjects.
-// NEW FEATURE: Display count of current subjects in the subject management table.
-// SIMPLIFICATION: Removed faculty selection from main view/upload UI.
-// NEW FEATURE: Added search functionality for subjects.
-// NEW FEATURE: Added 20MB file size limit for uploads.
-// NEW FEATURE: Made subject management section collapsible and added a filter for its table.
-// NEW FEATURE: Implemented autocomplete search UI for subject selection.
-// NEW FEATURE: Added real-time storage usage display.
-// NEW FEATURE: Added a collapsible accordion view for ALL uploaded documents, grouped by subject.
+// ... (previous version comments)
+// NEW FEATURE: Added ability to add and edit notes for documents.
+// NEW FEATURE: Added ability to edit subject information (name, code).
 
 // Import Firebase modules
 import { auth, db, storage, appId } from './portal-config.js';
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-import { getFirestore, collection, onSnapshot, addDoc, deleteDoc, query, where, doc, serverTimestamp, getDoc, setDoc, increment, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { getFirestore, collection, onSnapshot, addDoc, deleteDoc, query, where, doc, serverTimestamp, getDoc, setDoc, increment, getDocs, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
 /**
@@ -60,15 +48,15 @@ let state = {
     faculties: [],
     subjects: [],
     documents: [],
-    allDocuments: [], // NEW: To store all documents for the accordion view
+    allDocuments: [],
     selectedSubjectId: null,
     selectedSubjectIdsToDelete: new Set(),
 };
 
 // Firebase variables
 let facultiesCol, curriculumSubjectsCol, syllabusCol, storageMetadataCol;
-let documentsUnsubscribe = null; // To detach listener when changing subjects
-let subjectsUnsubscribe = null; // To detach listener for subjects table
+let documentsUnsubscribe = null;
+let subjectsUnsubscribe = null;
 
 // --- Helper Functions ---
 function formatBytes(bytes, decimals = 2) {
@@ -211,11 +199,17 @@ function renderSubjectsTable(filterText = '') {
             <td class="py-2 px-4 border-b text-sm text-gray-800">${subject.subjectName}</td>
             <td class="py-2 px-4 border-b text-sm text-gray-600">${subject.subjectCode || 'N/A'}</td>
             <td class="py-2 px-4 border-b text-sm text-gray-600">${facultyName}</td>
-            <td class="py-2 px-4 border-b text-sm"><button data-subject-id="${subject.id}" class="delete-subject-btn bg-red-500 hover:bg-red-600 text-white font-bold py-1 px-3 rounded-lg text-xs flex items-center gap-1"><i class="fas fa-trash"></i> Xóa</button></td>
+            <td class="py-2 px-4 border-b text-sm">
+                <div class="flex items-center gap-2">
+                    <button data-subject-id="${subject.id}" class="edit-subject-btn bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-1 px-3 rounded-lg text-xs flex items-center gap-1"><i class="fas fa-pencil-alt"></i> Sửa</button>
+                    <button data-subject-id="${subject.id}" class="delete-subject-btn bg-red-500 hover:bg-red-600 text-white font-bold py-1 px-3 rounded-lg text-xs flex items-center gap-1"><i class="fas fa-trash"></i> Xóa</button>
+                </div>
+            </td>
         `;
         tableBody.appendChild(row);
     });
-
+    
+    document.querySelectorAll('.edit-subject-btn').forEach(button => button.addEventListener('click', handleOpenEditSubjectModal));
     document.querySelectorAll('.delete-subject-btn').forEach(button => button.addEventListener('click', (e) => handleDeleteSubject([e.currentTarget.dataset.subjectId])));
     document.querySelectorAll('.subject-checkbox').forEach(checkbox => {
         checkbox.addEventListener('change', (e) => {
@@ -304,12 +298,20 @@ function renderDocumentsList() {
         if (docData.fileType?.includes('word')) fileIcon = 'fa-file-word';
         if (docData.fileType?.includes('excel')) fileIcon = 'fa-file-excel';
 
+        const notesHTML = docData.notes ? `
+            <div class="mt-2 text-sm text-gray-600 bg-yellow-50 border-l-4 border-yellow-400 p-2 rounded-r-lg">
+                <strong class="font-semibold">Ghi chú:</strong> ${docData.notes.replace(/\n/g, '<br>')}
+                ${isAdmin ? `<button data-doc-id="${docData.id}" class="edit-note-btn ml-2 text-blue-600 hover:text-blue-800 text-xs">(Sửa)</button>` : ''}
+            </div>` : 
+            (isAdmin ? `<div class="mt-2"><button data-doc-id="${docData.id}" class="edit-note-btn text-blue-600 hover:text-blue-800 text-xs"><i class="fas fa-plus-circle mr-1"></i>Thêm ghi chú</button></div>` : '');
+
         docElement.innerHTML = `
             <div class="flex-grow">
                 <p class="font-semibold text-gray-800 flex items-center"><i class="fas ${fileIcon} mr-3 text-gray-500"></i>${docData.fileName}</p>
                 <p class="text-xs text-gray-500 mt-1">Ngày tải lên: ${dateString}${isOld ? `<span class="ml-3 text-red-600 font-bold"><i class="fas fa-exclamation-triangle mr-1"></i>Tài liệu cũ (trên 5 năm)</span>` : ''}</p>
+                ${notesHTML}
             </div>
-            <div class="flex items-center gap-3 flex-shrink-0">
+            <div class="flex items-center gap-3 flex-shrink-0 self-start md:self-center mt-2 md:mt-0">
                 <a href="${docData.downloadURL}" target="_blank" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg text-sm flex items-center gap-2"><i class="fas fa-download"></i> Tải về</a>
                 ${isAdmin ? `<button data-doc-id="${docData.id}" data-file-path="${docData.filePath}" class="delete-btn bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg text-sm flex items-center gap-2"><i class="fas fa-trash"></i> Xóa</button>` : ''}
             </div>
@@ -318,9 +320,9 @@ function renderDocumentsList() {
     });
     
     document.querySelectorAll('.delete-btn').forEach(button => button.addEventListener('click', handleDelete));
+    document.querySelectorAll('.edit-note-btn').forEach(button => button.addEventListener('click', handleOpenEditNoteModal));
 }
 
-// NEW: Renders the accordion list of all documents
 function renderAllDocumentsAccordion() {
     const accordionContainer = document.getElementById('all-documents-accordion');
     if (!accordionContainer) return;
@@ -332,19 +334,15 @@ function renderAllDocumentsAccordion() {
         return;
     }
 
-    // Group documents by subjectId
     const docsBySubject = state.allDocuments.reduce((acc, doc) => {
         const subjectId = doc.subjectId;
-        if (!acc[subjectId]) {
-            acc[subjectId] = [];
-        }
+        if (!acc[subjectId]) acc[subjectId] = [];
         acc[subjectId].push(doc);
         return acc;
     }, {});
 
     const isAdmin = state.currentUser?.role === 'admin';
 
-    // Sort subjects by name before rendering
     const sortedSubjectIds = Object.keys(docsBySubject).sort((a, b) => {
         const subjectA = state.subjects.find(s => s.id === a)?.subjectName || '';
         const subjectB = state.subjects.find(s => s.id === b)?.subjectName || '';
@@ -353,7 +351,7 @@ function renderAllDocumentsAccordion() {
 
     for (const subjectId of sortedSubjectIds) {
         const subject = state.subjects.find(s => s.id === subjectId);
-        if (!subject) continue; // Skip if subject info is not available yet
+        if (!subject) continue;
 
         const documents = docsBySubject[subjectId];
         const accordionItem = document.createElement('div');
@@ -386,10 +384,15 @@ function renderAllDocumentsAccordion() {
             if (docData.fileType?.includes('word')) fileIcon = 'fa-file-word';
             if (docData.fileType?.includes('excel')) fileIcon = 'fa-file-excel';
 
+             const notesHTML = docData.notes ? `
+                <p class="text-xs text-gray-500 mt-1 italic">Ghi chú: ${docData.notes.substring(0, 100)}${docData.notes.length > 100 ? '...' : ''}</p>
+             ` : '';
+
             docElement.innerHTML = `
                 <div class="flex-grow">
                     <p class="font-medium text-gray-800 flex items-center text-sm"><i class="fas ${fileIcon} mr-2 text-gray-500"></i>${docData.fileName}</p>
                     <p class="text-xs text-gray-500 mt-1">Ngày tải lên: ${dateString} | Kích thước: ${formatBytes(docData.fileSize)}</p>
+                    ${notesHTML}
                 </div>
                 <div class="flex items-center gap-2 flex-shrink-0">
                     <a href="${docData.downloadURL}" target="_blank" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-1 px-3 rounded-lg text-xs flex items-center gap-1.5"><i class="fas fa-download"></i> Tải về</a>
@@ -409,7 +412,6 @@ function renderAllDocumentsAccordion() {
         });
     }
     
-    // Re-attach event listeners for the new delete buttons
     accordionContainer.querySelectorAll('.delete-btn').forEach(button => button.addEventListener('click', handleDelete));
 }
 
@@ -459,7 +461,7 @@ function fetchInitialData() {
     });
     
     listenToStorageUsage();
-    fetchAllDocuments(); // NEW: Fetch all documents on initial load
+    fetchAllDocuments();
 }
 
 function listenToStorageUsage() {
@@ -506,14 +508,13 @@ function fetchSubjects() {
     subjectsUnsubscribe = onSnapshot(curriculumSubjectsCol, (snapshot) => {
         state.subjects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         renderSubjectsTable(); 
-        renderAllDocumentsAccordion(); // Re-render accordion in case subject names were not ready before
+        renderAllDocumentsAccordion();
     }, (error) => {
         console.error("Error fetching subjects: ", error);
         showAlert("Không thể tải danh sách môn học.");
     });
 }
 
-// NEW: Fetches all documents from the syllabus collection
 function fetchAllDocuments() {
     onSnapshot(syllabusCol, (snapshot) => {
         state.allDocuments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -547,6 +548,7 @@ async function handleUpload(event) {
     event.preventDefault();
     const subjectId = document.getElementById('upload-subject-id').value;
     const fileInput = document.getElementById('file-input');
+    const notesInput = document.getElementById('file-notes'); // New
     const uploadBtn = document.getElementById('upload-btn');
     const progressBarContainer = document.getElementById('upload-progress-bar');
     const progressBar = document.getElementById('upload-progress');
@@ -561,6 +563,7 @@ async function handleUpload(event) {
     }
 
     const file = fileInput.files[0];
+    const notes = notesInput.value.trim(); // New
     const fileSize = file.size;
     const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024; // 20MB
     const FREE_QUOTA_BYTES = 5 * 1024 * 1024 * 1024; // 5GB
@@ -625,6 +628,7 @@ async function handleUpload(event) {
                 await addDoc(syllabusCol, {
                     facultyId, subjectId,
                     fileName: file.name, fileType: file.type, filePath, downloadURL, fileSize,
+                    notes: notes, // New
                     uploadedAt: serverTimestamp(),
                     uploaderUid: state.currentUser.uid, uploaderEmail: state.currentUser.email,
                 });
@@ -742,7 +746,7 @@ async function handleImportSubjects() {
                         facultyId = facultyDoc.id;
                     }
 
-                    const q = query(curriculumSubjectsCol, where("subjectCode", "==", subjectCode), where("facultyId", "==", facultyId));
+                    const q = query(curriculumSubjectsCol, where("subjectCode", "==", subjectCode));
                     if ((await getDocs(q)).empty) {
                         await addDoc(curriculumSubjectsCol, { subjectName, subjectCode, facultyId, createdAt: serverTimestamp() });
                         importedCount++;
@@ -808,15 +812,13 @@ async function handleAddSubjectManually(event) {
             facultyId = facultyDoc.id;
         }
 
-        const q = query(curriculumSubjectsCol, where("subjectCode", "==", subjectCode), where("facultyId", "==", facultyId));
+        const q = query(curriculumSubjectsCol, where("subjectCode", "==", subjectCode));
         if ((await getDocs(q)).empty) {
             await addDoc(curriculumSubjectsCol, { subjectName, subjectCode, facultyId, createdAt: serverTimestamp() });
             showAlert(`Thêm môn học "${subjectName}" (${subjectCode}) thành công!`);
-            subjectNameInput.value = '';
-            subjectCodeInput.value = '';
-            facultyNameInput.value = '';
+            document.getElementById('add-subject-form').reset();
         } else {
-            showAlert(`Môn học "${subjectName}" (${subjectCode}) thuộc khoa "${facultyName}" đã tồn tại.`);
+            showAlert(`Mã môn học "${subjectCode}" đã tồn tại.`);
         }
     } catch (error) {
         console.error("Error adding subject manually:", error);
@@ -853,7 +855,7 @@ async function handleDeleteSubject(subjectIds) {
             for (const docSnap of docsSnapshot.docs) {
                 const { filePath, fileSize = 0 } = docSnap.data();
                 try {
-                    await deleteObject(ref(storage, filePath));
+                    if (filePath) await deleteObject(ref(storage, filePath));
                     totalFileSizeDeleted += fileSize;
                 } catch (storageError) {
                     console.warn(`Could not delete file ${filePath} from storage:`, storageError);
@@ -886,6 +888,91 @@ async function handleDeleteSubject(subjectIds) {
 async function handleDeleteSelectedSubjects() {
     await handleDeleteSubject(Array.from(state.selectedSubjectIdsToDelete));
 }
+
+// --- NEW MODAL HANDLERS ---
+function handleOpenEditSubjectModal(event) {
+    const subjectId = event.currentTarget.dataset.subjectId;
+    const subject = state.subjects.find(s => s.id === subjectId);
+    if (!subject) {
+        showAlert("Không tìm thấy thông tin môn học.");
+        return;
+    }
+
+    const modal = document.getElementById('edit-subject-modal');
+    document.getElementById('edit-subject-id').value = subject.id;
+    document.getElementById('edit-subject-name').value = subject.subjectName;
+    document.getElementById('edit-subject-code').value = subject.subjectCode;
+    modal.style.display = 'block';
+}
+
+async function handleUpdateSubject(event) {
+    event.preventDefault();
+    const saveBtn = document.getElementById('edit-subject-save-btn');
+    setButtonLoading(saveBtn, true, 'Lưu thay đổi');
+
+    const subjectId = document.getElementById('edit-subject-id').value;
+    const newName = document.getElementById('edit-subject-name').value.trim();
+    const newCode = document.getElementById('edit-subject-code').value.trim();
+
+    if (!newName || !newCode) {
+        showAlert("Tên và mã môn học không được để trống.");
+        setButtonLoading(saveBtn, false, 'Lưu thay đổi');
+        return;
+    }
+
+    try {
+        const subjectRef = doc(curriculumSubjectsCol, subjectId);
+        await updateDoc(subjectRef, {
+            subjectName: newName,
+            subjectCode: newCode
+        });
+        showAlert("Cập nhật thông tin môn học thành công!");
+        document.getElementById('edit-subject-modal').style.display = 'none';
+    } catch (error) {
+        console.error("Error updating subject:", error);
+        showAlert(`Lỗi cập nhật môn học: ${error.message}`);
+    } finally {
+        setButtonLoading(saveBtn, false, 'Lưu thay đổi');
+    }
+}
+
+function handleOpenEditNoteModal(event) {
+    const docId = event.currentTarget.dataset.docId;
+    const docData = state.documents.find(d => d.id === docId) || state.allDocuments.find(d => d.id === docId);
+    if (!docData) {
+        showAlert("Không tìm thấy tài liệu.");
+        return;
+    }
+
+    const modal = document.getElementById('edit-note-modal');
+    document.getElementById('edit-note-doc-id').value = docId;
+    document.getElementById('edit-note-textarea').value = docData.notes || '';
+    modal.style.display = 'block';
+}
+
+async function handleUpdateNote(event) {
+    event.preventDefault();
+    const saveBtn = document.getElementById('edit-note-save-btn');
+    setButtonLoading(saveBtn, true, 'Lưu ghi chú');
+
+    const docId = document.getElementById('edit-note-doc-id').value;
+    const newNotes = document.getElementById('edit-note-textarea').value.trim();
+
+    try {
+        const docRef = doc(syllabusCol, docId);
+        await updateDoc(docRef, {
+            notes: newNotes
+        });
+        showAlert("Cập nhật ghi chú thành công!");
+        document.getElementById('edit-note-modal').style.display = 'none';
+    } catch (error) {
+        console.error("Error updating note:", error);
+        showAlert(`Lỗi cập nhật ghi chú: ${error.message}`);
+    } finally {
+        setButtonLoading(saveBtn, false, 'Lưu ghi chú');
+    }
+}
+
 
 function addEventListeners() {
     const searchInput = document.getElementById('search-subject-input');
@@ -935,13 +1022,22 @@ function addEventListeners() {
         document.getElementById('toggle-subject-icon').classList.toggle('rotate-180');
     });
 
-    // NEW: Event listener for the all-documents panel
     document.getElementById('toggle-all-docs-panel').addEventListener('click', () => {
         document.getElementById('all-documents-accordion').classList.toggle('hidden');
         document.getElementById('toggle-all-docs-icon').classList.toggle('rotate-180');
     });
 
     document.getElementById('admin-search-subject-input').addEventListener('input', (e) => renderSubjectsTable(e.target.value));
+
+    // Event listeners for new modals
+    document.getElementById('edit-subject-form').addEventListener('submit', handleUpdateSubject);
+    document.getElementById('edit-subject-cancel-btn').addEventListener('click', () => {
+        document.getElementById('edit-subject-modal').style.display = 'none';
+    });
+    document.getElementById('edit-note-form').addEventListener('submit', handleUpdateNote);
+    document.getElementById('edit-note-cancel-btn').addEventListener('click', () => {
+        document.getElementById('edit-note-modal').style.display = 'none';
+    });
 }
 
 // --- Initial Load ---
