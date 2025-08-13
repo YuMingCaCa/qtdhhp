@@ -121,19 +121,25 @@
 
             <!-- Filters -->
             <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 no-print">
-                <!-- START: CẢI TIẾN - Thêm bộ lọc Năm học -->
                 <div>
                     <label for="filter-year" class="block text-sm font-medium text-gray-700">Lọc theo Năm học</label>
                     <select id="filter-year" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"></select>
                 </div>
-                <!-- END: CẢI TIẾN -->
+                <!-- UPDATED: Department Filter -->
                 <div>
-                    <label for="filter-department" class="block text-sm font-medium text-gray-700">Lọc theo Khoa</label>
-                    <select id="filter-department" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"></select>
+                    <label for="search-department-input" class="block text-sm font-medium text-gray-700">Lọc theo Khoa</label>
+                    <div class="relative mt-1">
+                        <input type="text" id="search-department-input" placeholder="Tìm kiếm khoa..." class="w-full p-2 border border-gray-300 rounded-md shadow-sm">
+                        <div id="department-results" class="absolute z-20 w-full bg-white border border-gray-300 rounded-md mt-1 hidden max-h-60 overflow-y-auto"></div>
+                    </div>
                 </div>
+                <!-- UPDATED: Lecturer Filter -->
                 <div>
-                    <label for="filter-lecturer" class="block text-sm font-medium text-gray-700">Lọc theo Giảng viên</label>
-                    <select id="filter-lecturer" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"></select>
+                    <label for="search-lecturer-input" class="block text-sm font-medium text-gray-700">Lọc theo Giảng viên</label>
+                    <div class="relative mt-1">
+                        <input type="text" id="search-lecturer-input" placeholder="Tìm kiếm giảng viên..." class="w-full p-2 border border-gray-300 rounded-md shadow-sm">
+                        <div id="lecturer-results" class="absolute z-20 w-full bg-white border border-gray-300 rounded-md mt-1 hidden max-h-60 overflow-y-auto"></div>
+                    </div>
                 </div>
                 <div>
                     <label for="filter-status" class="block text-sm font-medium text-gray-700">Lọc theo Trạng thái</label>
@@ -171,6 +177,18 @@
                     </tbody>
                 </table>
             </div>
+            
+            <!-- NEW: Pagination Controls -->
+            <div id="pagination-controls" class="flex justify-between items-center mt-6 no-print">
+                <button id="prev-page-btn" class="bg-white hover:bg-gray-100 text-gray-800 font-semibold py-2 px-4 border border-gray-300 rounded-lg shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                    <i class="fas fa-arrow-left mr-2"></i> Trang trước
+                </button>
+                <span id="page-info" class="text-sm font-medium text-gray-700"></span>
+                <button id="next-page-btn" class="bg-white hover:bg-gray-100 text-gray-800 font-semibold py-2 px-4 border border-gray-300 rounded-lg shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                    Trang sau <i class="fas fa-arrow-right ml-2"></i>
+                </button>
+            </div>
+
         </div>
     </main>
 

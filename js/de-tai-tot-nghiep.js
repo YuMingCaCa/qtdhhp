@@ -1,11 +1,16 @@
 // File: js/de-tai-tot-nghiep.js
 // Logic for the "Graduation Thesis Management" module.
-// OPTIMIZED: Changed data fetching for 'topics' and 'students' from onSnapshot to on-demand getDocs.
-// ADDED: Main academic year filter to control data loading.
+// OPTIMIZED: Fetches all topics for a department/year, then applies client-side filtering and pagination.
+// This fixes pagination errors when filtering and avoids complex Firestore indexes.
+// ADDED: Search functionality for lecturer and department filters.
+// ADDED: Default filter to "Khoa Công nghệ Thông tin".
 
 import { auth, db, appId } from './portal-config.js';
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-import { getFirestore, collection, onSnapshot, addDoc, doc, getDoc, setDoc, getDocs, updateDoc, deleteDoc, query, where, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { 
+    getFirestore, collection, onSnapshot, addDoc, doc, getDoc, setDoc, getDocs, 
+    updateDoc, deleteDoc, query, where, writeBatch, orderBy, limit, startAfter, getCountFromServer 
+} from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 // --- Global Helper Functions ---
 function showAlert(message, isSuccess = false) {
@@ -70,17 +75,11 @@ async function initializeFirebase() {
         
         onAuthStateChanged(auth, async (user) => {
             if (user) {
-                const userDoc = await getDocs(query(usersCol, where("email", "==", user.email)));
-                if (!userDoc.empty) {
-                    currentUserInfo = { uid: user.uid, ...userDoc.docs[0].data() };
+                const userDocById = await getDoc(doc(usersCol, user.uid));
+                if(userDocById.exists()){
+                   currentUserInfo = { uid: user.uid, ...userDocById.data() };
                 } else {
-                    // Fallback for users that might not be in the custom users collection yet
-                    const userDocById = await getDoc(doc(usersCol, user.uid));
-                     if(userDocById.exists()){
-                        currentUserInfo = { uid: user.uid, ...userDocById.data() };
-                    } else {
-                        currentUserInfo = { uid: user.uid, email: user.email, role: 'viewer' };
-                    }
+                    currentUserInfo = { uid: user.uid, email: user.email, role: 'viewer' };
                 }
                 
                 document.getElementById('thesis-module-content').classList.remove('hidden');
@@ -99,13 +98,21 @@ async function initializeFirebase() {
 }
 
 // --- Global State ---
-let allTopics = []; // OPTIMIZED: Will only hold topics for the selected year
+let allTopicsForDept = []; // Holds all topics for the selected year and department
 let allLecturers = [];
 let allDepartments = [];
-let allStudents = []; // OPTIMIZED: Will be loaded on demand
+let allStudents = [];
 let allInternshipLocations = [];
 let academicYears = [];
 let selectedYear = null;
+let selectedDepartmentId = null; 
+let selectedLecturerId = null; 
+let localFilteredTopics = []; // For client-side filtering result
+
+// --- Pagination State ---
+let currentPage = 1;
+const TOPICS_PER_PAGE = 15;
+
 
 // --- UI Rendering & Logic ---
 
@@ -148,28 +155,17 @@ function getStatusBadge(status) {
     }
 }
 
-function renderTopicsList() {
+function renderTopicsList(topicsToRender) {
     const listBody = document.getElementById('topics-list-body');
     listBody.innerHTML = '';
-
-    const depFilter = document.getElementById('filter-department').value;
-    const lecFilter = document.getElementById('filter-lecturer').value;
-    const statusFilter = document.getElementById('filter-status').value;
     const isAdmin = currentUserInfo.role === 'admin';
 
-    const filteredTopics = allTopics.filter(topic => {
-        if (depFilter !== 'all' && topic.departmentId !== depFilter) return false;
-        if (lecFilter !== 'all' && topic.lecturerId !== lecFilter) return false;
-        if (statusFilter !== 'all' && topic.status !== statusFilter) return false;
-        return true;
-    });
-
-    if (filteredTopics.length === 0) {
-        listBody.innerHTML = `<tr><td colspan="5" class="text-center p-6 text-gray-500">Không có đề tài nào phù hợp với bộ lọc.</td></tr>`;
+    if (topicsToRender.length === 0) {
+        listBody.innerHTML = `<tr><td colspan="5" class="text-center p-6 text-gray-500">Không có đề tài nào phù hợp.</td></tr>`;
         return;
     }
 
-    filteredTopics.forEach(topic => {
+    topicsToRender.forEach(topic => {
         const row = document.createElement('tr');
         const lecturer = allLecturers.find(l => l.id === topic.lecturerId);
         
@@ -224,37 +220,21 @@ function renderTopicsList() {
     });
 }
 
-function populateFilterDropdowns() {
-    const depSelect = document.getElementById('filter-department');
+function populateInitialFilters() {
     const yearSelect = document.getElementById('filter-year');
-    
-    depSelect.innerHTML = '<option value="all">Tất cả Khoa</option>';
-    allDepartments.forEach(dep => {
-        depSelect.innerHTML += `<option value="${dep.id}">${dep.name}</option>`;
-    });
-
     yearSelect.innerHTML = '';
     academicYears.forEach(year => {
         yearSelect.innerHTML += `<option value="${year}">Năm học ${year}</option>`;
     });
     yearSelect.value = getCurrentAcademicYear();
     selectedYear = yearSelect.value;
-
-    updateLecturerFilterDropdown('all');
-}
-
-function updateLecturerFilterDropdown(departmentId) {
-    const lecSelect = document.getElementById('filter-lecturer');
-    lecSelect.innerHTML = '<option value="all">Tất cả Giảng viên</option>';
-
-    let lecturersToList = allLecturers;
-    if (departmentId && departmentId !== 'all') {
-        lecturersToList = allLecturers.filter(l => l.departmentId === departmentId);
+    
+    // Set default to CNTT
+    const defaultDept = allDepartments.find(d => d.name.toLowerCase() === "công nghệ thông tin");
+    if (defaultDept) {
+        selectedDepartmentId = defaultDept.id;
+        document.getElementById('search-department-input').value = defaultDept.name;
     }
-
-    lecturersToList.forEach(lec => {
-        lecSelect.innerHTML += `<option value="${lec.id}">${lec.name}</option>`;
-    });
 }
 
 function populateModalDropdowns() {
@@ -292,7 +272,8 @@ function clearTopicForm() {
 
 // --- CRUD Functions (exposed to window for onclick) ---
 window.editTopic = (id) => {
-    const topic = allTopics.find(t => t.id === id);
+    // Find topic in the master list for the department, not just the currently rendered page
+    const topic = allTopicsForDept.find(t => t.id === id);
     if (topic) {
         populateModalDropdowns();
         document.getElementById('topic-id').value = topic.id;
@@ -315,6 +296,7 @@ window.deleteTopic = (id) => {
         try {
             await deleteDoc(doc(topicsCol, id));
             showAlert('Xóa đề tài thành công!', true);
+            fetchTopicsForDepartment(); // Refresh data from server
         } catch (error) {
             showAlert(`Lỗi khi xóa đề tài: ${error.message}`);
             console.error("Error deleting topic: ", error);
@@ -323,7 +305,7 @@ window.deleteTopic = (id) => {
 };
 
 window.openRegisterModal = (id) => {
-    const topic = allTopics.find(t => t.id === id);
+    const topic = allTopicsForDept.find(t => t.id === id);
     if (topic) {
         document.getElementById('register-topic-id').value = id;
         document.getElementById('register-topic-name').textContent = topic.name;
@@ -342,8 +324,19 @@ window.openRegisterModal = (id) => {
 // --- Import/Export & Print Functions ---
 function downloadTemplateForTopics() {
     const headers = ["tenDeTai", "moTa", "tenKhoa", "maGiangVien"];
+    const sampleData = [{
+        tenDeTai: "Xây dựng Website bán hàng sử dụng ReactJS",
+        moTa: "Nghiên cứu và áp dụng thư viện ReactJS để xây dựng giao diện người dùng cho một trang web thương mại điện tử.",
+        tenKhoa: "Công nghệ Thông tin",
+        maGiangVien: "GV001"
+    }, {
+        tenDeTai: "Phân tích dữ liệu điểm thi THPT Quốc gia",
+        moTa: "Sử dụng Python và các thư viện như Pandas, Matplotlib để phân tích và trực quan hóa dữ liệu điểm thi.",
+        tenKhoa: "Công nghệ Thông tin",
+        maGiangVien: "GV002"
+    }];
     const filename = "Mau_Import_DeTai.xlsx";
-    const ws = XLSX.utils.json_to_sheet([{}], { header: headers });
+    const ws = XLSX.utils.json_to_sheet(sampleData, { header: headers });
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Data");
     XLSX.writeFile(wb, filename);
@@ -351,8 +344,23 @@ function downloadTemplateForTopics() {
 
 function downloadTemplateForStudents() {
     const headers = ["maSV", "hoTen", "ngaySinh", "lop", "tenKhoa", "khoaHoc"];
+    const sampleData = [{
+        maSV: "2131480123",
+        hoTen: "Nguyễn Văn An",
+        ngaySinh: "2003-10-20",
+        lop: "CNTT1-K14",
+        tenKhoa: "Công nghệ Thông tin",
+        khoaHoc: "K14"
+    }, {
+        maSV: "2131480124",
+        hoTen: "Trần Thị Bình",
+        ngaySinh: "2003-05-15",
+        lop: "CNTT2-K14",
+        tenKhoa: "Công nghệ Thông tin",
+        khoaHoc: "K14"
+    }];
     const filename = "Mau_Import_SinhVien.xlsx";
-    const ws = XLSX.utils.json_to_sheet([{}], { header: headers });
+    const ws = XLSX.utils.json_to_sheet(sampleData, { header: headers });
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Data");
     XLSX.writeFile(wb, filename);
@@ -360,8 +368,21 @@ function downloadTemplateForStudents() {
 
 function downloadTemplateForInternshipLocations() {
     const headers = ["tenCoSo", "diaChi", "soDienThoai", "ghiChu", "soSinhVien"];
+    const sampleData = [{
+        tenCoSo: "Công ty Phần mềm Sao Mai",
+        diaChi: "Số 1 Lê Hồng Phong, Ngô Quyền, Hải Phòng",
+        soDienThoai: "0912345678",
+        ghiChu: "Liên hệ chị Lan phòng nhân sự",
+        soSinhVien: 5
+    }, {
+        tenCoSo: "Tập đoàn Công nghệ HPT",
+        diaChi: "Khu Công nghệ cao Hòa Lạc, Hà Nội",
+        soDienThoai: "0987654321",
+        ghiChu: "",
+        soSinhVien: 10
+    }];
     const filename = "Mau_Import_CoSoThucTap.xlsx";
-    const ws = XLSX.utils.json_to_sheet([{}], { header: headers });
+    const ws = XLSX.utils.json_to_sheet(sampleData, { header: headers });
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Data");
     XLSX.writeFile(wb, filename);
@@ -905,10 +926,7 @@ function addEventListeners() {
         const isAdmin = currentUserInfo.role === 'admin';
         const departmentId = document.getElementById('topic-department-select').value;
         
-        // --- START FIX ---
-        // Find the lecturer based on the linked user ID, not by email prefix.
         const selfLecturer = allLecturers.find(l => l.linkedUid === currentUserInfo.uid);
-        // --- END FIX ---
 
         const data = {
             name: document.getElementById('topic-name').value.trim(),
@@ -943,6 +961,7 @@ function addEventListeners() {
                 showAlert('Đề xuất thành công!', true);
             }
             closeModal('topic-modal');
+            fetchTopicsForDepartment(); // Refresh data
         } catch (error) {
             showAlert(`Lỗi: ${error.message}`);
         }
@@ -956,11 +975,11 @@ function addEventListeners() {
         const studentClass = document.getElementById('student-class-input').value.trim();
         const internshipLocation = document.getElementById('student-internship-location').value;
         if (!studentName || !studentId || !studentClass || !internshipLocation) { showAlert("Vui lòng điền đầy đủ thông tin."); return; }
-        const topic = allTopics.find(t => t.id === topicId);
+        const topic = allTopicsForDept.find(t => t.id === topicId);
         const lecturer = allLecturers.find(l => l.id === topic.lecturerId);
         if (lecturer) {
             const quota = lecturer.supervisionQuota || 5; 
-            const currentTakenTopics = allTopics.filter(t => t.lecturerId === lecturer.id && t.status === 'taken').length;
+            const currentTakenTopics = allTopicsForDept.filter(t => t.lecturerId === lecturer.id && t.status === 'taken').length;
             if (currentTakenTopics >= quota) { showAlert(`Giảng viên ${lecturer.name} đã đạt chỉ tiêu (${quota} SV).`); return; }
         }
         const updateData = { status: 'taken', studentName, studentId, studentClass, internshipLocation, registeredByUid: currentUserInfo.uid, registeredAt: new Date().toISOString() };
@@ -968,6 +987,7 @@ function addEventListeners() {
             await updateDoc(doc(topicsCol, topicId), updateData);
             showAlert('Đăng ký thành công!', true);
             closeModal('student-register-modal');
+            fetchTopicsForDepartment(); // Refresh data
         } catch (error) { showAlert(`Lỗi: ${error.message}`); }
     });
 
@@ -1008,14 +1028,80 @@ function addEventListeners() {
     // Filter listeners
     document.getElementById('filter-year').addEventListener('change', (e) => {
         selectedYear = e.target.value;
-        loadDataForYear(selectedYear);
+        fetchTopicsForDepartment();
     });
-    document.getElementById('filter-department').addEventListener('change', () => {
-        updateLecturerFilterDropdown(document.getElementById('filter-department').value);
-        renderTopicsList();
+    document.getElementById('filter-status').addEventListener('change', () => applyFiltersAndRenderPage(1));
+
+
+    // --- UPDATED: Search-based Filter Listeners ---
+    const deptInput = document.getElementById('search-department-input');
+    const deptResults = document.getElementById('department-results');
+    deptInput.addEventListener('input', () => {
+        const searchTerm = deptInput.value.toLowerCase();
+        if (!searchTerm) {
+            selectedDepartmentId = null;
+            deptResults.classList.add('hidden');
+            fetchTopicsForDepartment();
+            return;
+        }
+        const filteredDepts = allDepartments.filter(d => d.name.toLowerCase().includes(searchTerm));
+        deptResults.innerHTML = '';
+        if (filteredDepts.length > 0) {
+            filteredDepts.forEach(d => {
+                const div = document.createElement('div');
+                div.textContent = d.name;
+                div.className = 'p-2 hover:bg-gray-100 cursor-pointer';
+                div.onclick = () => {
+                    deptInput.value = d.name;
+                    selectedDepartmentId = d.id;
+                    deptResults.classList.add('hidden');
+                    fetchTopicsForDepartment();
+                };
+                deptResults.appendChild(div);
+            });
+            deptResults.classList.remove('hidden');
+        } else {
+            deptResults.classList.add('hidden');
+        }
     });
-    document.getElementById('filter-lecturer').addEventListener('change', renderTopicsList);
-    document.getElementById('filter-status').addEventListener('change', renderTopicsList);
+    
+    const lecInput = document.getElementById('search-lecturer-input');
+    const lecResults = document.getElementById('lecturer-results');
+    lecInput.addEventListener('input', () => {
+        const searchTerm = lecInput.value.toLowerCase();
+        if (!searchTerm) {
+            selectedLecturerId = null;
+            lecResults.classList.add('hidden');
+            applyFiltersAndRenderPage(1);
+            return;
+        }
+        const filteredLecs = allLecturers.filter(l => l.name.toLowerCase().includes(searchTerm) && (selectedDepartmentId ? l.departmentId === selectedDepartmentId : true));
+        lecResults.innerHTML = '';
+        if (filteredLecs.length > 0) {
+            filteredLecs.forEach(l => {
+                const div = document.createElement('div');
+                div.textContent = l.name;
+                div.className = 'p-2 hover:bg-gray-100 cursor-pointer';
+                div.onclick = () => {
+                    lecInput.value = l.name;
+                    selectedLecturerId = l.id;
+                    lecResults.classList.add('hidden');
+                    applyFiltersAndRenderPage(1);
+                };
+                lecResults.appendChild(div);
+            });
+            lecResults.classList.remove('hidden');
+        } else {
+            lecResults.classList.add('hidden');
+        }
+    });
+
+    // Add a general click listener to hide search results
+    window.addEventListener('click', (e) => {
+        if (!deptInput.contains(e.target)) deptResults.classList.add('hidden');
+        if (!lecInput.contains(e.target)) lecResults.classList.add('hidden');
+    });
+
 
     // --- UPDATED: Print listeners ---
     const setupPrintModal = (isAdvanced = false) => {
@@ -1104,6 +1190,7 @@ function addEventListeners() {
             try {
                 await batch.commit();
                 showAlert('Duyệt hàng loạt thành công!', true);
+                fetchTopicsForDepartment(); // Refresh page
             } catch (error) {
                 showAlert(`Lỗi khi duyệt: ${error.message}`);
             }
@@ -1146,6 +1233,14 @@ function addEventListeners() {
     document.getElementById('clear-student-management-form-btn').addEventListener('click', clearStudentManagementForm);
     document.getElementById('location-management-form').addEventListener('submit', handleLocationFormSubmit);
     document.getElementById('clear-location-management-form-btn').addEventListener('click', clearLocationManagementForm);
+    
+    // --- NEW: Pagination Listeners ---
+    document.getElementById('next-page-btn').addEventListener('click', () => {
+        applyFiltersAndRenderPage(currentPage + 1);
+    });
+    document.getElementById('prev-page-btn').addEventListener('click', () => {
+        applyFiltersAndRenderPage(currentPage - 1);
+    });
 }
 
 // --- NEW: Data Management Functions ---
@@ -1241,7 +1336,7 @@ window.editStudentForManagement = (id) => {
 
 window.deleteStudentForManagement = (id) => {
     const student = allStudents.find(s => s.id === id);
-    const isAssigned = allTopics.some(t => t.studentId === student.studentId);
+    const isAssigned = allTopicsForDept.some(t => t.studentId === student.studentId);
     if (isAssigned) {
         showAlert("Không thể xóa sinh viên đã được phân công đề tài. Vui lòng hủy phân công trước.");
         return;
@@ -1347,22 +1442,64 @@ window.deleteLocationForManagement = (id) => {
 }
 
 
-// --- OPTIMIZED: Data Loading Logic ---
-async function loadDataForYear(year) {
-    selectedYear = year;
+// --- OPTIMIZED: Data Loading & Filtering Logic ---
+async function fetchTopicsForDepartment() {
     const listBody = document.getElementById('topics-list-body');
-    listBody.innerHTML = `<tr><td colspan="5" class="text-center p-6 text-gray-500"><i class="fas fa-spinner fa-spin mr-2"></i>Đang tải dữ liệu năm học ${year}...</td></tr>`;
+    listBody.innerHTML = `<tr><td colspan="5" class="text-center p-6 text-gray-500"><i class="fas fa-spinner fa-spin mr-2"></i>Đang tải dữ liệu...</td></tr>`;
 
     try {
-        const q = query(topicsCol, where("academicYear", "==", year));
+        let constraints = [where("academicYear", "==", selectedYear)];
+        if (selectedDepartmentId) {
+            constraints.push(where("departmentId", "==", selectedDepartmentId));
+        }
+        
+        const q = query(topicsCol, ...constraints, orderBy("createdAt", "desc"));
         const snapshot = await getDocs(q);
-        allTopics = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
-        renderTopicsList();
+        allTopicsForDept = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        
+        applyFiltersAndRenderPage(1); // Apply filters and render the first page
+
     } catch (error) {
-        console.error(`Error loading topics for year ${year}:`, error);
+        console.error(`Error loading topics:`, error);
         showAlert(`Lỗi khi tải dữ liệu đề tài: ${error.message}`);
         listBody.innerHTML = `<tr><td colspan="5" class="text-center p-6 text-red-500">Lỗi tải dữ liệu.</td></tr>`;
     }
+}
+
+function applyFiltersAndRenderPage(page = 1) {
+    currentPage = page;
+    const statusFilter = document.getElementById('filter-status').value;
+
+    let filteredTopics = allTopicsForDept;
+    if (selectedLecturerId) {
+        filteredTopics = filteredTopics.filter(topic => topic.lecturerId === selectedLecturerId);
+    }
+    if (statusFilter !== 'all') {
+        filteredTopics = filteredTopics.filter(topic => topic.status === statusFilter);
+    }
+    
+    localFilteredTopics = filteredTopics;
+    
+    const startIndex = (currentPage - 1) * TOPICS_PER_PAGE;
+    const endIndex = startIndex + TOPICS_PER_PAGE;
+    const topicsToRender = localFilteredTopics.slice(startIndex, endIndex);
+
+    renderTopicsList(topicsToRender);
+    updatePaginationControls();
+}
+
+
+function updatePaginationControls() {
+    const pageInfo = document.getElementById('page-info');
+    const prevBtn = document.getElementById('prev-page-btn');
+    const nextBtn = document.getElementById('next-page-btn');
+    
+    const totalTopics = localFilteredTopics.length;
+    const totalPages = Math.ceil(totalTopics / TOPICS_PER_PAGE);
+
+    pageInfo.textContent = `Trang ${currentPage} / ${totalPages || 1}`;
+    prevBtn.disabled = currentPage === 1;
+    nextBtn.disabled = currentPage >= totalPages;
 }
 
 async function loadAllStudents() {
@@ -1381,28 +1518,32 @@ function setupOnSnapshotListeners() {
     onSnapshot(doc(settingsCol, 'appSettings'), (docSnapshot) => {
         const customYears = docSnapshot.exists() ? (docSnapshot.data().customYears || []) : [];
         academicYears = Array.from(new Set([getCurrentAcademicYear(), ...customYears])).sort().reverse();
-        populateFilterDropdowns();
-        loadDataForYear(selectedYear || getCurrentAcademicYear());
+        populateInitialFilters();
+        fetchTopicsForDepartment(); 
     }, (error) => console.error("Error listening to settings:", error));
 
     onSnapshot(query(departmentsCol), (snapshot) => {
         allDepartments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a, b) => a.name.localeCompare(b.name));
-        populateFilterDropdowns();
-        renderTopicsList();
+        populateInitialFilters();
     }, (error) => console.error("Error listening to departments:", error));
 
     onSnapshot(query(lecturersCol), (snapshot) => {
         allLecturers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a, b) => a.name.localeCompare(b.name));
-        populateFilterDropdowns();
-        renderTopicsList();
     }, (error) => console.error("Error listening to lecturers:", error));
-
-    // OPTIMIZED: Removed onSnapshot for topicsCol and studentsCol
 
     onSnapshot(query(internshipLocationsCol), (snapshot) => {
         allInternshipLocations = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a, b) => a.name.localeCompare(b.name));
-        renderLocationsForManagement();
+        if(document.getElementById('manage-locations-modal').style.display === 'block') {
+            renderLocationsForManagement();
+        }
     }, (error) => console.error("Error listening to internship locations:", error));
+    
+    onSnapshot(query(studentsCol), (snapshot) => {
+        allStudents = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+         if(document.getElementById('manage-students-modal').style.display === 'block') {
+            renderStudentsForManagement();
+        }
+    }, (error) => console.error("Error listening to students:", error));
 }
 
 // --- NEW Bulk Assignment Helper Functions ---
@@ -1411,7 +1552,7 @@ function populateBulkAssignFilters() {
     const courseFilter = document.getElementById('bulk-assign-filter-course');
     const classFilter = document.getElementById('bulk-assign-filter-class');
     
-    const assignedStudentIds = new Set(allTopics.filter(t => t.status === 'taken').map(t => t.studentId));
+    const assignedStudentIds = new Set(allTopicsForDept.filter(t => t.status === 'taken').map(t => t.studentId));
     let availableStudents = allStudents.filter(s => !assignedStudentIds.has(s.studentId));
     
     if (deptFilter !== 'all') {
@@ -1444,7 +1585,7 @@ function populateBulkAssignLists() {
     const studentListDiv = document.getElementById('bulk-assignment-student-list');
     const topicListDiv = document.getElementById('bulk-assignment-topic-list');
 
-    const assignedStudentIds = new Set(allTopics.filter(t => t.status === 'taken').map(t => t.studentId));
+    const assignedStudentIds = new Set(allTopicsForDept.filter(t => t.status === 'taken').map(t => t.studentId));
     let filteredStudents = allStudents.filter(s => !assignedStudentIds.has(s.studentId));
     
     if (deptFilter !== 'all') filteredStudents = filteredStudents.filter(s => s.departmentId === deptFilter);
@@ -1453,7 +1594,7 @@ function populateBulkAssignLists() {
 
     studentListDiv.innerHTML = filteredStudents.map(s => `<div><input type="checkbox" id="student-${s.id}" value="${s.id}"><label for="student-${s.id}" class="ml-2">${s.name} (${s.studentId})</label></div>`).join('');
 
-    const approvedTopics = allTopics.filter(t => t.status === 'approved');
+    const approvedTopics = allTopicsForDept.filter(t => t.status === 'approved');
     topicListDiv.innerHTML = approvedTopics.map(t => `<div><input type="checkbox" id="topic-${t.id}" value="${t.id}"><label for="topic-${t.id}" class="ml-2">${t.name}</label></div>`).join('');
 
     updateSelectedCounts();
