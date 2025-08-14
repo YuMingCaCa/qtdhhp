@@ -1128,30 +1128,15 @@ window.unlinkLecturer = async (lecturerId) => {
 
 window.openAssignLecturerModal = (userId, userEmail) => {
     document.getElementById('assign-user-id').value = userId;
+    document.getElementById('assign-lecturer-id').value = ''; // Clear previous selection
     document.getElementById('assign-lecturer-title').textContent = `Gán Giảng viên cho: ${userEmail}`;
-
-    const select = document.getElementById('assign-lecturer-select');
-    const message = document.getElementById('no-lecturers-message');
-    const submitBtn = document.getElementById('assign-lecturer-submit-btn');
-    select.innerHTML = '<option value="">-- Chọn một giảng viên --</option>';
-
-    const unlinkedLecturers = state.lecturers.filter(l => !l.linkedUid);
-
-    if (unlinkedLecturers.length === 0) {
-        select.style.display = 'none';
-        message.style.display = 'block';
-        submitBtn.disabled = true;
-    } else {
-        select.style.display = 'block';
-        message.style.display = 'none';
-        submitBtn.disabled = false;
-        unlinkedLecturers.forEach(lecturer => {
-            const option = document.createElement('option');
-            option.value = lecturer.id;
-            option.textContent = `${lecturer.name} (${lecturer.code})`;
-            select.appendChild(option);
-        });
-    }
+    
+    const searchInput = document.getElementById('assign-lecturer-search-input');
+    const searchResults = document.getElementById('assign-lecturer-search-results');
+    
+    searchInput.value = ''; // Clear search input
+    searchResults.innerHTML = ''; // Clear results
+    searchResults.classList.add('hidden'); // Hide results container
 
     openModal('assign-lecturer-modal');
 };
@@ -1515,17 +1500,81 @@ function addEventListeners() {
         }
     });
 
-    // NEW: Assign lecturer form submission
+    // --- START: NEW/MODIFIED ASSIGN LECTURER LOGIC ---
+    const assignLecturerSearchInput = document.getElementById('assign-lecturer-search-input');
+    const assignLecturerSearchResults = document.getElementById('assign-lecturer-search-results');
+
+    // Event listener for typing in the search box
+    assignLecturerSearchInput.addEventListener('input', () => {
+        const searchTerm = assignLecturerSearchInput.value.trim().toLowerCase();
+        document.getElementById('assign-lecturer-id').value = ''; // Clear selection on new input
+        
+        if (searchTerm.length < 2) {
+            assignLecturerSearchResults.innerHTML = '';
+            assignLecturerSearchResults.classList.add('hidden');
+            return;
+        }
+
+        const unlinkedLecturers = state.lecturers.filter(l => !l.linkedUid);
+        const matches = unlinkedLecturers.filter(l => 
+            l.name.toLowerCase().includes(searchTerm) || 
+            (l.code && l.code.toLowerCase().includes(searchTerm))
+        );
+
+        assignLecturerSearchResults.innerHTML = '';
+        if (matches.length > 0) {
+            matches.forEach(lecturer => {
+                const resultItem = document.createElement('div');
+                resultItem.className = 'p-2 hover:bg-blue-100 cursor-pointer';
+                resultItem.textContent = `${lecturer.name} (${lecturer.code})`;
+                resultItem.dataset.lecturerId = lecturer.id;
+                resultItem.dataset.lecturerName = lecturer.name;
+                assignLecturerSearchResults.appendChild(resultItem);
+            });
+            assignLecturerSearchResults.classList.remove('hidden');
+        } else {
+            const noResultItem = document.createElement('div');
+            noResultItem.className = 'p-2 text-gray-500';
+            noResultItem.textContent = 'Không tìm thấy giảng viên phù hợp.';
+            assignLecturerSearchResults.appendChild(noResultItem);
+            assignLecturerSearchResults.classList.remove('hidden');
+        }
+    });
+    
+    // Event listener for clicking a search result
+    assignLecturerSearchResults.addEventListener('click', (e) => {
+        const target = e.target.closest('[data-lecturer-id]');
+        if (target) {
+            const lecturerId = target.dataset.lecturerId;
+            const lecturerName = target.dataset.lecturerName;
+            
+            document.getElementById('assign-lecturer-id').value = lecturerId;
+            assignLecturerSearchInput.value = lecturerName; // Put name in search box
+            
+            assignLecturerSearchResults.innerHTML = ''; // Clear results
+            assignLecturerSearchResults.classList.add('hidden'); // Hide container
+        }
+    });
+
+    // Hide search results if clicking outside the modal
+    document.addEventListener('click', (e) => {
+        const modalContent = document.querySelector('#assign-lecturer-modal .modal-content');
+        if (modalContent && !modalContent.contains(e.target)) {
+            assignLecturerSearchResults.classList.add('hidden');
+        }
+    });
+
+    // MODIFIED: Assign lecturer form submission
     document.getElementById('assign-lecturer-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const btn = e.target.querySelector('button[type="submit"]');
         setButtonLoading(btn, true);
 
         const userId = document.getElementById('assign-user-id').value;
-        const lecturerId = document.getElementById('assign-lecturer-select').value;
+        const lecturerId = document.getElementById('assign-lecturer-id').value; // Read from hidden input
 
         if (!userId || !lecturerId) {
-            showAlert("Vui lòng chọn một giảng viên.");
+            showAlert("Vui lòng tìm kiếm và chọn một giảng viên.");
             setButtonLoading(btn, false);
             return;
         }
@@ -1541,6 +1590,7 @@ function addEventListeners() {
             setButtonLoading(btn, false);
         }
     });
+    // --- END: NEW/MODIFIED ASSIGN LECTURER LOGIC ---
 
 
     // Department & Year select

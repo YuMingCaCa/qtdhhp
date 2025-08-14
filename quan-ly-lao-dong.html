@@ -236,17 +236,20 @@
         </div>
     </div>
 
-    <!-- NEW: Assign Lecturer Modal -->
+    <!-- MODIFIED: Assign Lecturer Modal with Search -->
     <div id="assign-lecturer-modal" class="modal">
         <div class="modal-content max-w-lg">
             <span class="close-button no-print" onclick="closeModal('assign-lecturer-modal')">&times;</span>
             <h3 id="assign-lecturer-title" class="text-xl font-bold mb-4">Gán Giảng viên</h3>
             <form id="assign-lecturer-form">
                 <input type="hidden" id="assign-user-id">
-                <div>
-                    <label for="assign-lecturer-select" class="block text-sm font-medium text-gray-700">Chọn giảng viên để gán:</label>
-                    <select id="assign-lecturer-select" required class="mt-1 block w-full p-2 border border-gray-300 rounded-md"></select>
-                    <p id="no-lecturers-message" class="text-sm text-gray-500 mt-2 hidden">Không có giảng viên nào chưa được gán tài khoản.</p>
+                <input type="hidden" id="assign-lecturer-id"> <!-- To store the selected lecturer's ID -->
+                <div class="relative">
+                    <label for="assign-lecturer-search-input" class="block text-sm font-medium text-gray-700">Tìm kiếm giảng viên (theo tên hoặc mã):</label>
+                    <input type="text" id="assign-lecturer-search-input" autocomplete="off" placeholder="Nhập để tìm kiếm..." class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                    <div id="assign-lecturer-search-results" class="absolute z-10 w-full bg-white border border-gray-300 rounded-md mt-1 max-h-60 overflow-y-auto shadow-lg hidden">
+                        <!-- Search results will be populated here -->
+                    </div>
                 </div>
                 <div class="mt-6 flex justify-end">
                     <button type="submit" id="assign-lecturer-submit-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Lưu liên kết</button>
