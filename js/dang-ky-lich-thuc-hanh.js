@@ -709,20 +709,50 @@ async function handleMassDelete() {
         return;
     }
 
-    if (await showConfirm(`Bạn có chắc muốn xóa ${selectedBookings.size} lịch đã chọn?`)) {
-        try {
-            const batch = writeBatch(db);
-            selectedBookings.forEach(bookingId => {
-                batch.delete(doc(schedulesCol, bookingId));
-            });
-            await batch.commit();
-            showAlert(`Đã xóa thành công ${selectedBookings.size} lịch.`);
-            selectedBookings.clear();
-            updateMassActionUI();
-        } catch (error) {
-            console.error("Error during mass deletion: ", error);
-            showAlert("Đã xảy ra lỗi khi xóa hàng loạt.");
+    if (await showConfirm(`Bạn có chắc muốn xóa ${selectedBookings.size} lịch đã chọn? Hành động này không thể hoàn tác.`)) {
+        const batch = writeBatch(db);
+        let authorizedDeletions = 0;
+        let unauthorizedDeletions = 0;
+
+        // Lặp qua các ID lịch đã chọn để kiểm tra quyền
+        selectedBookings.forEach(bookingId => {
+            const booking = weekSchedules.find(s => s.id === bookingId);
+            if (booking) {
+                // Chỉ cho phép xóa nếu là admin hoặc là người đăng ký lịch
+                if (currentUserInfo.role === 'admin' || currentUserInfo.uid === booking.bookedByUid) {
+                    batch.delete(doc(schedulesCol, bookingId));
+                    authorizedDeletions++;
+                } else {
+                    unauthorizedDeletions++;
+                }
+            }
+        });
+
+        // Nếu có mục không được phép xóa, thông báo cho người dùng
+        if (unauthorizedDeletions > 0) {
+            showAlert(`Bạn không có quyền xóa ${unauthorizedDeletions} lịch đã chọn. Chỉ những lịch bạn đã đăng ký hoặc tài khoản admin mới có thể xóa.`);
         }
+        
+        // Chỉ thực hiện xóa nếu có ít nhất một mục được phép
+        if (authorizedDeletions > 0) {
+            try {
+                await batch.commit();
+                let successMessage = `Đã xóa thành công ${authorizedDeletions} lịch.`;
+                if (unauthorizedDeletions > 0) {
+                    successMessage += ` Không thể xóa ${unauthorizedDeletions} lịch do không có quyền.`;
+                }
+                showAlert(successMessage);
+            } catch (error) {
+                console.error("Error during mass deletion: ", error);
+                showAlert("Đã xảy ra lỗi khi xóa hàng loạt.");
+            }
+        }
+        
+        // Dọn dẹp và cập nhật giao diện sau khi xử lý
+        selectedBookings.clear();
+        updateMassActionUI();
+        // Cần render lại lịch để loại bỏ các checkbox đã chọn
+        renderSchedule();
     }
 }
 
