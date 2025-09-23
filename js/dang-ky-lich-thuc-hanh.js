@@ -912,6 +912,7 @@ async function generatePrintableViewByRoom() {
                 <p style="text-align: right; font-style: italic; margin-bottom: 15px;">Hải Phòng, ${formattedPageDate}</p>
                 <table class="schedule-table all-rooms-print">${tableHeaderHtml}${tableBodyHtml}</table>
                 <div class="footer-container">
+                    <div class="signature-block"><h4 contenteditable="true">PHÒNG QTCSVC & ĐT</h4><p contenteditable="true"></p></div>
                     <div class="signature-block"><h4 contenteditable="true">BAN CHỦ NHIỆM KHOA</h4><p contenteditable="true"></p></div>
                     <div class="signature-block"><h4 contenteditable="true">TỔ BỘ MÔN</h4><p contenteditable="true"></p></div>
                     <div class="signature-block"><h4 contenteditable="true">NGƯỜI LẬP</h4><p contenteditable="true"></p></div>
@@ -963,6 +964,7 @@ async function generatePrintableViewByRoom() {
                     <tbody><tr>${tableBodyHtml}</tr></tbody>
                 </table>
                 <div class="footer-container">
+                    <div class="signature-block"><h4 contenteditable="true">PHÒNG QTCSVC & ĐT</h4><p contenteditable="true"></p></div>
                     <div class="signature-block"><h4 contenteditable="true">BAN CHỦ NHIỆM KHOA</h4><p contenteditable="true"></p></div>
                     <div class="signature-block"><h4 contenteditable="true">TỔ BỘ MÔN</h4><p contenteditable="true"></p></div>
                     <div class="signature-block"><h4 contenteditable="true">NGƯỜI LẬP</h4><p contenteditable="true"></p></div>
@@ -1080,6 +1082,7 @@ async function generatePrintableViewByLecturer() {
                         <tbody>${tableBodyHtml}</tbody>
                     </table>
                     <div class="footer-container">
+                        <div class="signature-block"><h4 contenteditable="true">PHÒNG QTCSVC & ĐT</h4><p contenteditable="true"></p></div>  
                         <div class="signature-block"><h4 contenteditable="true">BAN CHỦ NHIỆM KHOA</h4><p contenteditable="true"></p></div>
                         <div class="signature-block"><h4 contenteditable="true">TỔ BỘ MÔN</h4><p contenteditable="true"></p></div>
                         <div class="signature-block"><h4 contenteditable="true">NGƯỜI LẬP</h4><p contenteditable="true"></p></div>
