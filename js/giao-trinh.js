@@ -5,10 +5,9 @@
 // NEW FEATURE: Added ability to edit subject information (name, code).
 
 // Import Firebase modules
-import { auth, db, storage, appId } from './portal-config.js';
+import { auth, db, appId } from './portal-config.js';
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import { getFirestore, collection, onSnapshot, addDoc, deleteDoc, query, where, doc, serverTimestamp, getDoc, setDoc, increment, getDocs, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
 /**
  * Injects all necessary CSS styles into the document's head.
@@ -59,15 +58,6 @@ let documentsUnsubscribe = null;
 let subjectsUnsubscribe = null;
 
 // --- Helper Functions ---
-function formatBytes(bytes, decimals = 2) {
-    if (!+bytes) return '0 Bytes';
-    const k = 1024;
-    const dm = decimals < 0 ? 0 : decimals;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
-}
-
 // --- Custom Modal Logic ---
 function showAlert(message) {
     const modal = document.getElementById('alert-modal');
@@ -292,11 +282,7 @@ function renderDocumentsList() {
             if (uploadedDate < fiveYearsAgo) isOld = true;
         }
 
-        let fileIcon = 'fa-file';
-        if (docData.fileType?.startsWith('image/')) fileIcon = 'fa-file-image';
-        if (docData.fileType === 'application/pdf') fileIcon = 'fa-file-pdf';
-        if (docData.fileType?.includes('word')) fileIcon = 'fa-file-word';
-        if (docData.fileType?.includes('excel')) fileIcon = 'fa-file-excel';
+        let fileIcon = 'fa-link';
 
         const notesHTML = docData.notes ? `
             <div class="mt-2 text-sm text-gray-600 bg-yellow-50 border-l-4 border-yellow-400 p-2 rounded-r-lg">
@@ -307,13 +293,13 @@ function renderDocumentsList() {
 
         docElement.innerHTML = `
             <div class="flex-grow">
-                <p class="font-semibold text-gray-800 flex items-center"><i class="fas ${fileIcon} mr-3 text-gray-500"></i>${docData.fileName}</p>
-                <p class="text-xs text-gray-500 mt-1">Ngày tải lên: ${dateString}${isOld ? `<span class="ml-3 text-red-600 font-bold"><i class="fas fa-exclamation-triangle mr-1"></i>Tài liệu cũ (trên 5 năm)</span>` : ''}</p>
+                <p class="font-semibold text-gray-800 flex items-center"><i class="fas ${fileIcon} mr-3 text-blue-500"></i>${docData.fileName}</p>
+                <p class="text-xs text-gray-500 mt-1">Ngày thêm: ${dateString}${isOld ? `<span class="ml-3 text-red-600 font-bold"><i class="fas fa-exclamation-triangle mr-1"></i>Tài liệu cũ (trên 5 năm)</span>` : ''}</p>
                 ${notesHTML}
             </div>
             <div class="flex items-center gap-3 flex-shrink-0 self-start md:self-center mt-2 md:mt-0">
-                <a href="${docData.downloadURL}" target="_blank" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg text-sm flex items-center gap-2"><i class="fas fa-download"></i> Tải về</a>
-                ${isAdmin ? `<button data-doc-id="${docData.id}" data-file-path="${docData.filePath}" class="delete-btn bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg text-sm flex items-center gap-2"><i class="fas fa-trash"></i> Xóa</button>` : ''}
+                <a href="${docData.downloadURL}" target="_blank" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg text-sm flex items-center gap-2"><i class="fas fa-external-link-alt"></i> Truy cập</a>
+                ${isAdmin ? `<button data-doc-id="${docData.id}" class="delete-btn bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg text-sm flex items-center gap-2"><i class="fas fa-trash"></i> Xóa</button>` : ''}
             </div>
         `;
         listContainer.appendChild(docElement);
@@ -378,11 +364,7 @@ function renderAllDocumentsAccordion() {
             
             const uploadedDate = docData.uploadedAt?.toDate();
             const dateString = uploadedDate ? uploadedDate.toLocaleDateString('vi-VN') : 'Không rõ ngày';
-            let fileIcon = 'fa-file';
-            if (docData.fileType?.startsWith('image/')) fileIcon = 'fa-file-image';
-            if (docData.fileType === 'application/pdf') fileIcon = 'fa-file-pdf';
-            if (docData.fileType?.includes('word')) fileIcon = 'fa-file-word';
-            if (docData.fileType?.includes('excel')) fileIcon = 'fa-file-excel';
+            let fileIcon = 'fa-link';
 
              const notesHTML = docData.notes ? `
                 <p class="text-xs text-gray-500 mt-1 italic">Ghi chú: ${docData.notes.substring(0, 100)}${docData.notes.length > 100 ? '...' : ''}</p>
@@ -390,13 +372,13 @@ function renderAllDocumentsAccordion() {
 
             docElement.innerHTML = `
                 <div class="flex-grow">
-                    <p class="font-medium text-gray-800 flex items-center text-sm"><i class="fas ${fileIcon} mr-2 text-gray-500"></i>${docData.fileName}</p>
-                    <p class="text-xs text-gray-500 mt-1">Ngày tải lên: ${dateString} | Kích thước: ${formatBytes(docData.fileSize)}</p>
+                    <p class="font-medium text-gray-800 flex items-center text-sm"><i class="fas ${fileIcon} mr-2 text-blue-500"></i>${docData.fileName}</p>
+                    <p class="text-xs text-gray-500 mt-1">Ngày thêm: ${dateString}</p>
                     ${notesHTML}
                 </div>
                 <div class="flex items-center gap-2 flex-shrink-0">
-                    <a href="${docData.downloadURL}" target="_blank" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-1 px-3 rounded-lg text-xs flex items-center gap-1.5"><i class="fas fa-download"></i> Tải về</a>
-                    ${isAdmin ? `<button data-doc-id="${docData.id}" data-file-path="${docData.filePath}" class="delete-btn bg-red-500 hover:bg-red-600 text-white font-bold py-1 px-3 rounded-lg text-xs flex items-center gap-1.5"><i class="fas fa-trash"></i> Xóa</button>` : ''}
+                    <a href="${docData.downloadURL}" target="_blank" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-1 px-3 rounded-lg text-xs flex items-center gap-1.5"><i class="fas fa-external-link-alt"></i> Truy cập</a>
+                    ${isAdmin ? `<button data-doc-id="${docData.id}" class="delete-btn bg-red-500 hover:bg-red-600 text-white font-bold py-1 px-3 rounded-lg text-xs flex items-center gap-1.5"><i class="fas fa-trash"></i> Xóa</button>` : ''}
                 </div>
             `;
             contentContainer.appendChild(docElement);
@@ -460,46 +442,7 @@ function fetchInitialData() {
         showAlert("Không thể tải danh sách khoa.");
     });
     
-    listenToStorageUsage();
     fetchAllDocuments();
-}
-
-function listenToStorageUsage() {
-    const storageMetadataRef = doc(storageMetadataCol, 'main_bucket');
-    onSnapshot(storageMetadataRef, (docSnap) => {
-        const usedStorageEl = document.getElementById('used-storage');
-        const totalStorageEl = document.getElementById('total-storage');
-        const remainingStorageEl = document.getElementById('remaining-storage');
-        const storageProgressBar = document.getElementById('storage-progress-bar');
-        
-        const FREE_QUOTA_BYTES = 5 * 1024 * 1024 * 1024; // 5GB
-        let usedBytes = 0;
-
-        if (docSnap.exists()) {
-            usedBytes = docSnap.data().totalSizeInBytes || 0;
-        }
-
-        const remainingBytes = FREE_QUOTA_BYTES - usedBytes;
-        const percentageUsed = (usedBytes / FREE_QUOTA_BYTES) * 100;
-
-        usedStorageEl.textContent = formatBytes(usedBytes);
-        totalStorageEl.textContent = formatBytes(FREE_QUOTA_BYTES);
-        remainingStorageEl.textContent = formatBytes(remainingBytes);
-        storageProgressBar.style.width = `${percentageUsed}%`;
-
-        if (percentageUsed > 90) {
-            storageProgressBar.classList.remove('bg-green-600', 'bg-yellow-500');
-            storageProgressBar.classList.add('bg-red-600');
-        } else if (percentageUsed > 70) {
-            storageProgressBar.classList.remove('bg-green-600', 'bg-red-600');
-            storageProgressBar.classList.add('bg-yellow-500');
-        } else {
-            storageProgressBar.classList.remove('bg-yellow-500', 'bg-red-600');
-            storageProgressBar.classList.add('bg-green-600');
-        }
-    }, (error) => {
-        console.error("Error listening to storage metadata:", error);
-    });
 }
 
 
@@ -547,112 +490,64 @@ function fetchDocumentsForSubject(subjectId) {
 async function handleUpload(event) {
     event.preventDefault();
     const subjectId = document.getElementById('upload-subject-id').value;
-    const fileInput = document.getElementById('file-input');
+    const documentName = document.getElementById('document-name').value.trim();
+    const documentUrl = document.getElementById('document-url').value.trim();
     const notesInput = document.getElementById('file-notes'); // New
     const uploadBtn = document.getElementById('upload-btn');
-    const progressBarContainer = document.getElementById('upload-progress-bar');
-    const progressBar = document.getElementById('upload-progress');
 
     if (!subjectId) {
-        showAlert("Vui lòng chọn môn học trước khi tải lên.");
+        showAlert("Vui lòng chọn môn học trước khi thêm.");
         return;
     }
-    if (fileInput.files.length === 0) {
-        showAlert("Vui lòng chọn một file để tải lên.");
+    if (!documentName || !documentUrl) {
+        showAlert("Vui lòng nhập tên tài liệu và đường dẫn.");
         return;
     }
 
-    const file = fileInput.files[0];
     const notes = notesInput.value.trim(); // New
-    const fileSize = file.size;
-    const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024; // 20MB
-    const FREE_QUOTA_BYTES = 5 * 1024 * 1024 * 1024; // 5GB
 
-    if (fileSize > MAX_FILE_SIZE_BYTES) {
-        showAlert('Kích thước tệp không được vượt quá 20MB.');
-        fileInput.value = '';
-        return;
-    }
-    
-    setButtonLoading(uploadBtn, true, `<i class="fas fa-upload"></i> Tải lên`);
+    setButtonLoading(uploadBtn, true, `<i class="fas fa-link"></i> Thêm tài liệu`);
 
     try {
         const selectedSubject = state.subjects.find(s => s.id === subjectId);
         if (!selectedSubject) {
             showAlert("Môn học đã chọn không hợp lệ.");
-            setButtonLoading(uploadBtn, false, `<i class="fas fa-upload"></i> Tải lên`);
+            setButtonLoading(uploadBtn, false, `<i class="fas fa-link"></i> Thêm tài liệu`);
             return;
         }
         const facultyId = selectedSubject.facultyId || 'unknown_faculty';
 
-        const q = query(syllabusCol, where("subjectId", "==", subjectId), where("fileName", "==", file.name));
+        const q = query(syllabusCol, where("subjectId", "==", subjectId), where("fileName", "==", documentName));
         const querySnapshot = await getDocs(q);
         if (!querySnapshot.empty) {
-            showAlert(`Tên tệp "${file.name}" đã tồn tại trong môn học này. Vui lòng đổi tên tệp hoặc xóa tệp cũ.`);
-            setButtonLoading(uploadBtn, false, `<i class="fas fa-upload"></i> Tải lên`);
+            showAlert(`Tên tài liệu "${documentName}" đã tồn tại trong môn học này.`);
+            setButtonLoading(uploadBtn, false, `<i class="fas fa-link"></i> Thêm tài liệu`);
             return;
         }
 
-        const storageMetadataRef = doc(storageMetadataCol, 'main_bucket');
-        const metadataDoc = await getDoc(storageMetadataRef);
-        const currentTotalSize = metadataDoc.exists() ? metadataDoc.data().totalSizeInBytes : 0;
+        await addDoc(syllabusCol, {
+            facultyId, subjectId,
+            fileName: documentName, 
+            downloadURL: documentUrl,
+            notes: notes,
+            uploadedAt: serverTimestamp(),
+            uploaderUid: state.currentUser.uid, uploaderEmail: state.currentUser.email,
+        });
 
-        if (currentTotalSize + fileSize > FREE_QUOTA_BYTES) {
-            showAlert('Dung lượng lưu trữ đã đầy (vượt quá 5GB miễn phí). Vui lòng xóa bớt tài liệu cũ trước khi tải lên file mới.');
-            setButtonLoading(uploadBtn, false, `<i class="fas fa-upload"></i> Tải lên`);
-            return;
-        }
-
-        const filePath = `giao_trinh/${facultyId}/${subjectId}/${Date.now()}_${file.name}`;
-        const storageRef = ref(storage, filePath);
-
-        progressBarContainer.style.display = 'block';
-        progressBar.style.width = '0%';
-
-        const uploadTask = uploadBytesResumable(storageRef, file);
-
-        uploadTask.on('state_changed', 
-            (snapshot) => {
-                const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                progressBar.style.width = progress + '%';
-            }, 
-            (error) => {
-                console.error("Upload failed:", error);
-                showAlert(`Tải lên thất bại: ${error.message}`);
-                setButtonLoading(uploadBtn, false, `<i class="fas fa-upload"></i> Tải lên`);
-                progressBarContainer.style.display = 'none';
-            }, 
-            async () => {
-                const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-                
-                await addDoc(syllabusCol, {
-                    facultyId, subjectId,
-                    fileName: file.name, fileType: file.type, filePath, downloadURL, fileSize,
-                    notes: notes, // New
-                    uploadedAt: serverTimestamp(),
-                    uploaderUid: state.currentUser.uid, uploaderEmail: state.currentUser.email,
-                });
-
-                await setDoc(storageMetadataRef, { totalSizeInBytes: increment(fileSize) }, { merge: true });
-
-                showAlert("Tải lên tài liệu thành công!");
-                setButtonLoading(uploadBtn, false, `<i class="fas fa-upload"></i> Tải lên`);
-                progressBarContainer.style.display = 'none';
-                document.getElementById('upload-form').reset();
-                document.getElementById('upload-subject-id').value = '';
-            }
-        );
+        showAlert("Thêm tài liệu thành công!");
+        setButtonLoading(uploadBtn, false, `<i class="fas fa-link"></i> Thêm tài liệu`);
+        document.getElementById('upload-form').reset();
+        document.getElementById('upload-subject-id').value = '';
     } catch (error) {
-        console.error("Error during upload pre-check:", error);
-        showAlert("Đã có lỗi xảy ra khi kiểm tra tệp. Vui lòng thử lại.");
-        setButtonLoading(uploadBtn, false, `<i class="fas fa-upload"></i> Tải lên`);
+        console.error("Error during upload:", error);
+        showAlert("Đã có lỗi xảy ra. Vui lòng thử lại.");
+        setButtonLoading(uploadBtn, false, `<i class="fas fa-link"></i> Thêm tài liệu`);
     }
 }
 
 async function handleDelete(event) {
     const button = event.currentTarget;
     const docId = button.dataset.docId;
-    const filePath = button.dataset.filePath;
     const originalButtonHtml = button.innerHTML;
 
     if (!await showConfirm('Bạn có chắc chắn muốn xóa tài liệu này không? Hành động này không thể hoàn tác.')) return;
@@ -665,15 +560,8 @@ async function handleDelete(event) {
 
         if (!docSnap.exists()) throw new Error("Không tìm thấy thông tin tài liệu trong database.");
         
-        const fileSize = docSnap.data().fileSize || 0;
-        const fileRef = ref(storage, filePath);
-        await deleteObject(fileRef);
         await deleteDoc(docRef);
         
-        if (fileSize > 0) {
-            const storageMetadataRef = doc(storageMetadataCol, 'main_bucket');
-            await setDoc(storageMetadataRef, { totalSizeInBytes: increment(-fileSize) }, { merge: true });
-        }
         showAlert("Xóa tài liệu thành công!");
     } catch (error) {
         console.error("Error deleting document:", error);
@@ -850,21 +738,9 @@ async function handleDeleteSubject(subjectIds) {
         try {
             const docsToDeleteQuery = query(syllabusCol, where("subjectId", "==", subjectId));
             const docsSnapshot = await getDocs(docsToDeleteQuery);
-            let totalFileSizeDeleted = 0;
 
             for (const docSnap of docsSnapshot.docs) {
-                const { filePath, fileSize = 0 } = docSnap.data();
-                try {
-                    if (filePath) await deleteObject(ref(storage, filePath));
-                    totalFileSizeDeleted += fileSize;
-                } catch (storageError) {
-                    console.warn(`Could not delete file ${filePath} from storage:`, storageError);
-                }
                 await deleteDoc(doc(syllabusCol, docSnap.id));
-            }
-
-            if (totalFileSizeDeleted > 0) {
-                await setDoc(doc(storageMetadataCol, 'main_bucket'), { totalSizeInBytes: increment(-totalFileSizeDeleted) }, { merge: true });
             }
 
             await deleteDoc(doc(curriculumSubjectsCol, subjectId));
