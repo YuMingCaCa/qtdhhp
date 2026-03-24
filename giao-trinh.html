@@ -50,22 +50,7 @@
 
                 <!-- Admin Panel: Upload Section -->
                 <div id="admin-panel" class="admin-only mb-6 p-4 border-2 border-dashed rounded-lg bg-gray-50 hidden">
-                    <h3 class="text-lg font-bold text-gray-700 mb-2">Tải lên tài liệu mới</h3>
-                    <!-- Storage Stats Section -->
-                    <div id="storage-stats" class="mb-4 p-3 bg-gray-100 rounded-lg text-sm">
-                        <div class="flex justify-between items-center mb-1">
-                            <span class="font-semibold">Dung lượng lưu trữ</span>
-                            <span>
-                                <span id="used-storage">0 B</span> / <span id="total-storage">5 GB</span>
-                            </span>
-                        </div>
-                        <div class="w-full bg-gray-200 rounded-full h-2.5">
-                            <div id="storage-progress-bar" class="bg-green-600 h-2.5 rounded-full transition-all duration-500" style="width: 0%"></div>
-                        </div>
-                        <div class="text-right text-xs mt-1 text-gray-500">
-                            Còn lại: <span id="remaining-storage">5 GB</span>
-                        </div>
-                    </div>
+                    <h3 class="text-lg font-bold text-gray-700 mb-2">Thêm liên kết tài liệu mới</h3>
                     <form id="upload-form" class="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
                         <div>
                             <label for="upload-search-subject-input" class="block text-sm font-medium text-gray-700 mb-1">Chọn Môn học</label>
@@ -78,8 +63,12 @@
                             <input type="hidden" id="upload-subject-id">
                         </div>
                         <div>
-                            <label for="file-input" class="block text-sm font-medium text-gray-700 mb-1">Chọn File</label>
-                            <input type="file" id="file-input" required class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100">
+                            <label for="document-name" class="block text-sm font-medium text-gray-700 mb-1">Tên tài liệu</label>
+                            <input type="text" id="document-name" required placeholder="VD: Giáo trình C++" class="w-full p-2 border border-gray-300 rounded-lg shadow-sm focus:ring-orange-500 focus:border-orange-500">
+                        </div>
+                        <div class="col-span-full">
+                            <label for="document-url" class="block text-sm font-medium text-gray-700 mb-1">Đường dẫn (Link Google Drive, OneDrive...)</label>
+                            <input type="url" id="document-url" required placeholder="https://..." class="w-full p-2 border border-gray-300 rounded-lg shadow-sm focus:ring-orange-500 focus:border-orange-500">
                         </div>
                         <div class="col-span-full">
                             <label for="file-notes" class="block text-sm font-medium text-gray-700 mb-1">Ghi chú (tùy chọn)</label>
@@ -87,13 +76,10 @@
                         </div>
                         <div class="md:self-end col-span-full">
                             <button type="submit" id="upload-btn" class="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded-lg shadow-md flex items-center justify-center gap-2">
-                                <i class="fas fa-upload"></i> Tải lên
+                                <i class="fas fa-link"></i> Thêm tài liệu
                             </button>
                         </div>
                     </form>
-                    <div id="upload-progress-bar" class="w-full bg-gray-200 rounded-full h-2.5 mt-4 hidden">
-                        <div id="upload-progress" class="bg-orange-600 h-2.5 rounded-full" style="width: 0%"></div>
-                    </div>
                 </div>
 
                 <!-- Admin Panel: Subject Management Section -->
